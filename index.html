@@ -1684,8 +1684,8 @@ html{height:-webkit-fill-available;}
         <div style="font-size:11px;color:var(--ink3);margin-top:4px;">Stock is tracked in <strong id="containerTrackingUnit">ml</strong>. When restocking, you can add by bottles or by ml.</div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label class="form-label">Price per Unit (₱)</label><input class="form-input" id="apPrice" type="number" placeholder="0.00" min="0"></div>
-        <div class="form-group"><label class="form-label">Cost per Unit (₱)</label><input class="form-input" id="apCost" type="number" placeholder="0.00" min="0"></div>
+        <div class="form-group"><label class="form-label">Price per Unit (₱)</label><input class="form-input" id="apPrice" type="number" placeholder="0.00" min="0" oninput="updateProfitCalc()"></div>
+        <div class="form-group"><label class="form-label">Cost per Unit (₱) <span style="color:var(--gold-dk);font-size:10px;">← auto from consumables</span></label><input class="form-input" id="apCost" type="number" placeholder="0.00" min="0"></div>
       </div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Current Stock</label><input class="form-input" id="apStock" type="number" placeholder="0" min="0"></div>
@@ -1713,12 +1713,39 @@ html{height:-webkit-fill-available;}
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
           <div>
             <div style="font-size:12px;font-weight:600;color:var(--ink);margin-bottom:2px;">🧪 Consumables Used Per Session</div>
-            <div style="font-size:11px;color:var(--ink3);">These inventory items will auto-deduct when this service is sold at POS.</div>
+            <div style="font-size:11px;color:var(--ink3);">These inventory items auto-deduct when this service is sold. Cost is calculated automatically.</div>
           </div>
           <button type="button" class="btn btn-outline btn-sm" onclick="addConsumableRow()">+ Add</button>
         </div>
         <div id="consumablesList" style="display:flex;flex-direction:column;gap:8px;"></div>
         <div id="consumablesEmpty" style="font-size:12px;color:var(--ink4);padding:8px 0;">No consumables linked yet — tap + Add to link an inventory item.</div>
+
+        <!-- Live Profit Calculator -->
+        <div id="profitCalcWrap" style="display:none;margin-top:12px;background:linear-gradient(135deg,#FDFAF6,#F5EFE3);border:1.5px solid var(--gold);border-radius:12px;padding:14px 16px;">
+          <div style="font-size:10px;font-weight:700;color:var(--gold-dk);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">💰 Profit Calculator</div>
+          <div id="profitCalcRows" style="display:flex;flex-direction:column;gap:5px;margin-bottom:10px;"></div>
+          <div style="border-top:1px dashed rgba(184,147,90,0.3);padding-top:10px;display:flex;flex-direction:column;gap:6px;">
+            <div style="display:flex;justify-content:space-between;font-size:13px;">
+              <span style="color:var(--ink3);">Total Consumable Cost</span>
+              <span style="font-weight:600;color:var(--danger);" id="pcTotalCost">₱0.00</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:13px;">
+              <span style="color:var(--ink3);">Service Price</span>
+              <span style="font-weight:600;color:var(--ink);" id="pcPrice">₱0.00</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:700;border-top:1px solid rgba(184,147,90,0.3);padding-top:8px;margin-top:2px;">
+              <span style="color:var(--ink);">Profit per Session</span>
+              <span id="pcProfit" style="color:var(--success);">₱0.00</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;">
+              <span style="color:var(--ink4);">Margin</span>
+              <span id="pcMargin" style="color:var(--ink3);">0%</span>
+            </div>
+          </div>
+          <button type="button" class="btn btn-gold btn-sm" onclick="applyCalcCost()" style="width:100%;margin-top:10px;font-size:12px;">
+            ↓ Apply Cost to Service (₱<span id="pcApplyAmt">0</span>)
+          </button>
+        </div>
       </div>
       <!-- Add-ons Section -->
       <div style="border-top:1px solid var(--border2);padding-top:14px;margin-top:4px;">
@@ -2535,7 +2562,7 @@ let S = {
   ],
   products:[
     // ── NAIL SERVICES ──
-    {id:101,name:'Regular Nails',cat:'Nail Services',subcat:'Nails',unit:'sessions',price:249,cost:0,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
+    {id:101,name:'Regular Manicure/Pedicure',cat:'Nail Services',subcat:'Manicure',unit:'sessions',price:249,cost:114.89,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
     {id:102,name:'Gel Polish',cat:'Nail Services',subcat:'Nails',unit:'sessions',price:399,cost:115.33,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
     {id:103,name:'Signature Manicure',cat:'Nail Services',subcat:'Manicure',unit:'sessions',price:299,cost:118.12,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
     {id:104,name:'Signature Pedicure',cat:'Nail Services',subcat:'Pedicure',unit:'sessions',price:349,cost:118.41,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
@@ -2543,32 +2570,32 @@ let S = {
     {id:106,name:'Foot Spa',cat:'Nail Services',subcat:'Spa',unit:'sessions',price:499,cost:135.14,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
     // Add-ons
     {id:107,name:'Jelly Add-on',cat:'Nail Services',subcat:'Add-ons',unit:'sessions',price:150,cost:18.33,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
-    {id:108,name:'Paraffin V Add-on',cat:'Nail Services',subcat:'Add-ons',unit:'sessions',price:120,cost:16,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
+    {id:108,name:'Paraffin Wax',cat:'Nail Services',subcat:'Add-ons',unit:'sessions',price:120,cost:16,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
     {id:109,name:'Heel Repair Add-on',cat:'Nail Services',subcat:'Add-ons',unit:'sessions',price:149,cost:24.9,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
     // ── WAXING ──
     {id:201,name:'Underarm Wax',cat:'Waxing',subcat:'',unit:'sessions',price:300,cost:116.57,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
-    {id:202,name:'Upper Lip Wax',cat:'Waxing',subcat:'',unit:'sessions',price:200,cost:117.2,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
+    {id:202,name:'Upper Lip Wax',cat:'Waxing',subcat:'',unit:'sessions',price:200,cost:112.57,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
     {id:203,name:'Half Arms Wax',cat:'Waxing',subcat:'',unit:'sessions',price:350,cost:120.57,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
-    {id:204,name:'Full Arms Wax',cat:'Waxing',subcat:'',unit:'sessions',price:500,cost:120.63,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
+    {id:204,name:'Full Arms Wax',cat:'Waxing',subcat:'',unit:'sessions',price:500,cost:130.57,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
     {id:205,name:'Half Legs Wax',cat:'Waxing',subcat:'',unit:'sessions',price:500,cost:140.57,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
     {id:206,name:'Full Legs Wax',cat:'Waxing',subcat:'',unit:'sessions',price:800,cost:160.57,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
     {id:207,name:'Bikini Line Wax',cat:'Waxing',subcat:'',unit:'sessions',price:500,cost:128.57,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
     {id:208,name:'Brazilian Wax',cat:'Waxing',subcat:'',unit:'sessions',price:900,cost:140.57,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
     // ── FACIALS ──
-    {id:301,name:'Regular Facial',cat:'Facial Treatments',subcat:'Signature',unit:'sessions',price:999,cost:191.04,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
-    {id:302,name:'Whitening Facial',cat:'Facial Treatments',subcat:'Brightening',unit:'sessions',price:999,cost:191.04,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
-    {id:303,name:'Anti-Acne Facial',cat:'Facial Treatments',subcat:'Acne Control',unit:'sessions',price:999,cost:191.05,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
-    {id:304,name:'Anti-Ageing Facial',cat:'Facial Treatments',subcat:'Anti-Ageing',unit:'sessions',price:1099,cost:191.16,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
-    {id:305,name:'Moisturising Facial',cat:'Facial Treatments',subcat:'Moisturising',unit:'sessions',price:999,cost:191.05,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
-    {id:306,name:'HydraFacial',cat:'Facial Treatments',subcat:'HydraFacial',unit:'sessions',price:2000,cost:181.57,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
+    {id:301,name:'Regular Facial',cat:'Facial Treatments',subcat:'Signature',unit:'sessions',price:699,cost:126.71,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
+    {id:302,name:'Whitening Facial',cat:'Facial Treatments',subcat:'Brightening',unit:'sessions',price:699,cost:191.04,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
+    {id:303,name:'Anti-Acne Facial',cat:'Facial Treatments',subcat:'Acne Control',unit:'sessions',price:999,cost:179.91,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
+    {id:304,name:'Moisturising Facial',cat:'Facial Treatments',subcat:'Moisturising',unit:'sessions',price:899,cost:191.05,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
+    {id:305,name:'Anti-Ageing Facial',cat:'Facial Treatments',subcat:'Anti-Ageing',unit:'sessions',price:1099,cost:191.16,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
+    {id:306,name:'HydraFacial',cat:'Facial Treatments',subcat:'HydraFacial',unit:'sessions',price:999,cost:181.57,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
     // ── LASER HAIR REMOVAL ──
-    {id:401,name:'Laser Hair Removal — Face',cat:'Laser Treatments',subcat:'Laser Hair Removal',unit:'sessions',price:800,cost:120,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
-    {id:402,name:'Laser Hair Removal — Underarm',cat:'Laser Treatments',subcat:'Laser Hair Removal',unit:'sessions',price:2000,cost:125.82,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
+    {id:401,name:'Laser Hair Removal — Upper Lip',cat:'Laser Treatments',subcat:'Laser Hair Removal',unit:'sessions',price:800,cost:119.58,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
+    {id:402,name:'Laser Hair Removal — Underarm',cat:'Laser Treatments',subcat:'Laser Hair Removal',unit:'sessions',price:1200,cost:125.82,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
     {id:403,name:'Laser Hair Removal — Half Arms',cat:'Laser Treatments',subcat:'Laser Hair Removal',unit:'sessions',price:2000,cost:134.35,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
     {id:404,name:'Laser Hair Removal — Full Arms',cat:'Laser Treatments',subcat:'Laser Hair Removal',unit:'sessions',price:3000,cost:142.85,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
     {id:405,name:'Laser Hair Removal — Half Legs',cat:'Laser Treatments',subcat:'Laser Hair Removal',unit:'sessions',price:3000,cost:147.34,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
-    {id:406,name:'Laser Hair Removal — Full Legs',cat:'Laser Treatments',subcat:'Laser Hair Removal',unit:'sessions',price:4800,cost:160.98,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
-    {id:407,name:'Laser Hair Removal — Bikini',cat:'Laser Treatments',subcat:'Laser Hair Removal',unit:'sessions',price:3000,cost:135.1,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
+    {id:406,name:'Laser Hair Removal — Full Legs',cat:'Laser Treatments',subcat:'Laser Hair Removal',unit:'sessions',price:4800,cost:160.57,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
+    {id:407,name:'Laser Hair Removal — Bikini Line',cat:'Laser Treatments',subcat:'Laser Hair Removal',unit:'sessions',price:3000,cost:135.1,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
     {id:408,name:'Laser Hair Removal — Brazilian',cat:'Laser Treatments',subcat:'Laser Hair Removal',unit:'sessions',price:3800,cost:143.59,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
     // ── CARBON LASER ──
     {id:501,name:'Carbon Laser — Face',cat:'Laser Treatments',subcat:'Carbon Laser',unit:'sessions',price:1000,cost:134.15,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
@@ -2578,10 +2605,10 @@ let S = {
     {id:505,name:'Carbon Laser — Butt',cat:'Laser Treatments',subcat:'Carbon Laser',unit:'sessions',price:1400,cost:137.16,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
     // ── EXILIS ──
     {id:601,name:'Exilis — Face',cat:'Body Contouring',subcat:'Exilis',unit:'sessions',price:1800,cost:138.62,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
-    {id:602,name:'Exilis — Double Chin',cat:'Body Contouring',subcat:'Exilis',unit:'sessions',price:1500,cost:138.21,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
+    {id:602,name:'Exilis — Double Chin',cat:'Body Contouring',subcat:'Exilis',unit:'sessions',price:1500,cost:142.1,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
     {id:603,name:'Exilis — Arms',cat:'Body Contouring',subcat:'Exilis',unit:'sessions',price:2000,cost:141.1,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
-    {id:604,name:'Exilis — Tummy',cat:'Body Contouring',subcat:'Exilis',unit:'sessions',price:2800,cost:141.25,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
-    {id:605,name:'Exilis — Back',cat:'Body Contouring',subcat:'Exilis',unit:'sessions',price:2800,cost:141.88,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
+    {id:604,name:'Exilis — Back',cat:'Body Contouring',subcat:'Exilis',unit:'sessions',price:2500,cost:141.52,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
+    {id:605,name:'Exilis — Tummy',cat:'Body Contouring',subcat:'Exilis',unit:'sessions',price:2800,cost:141.25,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
     {id:606,name:'Exilis — Thighs',cat:'Body Contouring',subcat:'Exilis',unit:'sessions',price:3000,cost:144,stock:999,lowAt:0,notes:'',inPOS:true,consumables:[],addons:[]},
   ],
   packages:[
@@ -5078,66 +5105,68 @@ function renderByService(){
 
 function renderServiceRows(items){
   if(!items.length)return'';
-  return `<table class="inv-table" style="width:100%;margin-bottom:12px;">
-    <thead><tr><th>Service Name</th><th>Price</th><th>Cost</th><th>Profit</th><th>Add-ons</th><th>Actions</th></tr></thead>
-    <tbody>${items.map(p=>{
-      const profit=p.price-(p.cost||0);
-      const margin=p.price>0?Math.round(profit/p.price*100):0;
-      const addons=p.addons&&p.addons.length?p.addons.map(a=>a.name).join(', '):'—';
-      const hasConsumables=p.consumables&&p.consumables.length>0;
-      const consumableRows=hasConsumables?p.consumables.map(c=>{
+  let rows='';
+  items.forEach(p=>{
+    const profit=p.price-(p.cost||0);
+    const margin=p.price>0?Math.round(profit/p.price*100):0;
+    const addons=p.addons&&p.addons.length?p.addons.map(a=>a.name).join(', '):'—';
+    const hasConsumables=p.consumables&&p.consumables.length>0;
+    rows+=`<tr style="cursor:${hasConsumables?'pointer':'default'};" onclick="${hasConsumables?'toggleConsumableRows('+p.id+')':''}">
+      <td>
+        <div style="display:flex;align-items:center;gap:8px;">
+          ${hasConsumables?`<span id="csArrow_${p.id}" style="color:var(--gold-dk);font-size:12px;transition:transform .2s;display:inline-block;">▸</span>`:'<span style="width:16px;display:inline-block;"></span>'}
+          <div>
+            <div style="font-weight:500;font-size:13px;">${p.name}</div>
+            ${p.notes?`<div style="font-size:10px;color:var(--ink3);">${p.notes}</div>`:''}
+            ${hasConsumables?`<div style="font-size:10px;color:var(--gold-dk);">📦 ${p.consumables.length} consumable${p.consumables.length!==1?'s':''} — click to view</div>`:''}
+          </div>
+        </div>
+      </td>
+      <td style="font-weight:600;">${fmtPrice(p.price)}</td>
+      <td style="font-size:12px;color:var(--ink3);">${p.cost?fmtPrice(p.cost):'—'}</td>
+      <td><span style="font-size:12px;font-weight:600;color:var(--success);">${fmtPrice(profit)}</span><span style="font-size:10px;color:var(--ink4);margin-left:4px;">${margin}%</span></td>
+      <td style="font-size:11px;color:var(--ink3);max-width:160px;">${addons}</td>
+      <td onclick="event.stopPropagation()"><div style="display:flex;gap:5px;">
+        <button class="btn btn-outline btn-sm" onclick="editProd(${p.id})">Edit</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteProd(${p.id})">✕</button>
+      </div></td>
+    </tr>`;
+    if(hasConsumables){
+      p.consumables.forEach(c=>{
         const prod=S.products.find(x=>x.id===c.productId||x.name===c.name);
         const stock=prod?prod.stock:0;
-        const unit=prod?prod.unit:c.unit||'units';
+        const unit=prod?prod.unit:(c.unit||'units');
         const sessions=c.qty>0?Math.floor(stock/c.qty):0;
         const statusColor=stock===0?'var(--danger)':sessions<=3?'var(--warn)':'var(--success)';
-        const statusText=stock===0?'Out of stock':sessions<=3?`Only ${sessions} sessions left`:`~${sessions} sessions`;
-        return `<tr style="background:var(--cream2);">
-          <td style="padding-left:32px;font-size:12px;">
-            <span style="color:var(--ink3);margin-right:6px;">↳</span>
-            <strong>${c.name||prod?.name||'Unknown'}</strong>
-            <span style="color:var(--ink4);margin-left:6px;">${c.qty} ${unit} per session</span>
-            ${prod?.containerSize?`<span style="color:var(--ink4);font-size:10px;margin-left:6px;">(1 container = ${prod.containerSize} ${unit})</span>`:''}
+        const statusText=stock===0?'⚠ Out of stock':sessions<=3?'Only ~'+sessions+' sessions left':'~'+sessions+' sessions left';
+        rows+=`<tr class="csRow_${p.id}" style="display:none;background:var(--cream2);">
+          <td style="padding-left:40px;">
+            <div style="font-size:12px;font-weight:500;">↳ ${c.name||prod?.name||'Unknown'}</div>
+            <div style="font-size:10px;color:var(--ink4);">${c.qty} ${unit} per session${prod?.containerSize?' · 1 container = '+prod.containerSize+' '+unit:''}</div>
           </td>
           <td colspan="2"><span style="font-size:12px;font-weight:600;color:${statusColor};">● ${statusText}</span></td>
           <td><span style="font-size:11px;color:var(--ink3);">${stock} ${unit} in stock</span></td>
           <td></td>
-          <td><button class="btn btn-outline btn-sm" onclick="openRestock(${prod?.id||0})" ${!prod?'disabled':''}>Restock</button></td>
+          <td onclick="event.stopPropagation()"><button class="btn btn-outline btn-sm" onclick="openRestock(${prod?.id||0})" ${!prod?'disabled':''}>Restock</button></td>
         </tr>`;
-      }).join(''):'';
-      return `<tr style="cursor:${hasConsumables?'pointer':'default'};" onclick="${hasConsumables?`toggleConsumableRows(${p.id})`:''}">
-        <td>
-          <div style="display:flex;align-items:center;gap:8px;">
-            ${hasConsumables?`<span id="csArrow_${p.id}" style="color:var(--ink3);font-size:11px;transition:transform .2s;">▸</span>`:'<span style="width:16px;"></span>'}
-            <div>
-              <div style="font-weight:500;font-size:13px;">${p.name}</div>
-              ${p.notes?`<div style="font-size:10px;color:var(--ink3);">${p.notes}</div>`:''}
-              ${hasConsumables?`<div style="font-size:10px;color:var(--ink4);">${p.consumables.length} consumable${p.consumables.length!==1?'s':''}</div>`:''}
-            </div>
-          </div>
-        </td>
-        <td style="font-weight:600;">${fmtPrice(p.price)}</td>
-        <td style="font-size:12px;color:var(--ink3);">${p.cost?fmtPrice(p.cost):'—'}</td>
-        <td><span style="font-size:12px;font-weight:600;color:var(--success);">${fmtPrice(profit)}</span><span style="font-size:10px;color:var(--ink4);margin-left:4px;">${margin}%</span></td>
-        <td style="font-size:11px;color:var(--ink3);max-width:160px;">${addons}</td>
-        <td onclick="event.stopPropagation()"><div style="display:flex;gap:5px;">
-          <button class="btn btn-outline btn-sm" onclick="editProd(${p.id})">Edit</button>
-          <button class="btn btn-danger btn-sm" onclick="deleteProd(${p.id})">✕</button>
-        </div></td>
-      </tr>
-      <tbody id="csRows_${p.id}" style="display:none;">${consumableRows}</tbody>`;
-    }).join('')}</tbody>
+      });
+    }
+  });
+  return `<table class="inv-table" style="width:100%;margin-bottom:12px;">
+    <thead><tr><th>Service Name</th><th>Price</th><th>Cost</th><th>Profit</th><th>Add-ons</th><th>Actions</th></tr></thead>
+    <tbody>${rows}</tbody>
   </table>`;
 }
 
 function toggleConsumableRows(id){
-  const rows=document.getElementById('csRows_'+id);
+  const rows=document.querySelectorAll('.csRow_'+id);
   const arrow=document.getElementById('csArrow_'+id);
-  if(!rows)return;
-  const open=rows.style.display==='none'||rows.style.display==='';
-  rows.style.display=open?'table-row-group':'none';
-  if(arrow) arrow.style.transform=open?'rotate(90deg)':'rotate(0deg)';
+  if(!rows.length)return;
+  const isHidden=rows[0].style.display==='none'||rows[0].style.display==='';
+  rows.forEach(r=>r.style.display=isHidden?'table-row':'none');
+  if(arrow) arrow.style.transform=isHidden?'rotate(90deg)':'rotate(0deg)';
 }
+
 function openAddProd(){
   editProdId=null;
   document.getElementById('addProdTitle').textContent='Add Product / Service';
@@ -5383,23 +5412,45 @@ function renderConsumablesList(consumables){
   const list=document.getElementById('consumablesList');
   const empty=document.getElementById('consumablesEmpty');
   if(!list)return;
-  if(!consumables.length){list.innerHTML='';if(empty)empty.style.display='block';return;}
+  if(!consumables.length){
+    list.innerHTML='';
+    if(empty)empty.style.display='block';
+    updateProfitCalc();
+    return;
+  }
   if(empty)empty.style.display='none';
-  // Only show inventory items as options (not the current service itself)
-  const inventoryItems=S.products.filter(p=>p.unit==='ml'||p.unit==='g'||p.unit==='vials'||p.unit==='syringes'||p.unit==='pcs'||p.unit==='bottles'||p.unit==='boxes');
-  const opts=inventoryItems.map(p=>`<option value="${p.id}">${p.name} (${p.unit})</option>`).join('');
-  list.innerHTML=consumables.map((c,i)=>`
-    <div style="display:flex;align-items:center;gap:8px;background:var(--cream2);border:1px solid var(--border2);border-radius:9px;padding:8px 10px;">
-      <select class="form-select cons-item" data-idx="${i}" style="flex:2;font-size:12px;padding:6px 8px;">
-        <option value="">Select inventory item…</option>${opts}
-      </select>
-      <input type="number" class="form-input cons-qty" data-idx="${i}" value="${c.qty||''}" placeholder="Qty" min="0" step="0.1" style="flex:1;font-size:12px;padding:6px 8px;">
-      <select class="form-select cons-unit" data-idx="${i}" style="flex:1;font-size:12px;padding:6px 8px;">
-        <option value="ml">ml</option><option value="g">g</option><option value="vials">vials</option>
-        <option value="syringes">syringes</option><option value="pcs">pcs</option><option value="bottles">bottles</option>
-      </select>
-      <button type="button" onclick="removeConsumableRow(${i})" style="background:none;border:none;color:var(--danger);font-size:16px;cursor:pointer;padding:0 4px;flex-shrink:0;">✕</button>
-    </div>`).join('');
+  const inventoryItems=S.products.filter(p=>p.unit==='ml'||p.unit==='g'||p.unit==='vials'||p.unit==='syringes'||p.unit==='pcs'||p.unit==='bottles'||p.unit==='boxes'||p.unit==='sets');
+  const opts=inventoryItems.map(p=>`<option value="${p.id}">${p.name} (${p.unit}) — ₱${p.cost||0}/${p.unit}</option>`).join('');
+  list.innerHTML=consumables.map((c,i)=>{
+    const prod=inventoryItems.find(p=>p.id===c.productId);
+    const costPerUnit=prod?.cost||0;
+    const subtotal=costPerUnit*(c.qty||0);
+    return `<div style="display:flex;flex-direction:column;gap:6px;background:var(--cream2);border:1px solid var(--border2);border-radius:9px;padding:10px 12px;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <select class="form-select cons-item" data-idx="${i}" style="flex:2;font-size:12px;padding:6px 8px;" onchange="onConsumableChange()">
+          <option value="">Select inventory item…</option>${opts}
+        </select>
+        <button type="button" onclick="removeConsumableRow(${i})" style="background:none;border:none;color:var(--danger);font-size:16px;cursor:pointer;padding:0 4px;flex-shrink:0;">✕</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div style="flex:1;">
+          <label style="font-size:10px;color:var(--ink3);display:block;margin-bottom:3px;">Qty per session</label>
+          <input type="number" class="form-input cons-qty" data-idx="${i}" value="${c.qty||''}" placeholder="e.g. 2" min="0" step="0.1" style="font-size:13px;padding:6px 8px;" oninput="onConsumableChange()">
+        </div>
+        <div style="flex:1;">
+          <label style="font-size:10px;color:var(--ink3);display:block;margin-bottom:3px;">Unit</label>
+          <select class="form-select cons-unit" data-idx="${i}" style="font-size:12px;padding:6px 8px;" onchange="onConsumableChange()">
+            <option value="ml">ml</option><option value="g">g</option><option value="vials">vials</option>
+            <option value="syringes">syringes</option><option value="pcs">pcs</option><option value="bottles">bottles</option><option value="sets">sets</option>
+          </select>
+        </div>
+        <div style="flex:1;text-align:right;">
+          <div style="font-size:10px;color:var(--ink3);margin-bottom:3px;">Cost/unit: ₱${costPerUnit||'—'}</div>
+          <div class="cons-subtotal" data-idx="${i}" style="font-size:13px;font-weight:600;color:${subtotal>0?'var(--danger)':'var(--ink4)'};">${subtotal>0?'₱'+subtotal.toFixed(2):'₱0.00'}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
   // Set selected values
   consumables.forEach((c,i)=>{
     const itemSel=list.querySelector(`.cons-item[data-idx="${i}"]`);
@@ -5407,6 +5458,59 @@ function renderConsumablesList(consumables){
     if(itemSel) itemSel.value=c.productId||'';
     if(unitSel) unitSel.value=c.unit||'ml';
   });
+  updateProfitCalc();
+}
+
+function onConsumableChange(){
+  // Re-read current form state and re-render to update costs
+  const consumables=getConsumablesFromForm();
+  renderConsumablesList(consumables);
+}
+
+function updateProfitCalc(){
+  const wrap=document.getElementById('profitCalcWrap');
+  const rowsEl=document.getElementById('profitCalcRows');
+  if(!wrap||!rowsEl)return;
+  const consumables=getConsumablesFromForm();
+  if(!consumables.length){wrap.style.display='none';return;}
+  let totalCost=0;
+  const rows=consumables.map(c=>{
+    const prod=S.products.find(p=>p.id===c.productId);
+    if(!prod)return'';
+    const costPerUnit=prod.cost||0;
+    const subtotal=costPerUnit*c.qty;
+    totalCost+=subtotal;
+    return `<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink3);">
+      <span>↳ ${prod.name} × ${c.qty} ${c.unit}</span>
+      <span style="color:var(--danger);">₱${subtotal.toFixed(2)}</span>
+    </div>`;
+  }).join('');
+  const price=parseFloat(document.getElementById('apPrice')?.value)||0;
+  const profit=price-totalCost;
+  const margin=price>0?Math.round(profit/price*100):0;
+  rowsEl.innerHTML=rows;
+  document.getElementById('pcTotalCost').textContent='₱'+totalCost.toFixed(2);
+  document.getElementById('pcPrice').textContent='₱'+price.toFixed(2);
+  const profitEl=document.getElementById('pcProfit');
+  profitEl.textContent='₱'+profit.toFixed(2);
+  profitEl.style.color=profit>0?'var(--success)':'var(--danger)';
+  document.getElementById('pcMargin').textContent=margin+'%';
+  document.getElementById('pcApplyAmt').textContent=totalCost.toFixed(2);
+  wrap.style.display='block';
+}
+
+function applyCalcCost(){
+  const consumables=getConsumablesFromForm();
+  let totalCost=0;
+  consumables.forEach(c=>{
+    const prod=S.products.find(p=>p.id===c.productId);
+    if(prod) totalCost+=( prod.cost||0)*c.qty;
+  });
+  const costEl=document.getElementById('apCost');
+  if(costEl){
+    costEl.value=totalCost.toFixed(2);
+    showToast('Cost updated to ₱'+totalCost.toFixed(2),'ok');
+  }
 }
 
 function skipAddons(){
@@ -5444,7 +5548,10 @@ function getConsumablesFromForm(){
     const productId=itemSel?parseInt(itemSel.value)||null:null;
     const qty=qtyInp?parseFloat(qtyInp.value)||0:0;
     const unit=unitSel?unitSel.value:'ml';
-    if(productId&&qty>0) result.push({productId,qty,unit});
+    if(productId&&qty>0){
+      const prod=S.products.find(p=>p.id===productId);
+      result.push({productId,qty,unit,name:prod?.name||''});
+    }
   });
   return result;
 }
@@ -5589,8 +5696,23 @@ function renderUsersGrid(){
         <div style="font-size:11px;color:var(--ink3);">${u.specialty||'—'}</div>
         <span class="role-badge ${ROLE_CLASSES[u.role]||'role-staff'}" style="margin-top:4px;display:inline-block;">${ROLE_LABELS[u.role]||u.role}</span>
       </div>
-      ${canEdit?`<button class="btn btn-outline btn-sm" onclick="editUser(${u.id})">Edit</button>`:''}
+      ${canEdit?`<div style="display:flex;gap:6px;">
+        <button class="btn btn-outline btn-sm" onclick="editUser(${u.id})">Edit</button>
+        ${u.id!==currentUser.id?`<button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id})" title="Delete user">✕</button>`:'<span style="width:28px;"></span>'}
+      </div>`:''}
     </div>`).join('');
+}
+
+function deleteUser(id){
+  const u=S.users.find(x=>x.id===id);
+  if(!u)return;
+  if(u.role==='owner'&&S.users.filter(x=>x.role==='owner').length<=1){
+    showToast('Cannot delete the only owner account','err');return;
+  }
+  if(!confirm(`Delete ${u.name}? This cannot be undone.`))return;
+  S.users=S.users.filter(x=>x.id!==id);
+  sync('users');renderUsersGrid();populateForms();
+  showToast(u.name+' deleted','ok');
 }
 function openAddUser(){
   const canEdit=currentUser?.role==='owner'||currentUser?.role==='admin';
