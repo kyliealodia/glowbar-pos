@@ -186,7 +186,15 @@ try{
 }catch(e){ db = null; }
 
 // ── STATE ──
-let DATA = { products:[], packages:[], users:[], bookings:[], settings:null };
+let DATA = { products:[], packages:[], users:[], bookings:[], settings:{
+  openDays:[1,2,3,4,5,6],
+  openTime:'09:00',
+  closeTime:'19:00',
+  slotDuration:60,
+  maxStaff:2,
+  breakStart:'',
+  breakEnd:''
+}};
 let booking = { services:[], service:'', serviceId:null, servicePrice:0, staff:'', staffColor:'', date:'', time:'', name:'', phone:'', email:'', notes:'' };
 let calYear, calMonth;
 const TIMES = ['09:00','09:30','10:00','10:30','11:00','11:30','12:00','12:30','13:00','13:30','14:00','14:30','15:00','15:30','16:00','16:30','17:00','17:30','18:00'];
@@ -207,14 +215,14 @@ function show(html){ document.getElementById('mainContent').innerHTML=html; }
 const DEMO_DATA = {
   products:[
     // NAIL SERVICES
-    {id:101,name:'Regular Nails',cat:'Nail Services',subcat:'Nails',price:249,inPOS:true},
+    {id:101,name:'Regular Manicure/Pedicure',cat:'Nail Services',subcat:'Nails',price:249,inPOS:true},
     {id:102,name:'Gel Polish',cat:'Nail Services',subcat:'Nails',price:399,inPOS:true},
     {id:103,name:'Signature Manicure',cat:'Nail Services',subcat:'Manicure',price:299,inPOS:true},
     {id:104,name:'Signature Pedicure',cat:'Nail Services',subcat:'Pedicure',price:349,inPOS:true},
     {id:105,name:'Hand Spa',cat:'Nail Services',subcat:'Spa',price:349,inPOS:true},
     {id:106,name:'Foot Spa',cat:'Nail Services',subcat:'Spa',price:499,inPOS:true},
     {id:107,name:'Jelly Add-on',cat:'Nail Services',subcat:'Add-ons',price:150,inPOS:true},
-    {id:108,name:'Paraffin V Add-on',cat:'Nail Services',subcat:'Add-ons',price:120,inPOS:true},
+    {id:108,name:'Paraffin Wax',cat:'Nail Services',subcat:'Add-ons',price:120,inPOS:true},
     {id:109,name:'Heel Repair Add-on',cat:'Nail Services',subcat:'Add-ons',price:149,inPOS:true},
     // WAXING
     {id:201,name:'Underarm Wax',cat:'Waxing',price:300,inPOS:true},
@@ -226,20 +234,20 @@ const DEMO_DATA = {
     {id:207,name:'Bikini Line Wax',cat:'Waxing',price:500,inPOS:true},
     {id:208,name:'Brazilian Wax',cat:'Waxing',price:900,inPOS:true},
     // FACIALS
-    {id:301,name:'Regular Facial',cat:'Facial Treatments',subcat:'Signature',price:999,inPOS:true},
-    {id:302,name:'Whitening Facial',cat:'Facial Treatments',subcat:'Brightening',price:999,inPOS:true},
+    {id:301,name:'Regular Facial',cat:'Facial Treatments',subcat:'Signature',price:699,inPOS:true},
+    {id:302,name:'Whitening Facial',cat:'Facial Treatments',subcat:'Brightening',price:699,inPOS:true},
     {id:303,name:'Anti-Acne Facial',cat:'Facial Treatments',subcat:'Acne Control',price:999,inPOS:true},
-    {id:304,name:'Anti-Ageing Facial',cat:'Facial Treatments',subcat:'Anti-Ageing',price:1099,inPOS:true},
-    {id:305,name:'Moisturising Facial',cat:'Facial Treatments',subcat:'Moisturising',price:999,inPOS:true},
-    {id:306,name:'HydraFacial',cat:'Facial Treatments',subcat:'HydraFacial',price:2000,inPOS:true},
+    {id:304,name:'Moisturising Facial',cat:'Facial Treatments',subcat:'Moisturising',price:899,inPOS:true},
+    {id:305,name:'Anti-Ageing Facial',cat:'Facial Treatments',subcat:'Anti-Ageing',price:1099,inPOS:true},
+    {id:306,name:'HydraFacial',cat:'Facial Treatments',subcat:'HydraFacial',price:999,inPOS:true},
     // LASER HAIR REMOVAL
-    {id:401,name:'Laser Hair Removal — Face',cat:'Laser Treatments',subcat:'Laser Hair Removal',price:800,inPOS:true},
-    {id:402,name:'Laser Hair Removal — Underarm',cat:'Laser Treatments',subcat:'Laser Hair Removal',price:2000,inPOS:true},
+    {id:401,name:'Laser Hair Removal — Upper Lip',cat:'Laser Treatments',subcat:'Laser Hair Removal',price:800,inPOS:true},
+    {id:402,name:'Laser Hair Removal — Underarm',cat:'Laser Treatments',subcat:'Laser Hair Removal',price:1200,inPOS:true},
     {id:403,name:'Laser Hair Removal — Half Arms',cat:'Laser Treatments',subcat:'Laser Hair Removal',price:2000,inPOS:true},
     {id:404,name:'Laser Hair Removal — Full Arms',cat:'Laser Treatments',subcat:'Laser Hair Removal',price:3000,inPOS:true},
     {id:405,name:'Laser Hair Removal — Half Legs',cat:'Laser Treatments',subcat:'Laser Hair Removal',price:3000,inPOS:true},
     {id:406,name:'Laser Hair Removal — Full Legs',cat:'Laser Treatments',subcat:'Laser Hair Removal',price:4800,inPOS:true},
-    {id:407,name:'Laser Hair Removal — Bikini',cat:'Laser Treatments',subcat:'Laser Hair Removal',price:3000,inPOS:true},
+    {id:407,name:'Laser Hair Removal — Bikini Line',cat:'Laser Treatments',subcat:'Laser Hair Removal',price:3000,inPOS:true},
     {id:408,name:'Laser Hair Removal — Brazilian',cat:'Laser Treatments',subcat:'Laser Hair Removal',price:3800,inPOS:true},
     // CARBON LASER
     {id:501,name:'Carbon Laser — Face',cat:'Laser Treatments',subcat:'Carbon Laser',price:1000,inPOS:true},
@@ -247,12 +255,12 @@ const DEMO_DATA = {
     {id:503,name:'Carbon Laser — Elbows',cat:'Laser Treatments',subcat:'Carbon Laser',price:800,inPOS:true},
     {id:504,name:'Carbon Laser — Knees',cat:'Laser Treatments',subcat:'Carbon Laser',price:800,inPOS:true},
     {id:505,name:'Carbon Laser — Butt',cat:'Laser Treatments',subcat:'Carbon Laser',price:1400,inPOS:true},
-    // EXILIS
+    // EXILIS / BODY CONTOURING
     {id:601,name:'Exilis — Face',cat:'Body Contouring',subcat:'Exilis',price:1800,inPOS:true},
     {id:602,name:'Exilis — Double Chin',cat:'Body Contouring',subcat:'Exilis',price:1500,inPOS:true},
     {id:603,name:'Exilis — Arms',cat:'Body Contouring',subcat:'Exilis',price:2000,inPOS:true},
-    {id:604,name:'Exilis — Tummy',cat:'Body Contouring',subcat:'Exilis',price:2800,inPOS:true},
-    {id:605,name:'Exilis — Back',cat:'Body Contouring',subcat:'Exilis',price:2800,inPOS:true},
+    {id:604,name:'Exilis — Back',cat:'Body Contouring',subcat:'Exilis',price:2500,inPOS:true},
+    {id:605,name:'Exilis — Tummy',cat:'Body Contouring',subcat:'Exilis',price:2800,inPOS:true},
     {id:606,name:'Exilis — Thighs',cat:'Body Contouring',subcat:'Exilis',price:3000,inPOS:true},
   ],
   packages:[
@@ -314,7 +322,7 @@ async function loadData(){
     DATA.packages = pkgs  && pkgs.length  ? pkgs  : DEMO_DATA.packages;
     DATA.users    = users && users.length ? users : DEMO_DATA.users;
     DATA.bookings = bkgs  || [];
-    DATA.settings = d.settings ? (typeof d.settings==='object'&&!Array.isArray(d.settings)?d.settings:null) : null;
+    DATA.settings = d.settings && typeof d.settings==='object' && !Array.isArray(d.settings) ? d.settings : DATA.settings;
 
     showStep1();
   } catch(e){
@@ -322,7 +330,7 @@ async function loadData(){
     DATA.packages = DEMO_DATA.packages;
     DATA.users    = DEMO_DATA.users;
     DATA.bookings = [];
-      DATA.settings = null;
+    // Keep default settings — don't set null
     showStep1();
   }
 }
@@ -655,13 +663,14 @@ async function submitBooking(){
     client:booking.name,
     phone:booking.phone,
     email:booking.email||'',
-    service:booking.service, // comma-separated names for POS display
-    services:booking.services, // full array with prices
+    service:booking.service,
+    services:booking.services,
     totalPrice:booking.servicePrice,
     staff:booking.staff||'',
     date:booking.date,
     time:booking.time,
     duration:60,
+    source:'online',
     status:'pending',
     notes:booking.notes||'',
     reminder:true,
