@@ -562,9 +562,17 @@ html{height:-webkit-fill-available;}
           <div class="metric"><div class="metric-lbl">Appointments</div><div class="metric-val" id="mAppts">0</div><div class="metric-sub">today</div></div>
           <div class="metric"><div class="metric-lbl">Low Stock</div><div class="metric-val" id="mLow" style="color:var(--warn)">0</div><div class="metric-sub" style="color:var(--ink3)">items</div></div>
         </div>
+        <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
+          <button class="btn btn-outline btn-sm" onclick="openEOD()" style="font-size:12px;">📊 End of Day Summary</button>
+        </div>
         <div class="dash-grid">
           <div class="card"><div class="card-hdr"><h3>Recent Transactions</h3></div><div id="dashTxns"><div style="padding:24px;text-align:center;color:var(--ink3);font-size:12px;">No transactions yet today</div></div></div>
           <div class="card"><div class="card-hdr"><h3>Today's Schedule</h3></div><div id="dashAppts"><div style="padding:24px;text-align:center;color:var(--ink3);font-size:12px;">No appointments today</div></div></div>
+        </div>
+        <!-- Alerts Panel -->
+        <div id="dashAlertsWrap" style="margin-top:16px;display:none;">
+          <div style="font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">🚨 Alerts & Flags</div>
+          <div id="dashAlerts" style="display:flex;flex-direction:column;gap:8px;"></div>
         </div>
       </div>
 
@@ -626,6 +634,9 @@ html{height:-webkit-fill-available;}
               </div>
               <div class="tot-row" id="vatRow" style="display:none;"><span>VAT (12%)</span><span id="cartVat">₱0.00</span></div>
               <div class="tot-row total"><span>TOTAL</span><span id="cartTotal">₱0.00</span></div>
+              <div id="loyaltyRow" style="display:none;padding:6px 0;border-top:1px dashed var(--border);">
+                <button class="btn btn-outline btn-sm" style="width:100%;font-size:11px;" onclick="openLoyalty()">✨ Redeem Loyalty Points (<span id="loyaltyPtsAvail">0</span> pts available)</button>
+              </div>
               <button class="btn btn-gold btn-lg" id="chargeBtn" onclick="openPayment()" disabled style="margin-top:10px;">Charge</button>
             </div>
           </div>
@@ -728,6 +739,7 @@ html{height:-webkit-fill-available;}
             <button class="btn btn-outline btn-sm" onclick="downloadProductTemplate()">⬇ Template</button>
             <button class="btn btn-outline btn-sm" onclick="document.getElementById('csvImportInput').click()">📂 Import CSV</button>
             <input type="file" id="csvImportInput" accept=".csv" style="display:none;" onchange="importProductsCSV(this)">
+            <button class="btn btn-outline btn-sm" onclick="openReorderList()">📋 Reorder List</button>
             <button class="btn btn-gold btn-sm" onclick="openAddProd()">+ Add</button>
           </div>
         </div>
@@ -1469,6 +1481,14 @@ html{height:-webkit-fill-available;}
       <div class="pay-m" data-m="package" onclick="selPay(this)"><span class="pay-ico">📋</span>Package</div>
     </div>
 
+    <!-- Link to appointment — shown if client has appointments today -->
+    <div id="linkApptWrap" style="display:none;margin-top:14px;padding:12px 14px;background:var(--cream2);border-radius:12px;border:1.5px solid var(--border2);">
+      <div style="font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">📋 Link to Appointment</div>
+      <select class="form-select" id="linkApptSelect" style="font-size:13px;">
+        <option value="">No appointment — walk-in</option>
+      </select>
+    </div>
+
     <!-- Cash amount received — shown only for Cash -->
     <div id="cashWrap" style="margin-top:14px;padding:14px;background:var(--cream2);border-radius:12px;border:1.5px solid var(--border2);">
       <div style="font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">💵 Cash Received</div>
@@ -1535,13 +1555,39 @@ html{height:-webkit-fill-available;}
     <div id="receiptContent"></div>
     <div class="modal-footer" style="flex-wrap:wrap;gap:8px;">
       <button class="btn btn-outline" onclick="printR()">🖨 Print</button>
-      <button class="btn btn-outline" id="emailSummaryBtn" onclick="openEmailSummary()" style="display:none;">📧 Email Summary</button>
-      <button class="btn btn-gold" onclick="closeM('receiptModal')">Done</button>
+      <button class="btn btn-outline" onclick="shareReceipt()">📤 Share</button>
+      <button class="btn btn-outline" id="emailSummaryBtn" onclick="openEmailSummary()" style="display:none;">📧 Email</button>
+      <button class="btn btn-gold" onclick="closeM('receiptModal');clearCart();">Done</button>
     </div>
   </div>
 </div>
 
-<!-- Client Picker -->
+<!-- End of Day Modal -->
+<div class="overlay hidden" id="eodModal">
+  <div class="modal modal-md" style="max-height:92vh;overflow-y:auto;">
+    <div class="modal-hdr"><div class="modal-title">📊 End of Day Summary</div><div class="modal-x" onclick="closeM('eodModal')">✕</div></div>
+    <div id="eodContent" class="modal-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="printEOD()">🖨 Print</button>
+      <button class="btn btn-outline" onclick="shareEOD()">📤 Share</button>
+      <button class="btn btn-gold" onclick="closeM('eodModal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Loyalty Points Modal -->
+<div class="overlay hidden" id="loyaltyModal">
+  <div class="modal modal-sm">
+    <div class="modal-hdr"><div class="modal-title">✨ Loyalty Points</div><div class="modal-x" onclick="closeM('loyaltyModal')">✕</div></div>
+    <div class="modal-body" id="loyaltyContent"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeM('loyaltyModal')">Cancel</button>
+      <button class="btn btn-gold" onclick="redeemLoyalty()">Redeem Points</button>
+    </div>
+  </div>
+</div>
+
+<!-- Receipt Modal -->
 <div class="overlay hidden" id="clientModal">
   <div class="modal modal-md">
     <div class="modal-hdr"><div class="modal-title">Select Client</div><div class="modal-x" onclick="closeM('clientModal')">✕</div></div>
@@ -1645,6 +1691,17 @@ html{height:-webkit-fill-available;}
         <div class="form-group"><label class="form-label">Current Stock</label><input class="form-input" id="apStock" type="number" placeholder="0" min="0"></div>
         <div class="form-group"><label class="form-label">Low Stock Alert At</label><input class="form-input" id="apLowAt" type="number" placeholder="5" min="0"></div>
       </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Par Level <span style="color:var(--ink4);font-size:10px;">(target stock to maintain)</span></label>
+          <input class="form-input" id="apParLevel" type="number" placeholder="e.g. 300" min="0" oninput="updateParPreview()">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Reorder Qty <span style="color:var(--ink4);font-size:10px;">(how much to order)</span></label>
+          <input class="form-input" id="apReorderQty" type="number" placeholder="e.g. 3 bottles" min="0">
+        </div>
+      </div>
+      <div id="parPreview" style="display:none;font-size:11px;color:var(--ink3);background:var(--cream2);border-radius:8px;padding:8px 12px;margin-bottom:8px;"></div>
       <div class="form-group"><label class="form-label">Notes / Supplier</label><input class="form-input" id="apNotes" placeholder="Supplier name, SKU, notes…"></div>
       <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--cream2);border-radius:9px;border:1px solid var(--border);margin-bottom:14px;">
         <input type="checkbox" id="apShowInPOS" checked style="width:16px;height:16px;accent-color:var(--gold);">
@@ -1801,6 +1858,25 @@ html{height:-webkit-fill-available;}
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeM('clinicSettingsModal')">Cancel</button>
       <button class="btn btn-gold" onclick="saveClinicSettings()">✓ Save Settings</button>
+    </div>
+  </div>
+</div>
+
+<!-- Reorder List Modal -->
+<div class="overlay hidden" id="reorderModal">
+  <div class="modal modal-md" style="max-height:92vh;overflow-y:auto;">
+    <div class="modal-hdr">
+      <div>
+        <div class="modal-title">📋 Reorder List</div>
+        <div style="font-size:11px;color:var(--ink3);margin-top:2px;" id="reorderSubtitle"></div>
+      </div>
+      <div class="modal-x" onclick="closeM('reorderModal')">✕</div>
+    </div>
+    <div id="reorderContent" class="modal-body" style="padding:0;"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="printReorder()">🖨 Print</button>
+      <button class="btn btn-outline" onclick="shareReorder()">📤 Share</button>
+      <button class="btn btn-gold" onclick="closeM('reorderModal')">Close</button>
     </div>
   </div>
 </div>
@@ -2287,6 +2363,15 @@ html{height:-webkit-fill-available;}
         <div id="cpNotes" style="background:var(--cream2);border-radius:10px;padding:12px 14px;font-size:13px;color:var(--ink2);line-height:1.7;white-space:pre-wrap;"></div>
       </div>
 
+      <!-- Message History -->
+      <div id="cpMsgHistoryWrap" style="display:none;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <div style="font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;">💬 Message History</div>
+          <span id="cpMsgCount" style="font-size:11px;color:var(--ink4);"></span>
+        </div>
+        <div id="cpMsgHistory" style="display:flex;flex-direction:column;gap:8px;max-height:320px;overflow-y:auto;"></div>
+      </div>
+
     </div>
   </div>
 </div>
@@ -2722,29 +2807,122 @@ function afterLoad(){
 function updateClock(){const el=document.getElementById('sbClock');if(el)el.textContent=new Date().toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'});}
 
 // ══ APPOINTMENT REMINDERS ══
-const remindedAppts=new Set();
+// sentAutoMsgs defined in auto messages section
+// ══ AUTO MESSAGES ══
+const AUTO_MSG={
+  confirmation:(b)=>
+`Hi ${b.client}! 🌸 Your appointment at GlowBar Beauty Clinic has been received.
+
+📅 ${fmtDate(b.date)} at ${b.time}
+💆 ${b.service}${b.staff?' with '+b.staff:''}
+
+We'll confirm your booking shortly. For questions, please reply to this message.
+
+Thank you for choosing GlowBar! ✨`,
+
+  morningReminder:(b)=>
+`Good morning, ${b.client}! ☀️ Just a reminder that you have an appointment today at GlowBar Beauty Clinic.
+
+⏰ ${b.time}
+💆 ${b.service}${b.staff?' with '+b.staff:''}
+
+Please arrive 5 minutes early. We look forward to seeing you! 🌸`,
+
+  thirtyMinReminder:(b)=>
+`Hi ${b.client}! ⏰ Your GlowBar appointment is in 30 minutes.
+
+💆 ${b.service} at ${b.time}
+
+See you soon! 🌸 — GlowBar Beauty Clinic`
+};
+
+function logAutoMessage(booking, template, templateKey){
+  // Find client record
+  const client=S.clients.find(c=>c.name===booking.client||(c.phone&&booking.phone&&c.phone.replace(/\D/g,'')===booking.phone.replace(/\D/g,'')));
+  const clientId=client?.id||null;
+  const msg={
+    id:Date.now(),
+    clientId,
+    clientName:booking.client,
+    bookingId:booking.id,
+    text:template,
+    channel:'sms',
+    dir:'sent',
+    auto:true,
+    templateKey,
+    staff:'System',
+    time:new Date().toISOString()
+  };
+  S.messages.push(msg);
+  sync('messages');
+}
+
+function sendBookingConfirmation(booking){
+  const key=String(booking.id)+'_confirm';
+  if(sentAutoMsgs.has(key)) return;
+  sentAutoMsgs.add(key);
+  const text=AUTO_MSG.confirmation(booking);
+  logAutoMessage(booking, text, 'confirmation');
+  // Show toast with message preview
+  showAutoMsgToast('📨 Confirmation message logged for '+booking.client, text, booking);
+}
+
+function showAutoMsgToast(title, text, booking){
+  const div=document.createElement('div');
+  div.style.cssText=`position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#fff;border:1.5px solid var(--gold);border-radius:14px;box-shadow:0 8px 32px rgba(44,35,24,0.18);padding:14px 18px;z-index:9999;max-width:360px;width:92%;`;
+  div.innerHTML=`
+    <div style="display:flex;align-items:flex-start;gap:10px;">
+      <div style="font-size:22px;">💬</div>
+      <div style="flex:1;">
+        <div style="font-weight:600;font-size:13px;color:var(--ink);margin-bottom:6px;">${title}</div>
+        <div style="font-size:11px;color:var(--ink3);background:var(--cream2);border-radius:8px;padding:8px 10px;line-height:1.6;max-height:80px;overflow:hidden;">${text.slice(0,150)}…</div>
+        <div style="display:flex;gap:8px;margin-top:10px;">
+          <button onclick="selMsgClient(${booking.clientId||'null'});goPage('messaging');this.closest('div[style*=fixed]').remove();" style="flex:1;padding:7px;background:var(--gold);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Jost',sans-serif;">📱 Send Now</button>
+          <button onclick="this.closest('div[style*=fixed]').remove();" style="padding:7px 12px;background:var(--cream2);color:var(--ink2);border:1px solid var(--border2);border-radius:8px;font-size:12px;cursor:pointer;font-family:'Jost',sans-serif;">Dismiss</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(div);
+  setTimeout(()=>{if(div.parentNode)div.remove();},20000);
+}
+
+const sentAutoMsgs=new Set();
+
 function checkApptReminders(){
-  if(!currentUser) return; // only check when logged in
+  if(!currentUser) return;
   const now=new Date();
   const todayStr=td();
-  S.bookings.filter(b=>b.date===todayStr&&b.status!=='cancelled'&&b.status!=='completed'&&b.status!=='no-show').forEach(b=>{
+
+  // Morning reminders — fire between 8:00 and 8:10 AM
+  const hour=now.getHours(), min=now.getMinutes();
+  if(hour===8&&min<10){
+    S.bookings.filter(b=>b.date===todayStr&&b.status!=='cancelled'&&b.status!=='no-show').forEach(b=>{
+      const key=String(b.id)+'_morning';
+      if(!sentAutoMsgs.has(key)){
+        sentAutoMsgs.add(key);
+        const text=AUTO_MSG.morningReminder(b);
+        logAutoMessage(b,text,'morningReminder');
+        showReminderToast(b,'this morning',text);
+      }
+    });
+  }
+
+  // 30-min reminders
+  S.bookings.filter(b=>b.date===todayStr&&b.status!=='cancelled'&&b.status!=='no-show').forEach(b=>{
     const [h,m]=b.time.split(':').map(Number);
     const apptTime=new Date(); apptTime.setHours(h,m,0,0);
     const diffMin=Math.round((apptTime-now)/60000);
-    // Fire at 60 min and 30 min before
-    const key60=b.id+'_60'; const key30=b.id+'_30';
-    if(diffMin<=60&&diffMin>55&&!remindedAppts.has(key60)){
-      remindedAppts.add(key60);
-      showReminderToast(b,'1 hour');
-    }
-    if(diffMin<=30&&diffMin>25&&!remindedAppts.has(key30)){
-      remindedAppts.add(key30);
-      showReminderToast(b,'30 minutes');
+    const key30=String(b.id)+'_30';
+    if(diffMin<=30&&diffMin>25&&!sentAutoMsgs.has(key30)){
+      sentAutoMsgs.add(key30);
+      const text=AUTO_MSG.thirtyMinReminder(b);
+      logAutoMessage(b,text,'thirtyMinReminder');
+      showReminderToast(b,'30 minutes',text);
     }
   });
 }
 
-function showReminderToast(b,timeLabel){
+function showReminderToast(b, timeLabel, msgText){
   const div=document.createElement('div');
   div.style.cssText=`position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#fff;border:1.5px solid var(--gold);border-radius:14px;box-shadow:0 8px 32px rgba(44,35,24,0.18);padding:14px 18px;z-index:9999;max-width:340px;width:90%;animation:slideUp .3s ease;`;
   div.innerHTML=`
@@ -2752,17 +2930,16 @@ function showReminderToast(b,timeLabel){
       <div style="font-size:22px;line-height:1;">🔔</div>
       <div style="flex:1;">
         <div style="font-weight:600;font-size:13px;color:var(--ink);margin-bottom:2px;">Appointment in ${timeLabel}</div>
-        <div style="font-size:12px;color:var(--ink2);margin-bottom:8px;"><strong>${b.client}</strong> — ${b.service} at ${b.time}</div>
-        <div style="font-size:11px;color:var(--ink3);margin-bottom:10px;">💬 Remember to send a reminder message to the client!</div>
+        <div style="font-size:12px;color:var(--ink2);margin-bottom:4px;"><strong>${b.client}</strong> — ${b.service} at ${b.time}</div>
+        <div style="font-size:11px;color:var(--ink3);margin-bottom:10px;">💬 Reminder message logged — tap Send to deliver it</div>
         <div style="display:flex;gap:8px;">
-          <button onclick="goPage('messaging');this.closest('div[style]').remove();" style="flex:1;padding:7px;background:var(--gold);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;">Send Message</button>
-          <button onclick="this.closest('div[style]').remove();" style="padding:7px 12px;background:var(--cream2);color:var(--ink2);border:1px solid var(--border2);border-radius:8px;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;">Dismiss</button>
+          <button onclick="goPage('messaging');this.closest('div[style*=fixed]').remove();" style="flex:1;padding:7px;background:var(--gold);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Jost',sans-serif;">📱 Send Message</button>
+          <button onclick="this.closest('div[style*=fixed]').remove();" style="padding:7px 12px;background:var(--cream2);color:var(--ink2);border:1px solid var(--border2);border-radius:8px;font-size:12px;cursor:pointer;font-family:'Jost',sans-serif;">Dismiss</button>
         </div>
       </div>
     </div>`;
   document.body.appendChild(div);
-  // Auto-dismiss after 30 seconds
-  setTimeout(()=>{ if(div.parentNode) div.remove(); }, 30000);
+  setTimeout(()=>{if(div.parentNode)div.remove();},30000);
 }
 
 function initApp(){
@@ -3381,7 +3558,7 @@ function renderCart(){
         <span class="ci-sub">${fmtPrice(item.price*item.qty)}</span>
       </div>
     </div>`).join('');
-  document.getElementById('chargeBtn').disabled=false; recalc(); updateReceiptFab();
+  document.getElementById('chargeBtn').disabled=false; recalc(); updateReceiptFab(); updateLoyaltyRow();
 }
 
 function setDiscType(t){
@@ -3459,6 +3636,7 @@ function openPayment(){
   const refWrap=document.getElementById('refCaptureWrap');
   if(refWrap) refWrap.style.display='none';
   _refPhotoData=null;
+  populateLinkAppt();
   openM('payModal');
 }
 function selPay(el){
@@ -3652,6 +3830,15 @@ function confirmPay(){
   const cashChange=method==='cash'?Math.max(0,cashGiven-total):0;
   S.transactions.push({id:txid,client:cn,clientId:selClient?.id||null,items:JSON.parse(JSON.stringify(cart)),sub,disc,discType,tip,vat,vatOn,total,method,cashGiven:cashGiven||null,cashChange:cashChange||null,refPhoto:_refPhotoData||null,time:now.toISOString(),staff:currentUser.name});
   sync('transactions'); sync('products'); if(selClient)sync('clients');
+  // Award loyalty points
+  if(selClient) awardLoyaltyPoints(selClient.id, total);
+  // Mark linked appointment as completed
+  const linkApptSel=document.getElementById('linkApptSelect');
+  const linkedApptId=linkApptSel?.value;
+  if(linkedApptId){
+    const appt=S.bookings.find(x=>String(x.id)===String(linkedApptId));
+    if(appt){appt.status='completed';sync('bookings');renderCalendar();}
+  }
   stopRefCam();
   _refPhotoData=null;
   resetRefPhotoUI();
@@ -3699,6 +3886,248 @@ function confirmPay(){
   showToast('Payment confirmed! '+fmtPrice(total),'ok');
 }
 function printR(){const c=document.getElementById('receiptContent').innerHTML;const w=window.open('','_blank','width=380,height=560');w.document.write('<html><head><title>GlowBar Receipt</title><style>body{font-family:sans-serif;padding:18px;font-size:12px;}</style></head><body>'+c+'</body></html>');w.document.close();w.print();}
+
+function shareReceipt(){
+  const content=document.getElementById('receiptContent');
+  if(!content)return;
+  // Build plain text receipt
+  const tx=lastTx||S.transactions[S.transactions.length-1];
+  if(!tx)return;
+  const lines=[
+    '🌸 GlowBar Beauty Clinic',
+    '─────────────────────',
+    `Ref: ${tx.id}`,
+    `Date: ${new Date(tx.time).toLocaleString('en-PH')}`,
+    `Client: ${tx.client}`,
+    '─────────────────────',
+    ...(tx.items||[]).map(i=>`${i.name} x${i.qty}   ${fmtPrice(i.price*i.qty)}`),
+    '─────────────────────',
+    tx.disc>0?`Discount: -${fmtPrice(tx.disc)}`:'',
+    tx.tip>0?`Tip: +${fmtPrice(tx.tip)}`:'',
+    `TOTAL: ${fmtPrice(tx.total)}`,
+    `Paid via: ${(tx.method||'cash').toUpperCase()}`,
+    tx.cashGiven>0?`Cash: ${fmtPrice(tx.cashGiven)} | Change: ${fmtPrice(tx.cashChange)}`:'',
+    '─────────────────────',
+    'Thank you for visiting GlowBar! 🌸',
+  ].filter(Boolean).join('\n');
+  if(navigator.share){
+    navigator.share({title:'GlowBar Receipt',text:lines}).catch(()=>{});
+  } else {
+    navigator.clipboard.writeText(lines).then(()=>showToast('Receipt copied to clipboard','ok')).catch(()=>{
+      // Fallback — open in new window
+      const w=window.open('','_blank');
+      w.document.write('<pre style="font-family:monospace;padding:20px;">'+lines+'</pre>');
+    });
+  }
+}
+
+// ══ LOYALTY POINTS ══
+const LOYALTY_RATE=10; // ₱1 per 10 points
+const POINTS_PER_PESO=1; // 1 point per ₱1 spent
+let loyaltyRedeem=0;
+
+function openLoyalty(){
+  if(!selClient){showToast('Select a client first','err');return;}
+  const c=S.clients.find(x=>x.id===selClient.id);
+  if(!c)return;
+  const pts=c.loyaltyPoints||0;
+  const maxRedeem=Math.floor(pts/LOYALTY_RATE);
+  const total=parseFloat(document.getElementById('cartTotal').textContent.replace(/[₱,]/g,''))||0;
+  const maxDiscount=Math.min(maxRedeem,Math.floor(total));
+  document.getElementById('loyaltyContent').innerHTML=`
+    <div style="text-align:center;padding:10px 0 16px;">
+      <div style="font-size:36px;font-weight:700;color:var(--gold-dk);">${pts.toLocaleString()}</div>
+      <div style="font-size:12px;color:var(--ink3);">points available</div>
+      <div style="font-size:11px;color:var(--ink4);margin-top:4px;">${LOYALTY_RATE} pts = ₱1 discount</div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Discount amount to redeem (max ₱${maxDiscount})</label>
+      <input class="form-input" type="number" id="loyaltyRedeemAmt" min="0" max="${maxDiscount}" placeholder="0" value="${Math.min(maxDiscount,Math.floor(total*0.2))}" oninput="previewLoyalty(${pts})">
+    </div>
+    <div id="loyaltyPreview" style="background:var(--cream2);border-radius:10px;padding:10px 14px;font-size:13px;margin-top:8px;"></div>`;
+  loyaltyRedeem=0;
+  previewLoyalty(pts);
+  openM('loyaltyModal');
+}
+
+function previewLoyalty(pts){
+  const amt=parseFloat(document.getElementById('loyaltyRedeemAmt').value)||0;
+  const ptsUsed=amt*LOYALTY_RATE;
+  const ptsAfter=pts-ptsUsed;
+  document.getElementById('loyaltyPreview').innerHTML=
+    `Points used: <strong>${ptsUsed.toLocaleString()}</strong><br>
+    Discount: <strong style="color:var(--success);">-₱${fmtPrice(amt)}</strong><br>
+    Points remaining after: <strong>${Math.max(0,ptsAfter).toLocaleString()}</strong>`;
+  loyaltyRedeem=amt;
+}
+
+function redeemLoyalty(){
+  const amt=parseFloat(document.getElementById('loyaltyRedeemAmt').value)||0;
+  if(!amt){closeM('loyaltyModal');return;}
+  // Apply as discount
+  const discEl=document.getElementById('discInp');
+  const discAmtBtn=document.getElementById('discAmtBtn');
+  if(discEl&&discAmtBtn){
+    setDiscType('amt');
+    discEl.value=parseFloat(discEl.value||0)+amt;
+    recalc();
+  }
+  loyaltyRedeem=amt;
+  closeM('loyaltyModal');
+  showToast(`✨ ₱${amt} loyalty discount applied`,'ok');
+}
+
+function awardLoyaltyPoints(clientId, total){
+  const c=S.clients.find(x=>x.id===clientId);
+  if(!c)return;
+  const pts=Math.floor(total*POINTS_PER_PESO);
+  c.loyaltyPoints=(c.loyaltyPoints||0)+pts;
+  sync('clients');
+  showToast(`✨ ${pts} loyalty points awarded to ${c.name}`,'ok');
+}
+
+function updateLoyaltyRow(){
+  const row=document.getElementById('loyaltyRow');
+  const ptsEl=document.getElementById('loyaltyPtsAvail');
+  if(!row||!ptsEl)return;
+  if(selClient){
+    const c=S.clients.find(x=>x.id===selClient.id);
+    const pts=c?.loyaltyPoints||0;
+    ptsEl.textContent=pts.toLocaleString();
+    row.style.display=pts>=LOYALTY_RATE?'block':'none';
+  } else {
+    row.style.display='none';
+  }
+}
+
+// ══ APPOINTMENT LINKING ══
+function populateLinkAppt(){
+  const wrap=document.getElementById('linkApptWrap');
+  const sel=document.getElementById('linkApptSelect');
+  if(!wrap||!sel)return;
+  const today=td();
+  const appts=S.bookings.filter(b=>
+    b.date===today&&
+    b.status!=='cancelled'&&b.status!=='completed'&&
+    (!selClient||b.client===selClient.name)
+  );
+  if(!appts.length){wrap.style.display='none';return;}
+  wrap.style.display='block';
+  sel.innerHTML='<option value="">No appointment — walk-in</option>'+
+    appts.map(b=>`<option value="${b.id}">${b.time} — ${b.client} (${b.service.slice(0,30)})</option>`).join('');
+}
+
+// ══ END OF DAY ══
+function openEOD(){
+  const today=td();
+  const txns=S.transactions.filter(t=>t.time.startsWith(today));
+  const rev=txns.reduce((s,t)=>s+t.total,0);
+  const cash=txns.filter(t=>t.method==='cash').reduce((s,t)=>s+t.total,0);
+  const digital=txns.filter(t=>t.method!=='cash'&&t.method!=='package').reduce((s,t)=>s+t.total,0);
+  const pkg=txns.filter(t=>t.method==='package').reduce((s,t)=>s+t.total,0);
+  const tips=txns.reduce((s,t)=>s+(t.tip||0),0);
+  const appts=S.bookings.filter(b=>b.date===today);
+  const completed=appts.filter(b=>b.status==='completed').length;
+  const noShow=appts.filter(b=>b.status==='no-show').length;
+
+  // Per staff breakdown
+  const staffTotals={};
+  txns.forEach(t=>{
+    const s=t.staff||'Unassigned';
+    if(!staffTotals[s]) staffTotals[s]={rev:0,txns:0,tips:0};
+    staffTotals[s].rev+=t.total;
+    staffTotals[s].txns++;
+    staffTotals[s].tips+=t.tip||0;
+  });
+
+  // Top services
+  const svcTotals={};
+  txns.forEach(t=>(t.items||[]).forEach(i=>{
+    if(!svcTotals[i.name]) svcTotals[i.name]={qty:0,rev:0};
+    svcTotals[i.name].qty+=i.qty;
+    svcTotals[i.name].rev+=i.price*i.qty;
+  }));
+  const topSvcs=Object.entries(svcTotals).sort((a,b)=>b[1].rev-a[1].rev).slice(0,5);
+
+  const dateStr=new Date().toLocaleDateString('en-PH',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+
+  document.getElementById('eodContent').innerHTML=`
+    <div style="text-align:center;padding:10px 0 18px;border-bottom:1px solid var(--border);">
+      <div style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;color:var(--gold-dk);">GlowBar Beauty Clinic</div>
+      <div style="font-size:12px;color:var(--ink3);margin-top:2px;">End of Day Report — ${dateStr}</div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:14px 0;">
+      <div style="background:var(--cream2);border-radius:10px;padding:12px 14px;text-align:center;">
+        <div style="font-size:24px;font-weight:700;color:var(--gold-dk);">${fmtPrice(rev)}</div>
+        <div style="font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;">Total Revenue</div>
+      </div>
+      <div style="background:var(--cream2);border-radius:10px;padding:12px 14px;text-align:center;">
+        <div style="font-size:24px;font-weight:700;color:var(--ink);">${txns.length}</div>
+        <div style="font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;">Transactions</div>
+      </div>
+      <div style="background:var(--cream2);border-radius:10px;padding:12px 14px;text-align:center;">
+        <div style="font-size:20px;font-weight:700;color:var(--success);">${fmtPrice(cash)}</div>
+        <div style="font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;">Cash</div>
+      </div>
+      <div style="background:var(--cream2);border-radius:10px;padding:12px 14px;text-align:center;">
+        <div style="font-size:20px;font-weight:700;color:#007AFF;">${fmtPrice(digital)}</div>
+        <div style="font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;">Digital</div>
+      </div>
+    </div>
+
+    ${tips>0?`<div style="background:rgba(74,140,92,0.1);border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:var(--success);font-weight:500;">🫶 Total Tips: ${fmtPrice(tips)}</div>`:''}
+
+    <div style="margin-bottom:14px;">
+      <div style="font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Appointments</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <span style="background:var(--cream2);border-radius:8px;padding:6px 12px;font-size:12px;">📋 ${appts.length} total</span>
+        <span style="background:rgba(74,140,92,0.1);border-radius:8px;padding:6px 12px;font-size:12px;color:var(--success);">✓ ${completed} completed</span>
+        ${noShow>0?`<span style="background:rgba(220,53,69,0.1);border-radius:8px;padding:6px 12px;font-size:12px;color:var(--danger);">🚫 ${noShow} no-show</span>`:''}
+      </div>
+    </div>
+
+    ${Object.keys(staffTotals).length?`
+    <div style="margin-bottom:14px;">
+      <div style="font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Staff Performance</div>
+      ${Object.entries(staffTotals).map(([name,s])=>`
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--cream2);border-radius:8px;margin-bottom:6px;">
+          <div style="font-size:13px;font-weight:500;">${name}</div>
+          <div style="text-align:right;">
+            <div style="font-size:13px;font-weight:600;color:var(--gold-dk);">${fmtPrice(s.rev)}</div>
+            <div style="font-size:10px;color:var(--ink3);">${s.txns} txn${s.txns!==1?'s':''}${s.tips>0?' · tip '+fmtPrice(s.tips):''}</div>
+          </div>
+        </div>`).join('')}
+    </div>`:''}
+
+    ${topSvcs.length?`
+    <div>
+      <div style="font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Top Services Today</div>
+      ${topSvcs.map(([name,d],i)=>`
+        <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px;">
+          <span>${i+1}. ${name}</span>
+          <span style="font-weight:600;">${d.qty}x — ${fmtPrice(d.rev)}</span>
+        </div>`).join('')}
+    </div>`:''}
+  `;
+  openM('eodModal');
+}
+
+function printEOD(){
+  const c=document.getElementById('eodContent').innerHTML;
+  const w=window.open('','_blank','width=480,height=700');
+  w.document.write('<html><head><title>GlowBar EOD Report</title><style>body{font-family:sans-serif;padding:24px;font-size:13px;}</style></head><body>'+c+'</body></html>');
+  w.document.close();w.print();
+}
+
+function shareEOD(){
+  const today=td();
+  const txns=S.transactions.filter(t=>t.time.startsWith(today));
+  const rev=txns.reduce((s,t)=>s+t.total,0);
+  const text=`GlowBar EOD — ${new Date().toLocaleDateString('en-PH')}\nRevenue: ${fmtPrice(rev)}\nTransactions: ${txns.length}`;
+  if(navigator.share) navigator.share({title:'GlowBar EOD',text}).catch(()=>{});
+  else navigator.clipboard.writeText(text).then(()=>showToast('Copied to clipboard','ok'));
+}
 
 function openEmailSummary(){
   const cl=S.clients.find(c=>c.id===window._lastPaidClientId);
@@ -4039,12 +4468,163 @@ function quickBook(){
     const max=S.settings?.maxStaff||2;
     showToast(`Slot fully booked — max ${max} at this time`,'err');return;
   }
-  S.bookings.push({id:Date.now(),client,service,staff:document.getElementById('qbStaff').value||'',date,time,duration:60,status:'pending',notes:'',reminder:false});
+  const newBk={id:Date.now(),client,service,staff:document.getElementById('qbStaff').value||'',date,time,duration:60,status:'pending',notes:'',reminder:false};
+  S.bookings.push(newBk);
   sync('bookings');renderCalendar();renderBookings();renderDashboard();
   showToast('Appointment booked for '+client,'ok');
+  setTimeout(()=>sendBookingConfirmation(newBk),500);
 }
 
 // ══ CLINIC SETTINGS ══
+function updateParPreview(){
+  const parEl=document.getElementById('apParLevel');
+  const stockEl=document.getElementById('apStock');
+  const unitEl=document.getElementById('apUnit');
+  const csEl=document.getElementById('apContainerSize');
+  const preview=document.getElementById('parPreview');
+  if(!parEl||!preview)return;
+  const par=parseFloat(parEl.value)||0;
+  const stock=parseFloat(stockEl?.value)||0;
+  const unit=unitEl?.value||'units';
+  const containerSize=parseFloat(csEl?.value)||0;
+  if(!par){preview.style.display='none';return;}
+  const needed=Math.max(0,par-stock);
+  // Calculate sessions this par level covers using consumables
+  let sessionsInfo='';
+  // Auto-suggest reorder qty in containers
+  let containerInfo='';
+  if(containerSize>0&&needed>0){
+    const containers=Math.ceil(needed/containerSize);
+    containerInfo=` → <strong>${containers} container${containers!==1?'s':''}</strong> to order`;
+    const reorderEl=document.getElementById('apReorderQty');
+    if(reorderEl&&!reorderEl.value) reorderEl.value=containers;
+  }
+  preview.style.display='block';
+  if(needed===0){
+    preview.innerHTML=`✅ Stock is at or above par level — no reorder needed`;
+    preview.style.color='var(--success)';
+  } else {
+    preview.style.color='var(--ink3)';
+    preview.innerHTML=`Need <strong>${needed} ${unit}</strong> to reach par${containerInfo}`;
+  }
+}
+
+// ══ REORDER LIST ══
+function openReorderList(){
+  // Find all consumable products with low stock or below par
+  const items=S.products.filter(p=>p.unit!=='sessions'&&p.inPOS!==false);
+  const reorderItems=items.map(p=>{
+    const belowPar=p.parLevel&&p.stock<p.parLevel;
+    const belowLow=p.stock<=p.lowAt;
+    if(!belowPar&&!belowLow) return null;
+    // Calculate needed to reach par (or 2x lowAt if no par set)
+    const target=p.parLevel||(p.lowAt*3);
+    const needed=Math.max(0,target-p.stock);
+    // Containers needed
+    const containers=p.containerSize&&p.containerSize>0?Math.ceil(needed/p.containerSize):null;
+    // Override with manual reorderQty if set
+    const orderContainers=p.reorderQty||containers||Math.ceil(needed);
+    const orderUnits=p.containerSize?orderContainers*p.containerSize:needed;
+    // Sessions this stock covers (find linked service)
+    let sessionsLeft=null;
+    S.products.filter(s=>s.unit==='sessions').forEach(svc=>{
+      (svc.consumables||[]).forEach(c=>{
+        if((c.productId===p.id||c.name===p.name)&&c.qty>0){
+          const s=Math.floor(p.stock/c.qty);
+          if(sessionsLeft===null||s<sessionsLeft) sessionsLeft=s;
+        }
+      });
+    });
+    const sessionsAfter=p.containerSize&&orderContainers?(Math.floor((p.stock+orderUnits)/(sessionsLeft!==null?Math.ceil(p.stock/Math.max(sessionsLeft,1)):1))):null;
+    return {
+      ...p, needed, target, containers, orderContainers, orderUnits,
+      sessionsLeft, urgent:p.stock===0||belowLow
+    };
+  }).filter(Boolean).sort((a,b)=>(b.urgent?1:0)-(a.urgent?1:0));
+
+  const subtitle=`${reorderItems.length} item${reorderItems.length!==1?'s':''} need restocking · ${new Date().toLocaleDateString('en-PH',{month:'long',day:'numeric',year:'numeric'})}`;
+  document.getElementById('reorderSubtitle').textContent=subtitle;
+
+  if(!reorderItems.length){
+    document.getElementById('reorderContent').innerHTML=`<div style="padding:40px;text-align:center;color:var(--success);font-size:14px;">✅ All stock levels are healthy — nothing to reorder!</div>`;
+    openM('reorderModal');return;
+  }
+
+  document.getElementById('reorderContent').innerHTML=`
+    <table class="inv-table" style="width:100%;">
+      <thead>
+        <tr>
+          <th>Product</th>
+          <th>Current Stock</th>
+          <th>Par Level</th>
+          <th>To Order</th>
+          <th>Sessions Left</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${reorderItems.map(p=>`
+          <tr style="${p.urgent?'background:rgba(220,53,69,0.04);':''}">
+            <td>
+              <div style="font-weight:600;font-size:13px;">${p.name}</div>
+              <div style="font-size:10px;color:var(--ink3);">${p.notes||p.cat||''}</div>
+            </td>
+            <td>
+              <div style="font-weight:600;color:${p.stock===0?'var(--danger)':p.stock<=p.lowAt?'var(--warn)':'var(--ink)'};">${p.stock} ${p.unit}</div>
+              <div style="font-size:10px;color:var(--ink4);">Alert at ${p.lowAt} ${p.unit}</div>
+            </td>
+            <td style="font-size:13px;color:var(--ink2);">${p.parLevel?`${p.parLevel} ${p.unit}`:'—'}</td>
+            <td>
+              <div style="font-weight:700;font-size:14px;color:var(--gold-dk);">
+                ${p.containerSize&&p.orderContainers?`${p.orderContainers} container${p.orderContainers!==1?'s':''}`:`${p.needed} ${p.unit}`}
+              </div>
+              ${p.containerSize?`<div style="font-size:10px;color:var(--ink3);">${p.needed} ${p.unit} · 1 container = ${p.containerSize} ${p.unit}</div>`:''}
+            </td>
+            <td style="font-size:13px;color:${p.sessionsLeft===null?'var(--ink3)':p.sessionsLeft<=3?'var(--danger)':p.sessionsLeft<=10?'var(--warn)':'var(--success)'};">
+              ${p.sessionsLeft!==null?`~${p.sessionsLeft} sessions`:'—'}
+            </td>
+            <td>
+              <span style="background:${p.stock===0?'var(--danger)':'var(--warn)'};color:#fff;border-radius:6px;padding:3px 8px;font-size:10px;font-weight:600;">
+                ${p.stock===0?'OUT OF STOCK':'LOW STOCK'}
+              </span>
+            </td>
+          </tr>`).join('')}
+      </tbody>
+    </table>
+    <div style="padding:14px 16px;border-top:1px solid var(--border);font-size:11px;color:var(--ink4);">
+      💡 Par level is the minimum stock you want to maintain. Order quantities are calculated to bring stock back to par level.
+      Set par levels and reorder quantities by editing each product.
+    </div>`;
+  openM('reorderModal');
+}
+
+function printReorder(){
+  const c=document.getElementById('reorderContent').innerHTML;
+  const sub=document.getElementById('reorderSubtitle').textContent;
+  const w=window.open('','_blank','width=700,height=600');
+  w.document.write(`<html><head><title>GlowBar Reorder List</title>
+    <style>body{font-family:sans-serif;padding:24px;font-size:12px;}
+    table{width:100%;border-collapse:collapse;}th,td{padding:8px 10px;border:1px solid #ddd;text-align:left;}
+    th{background:#f5f0e8;font-size:11px;text-transform:uppercase;}
+    h2{margin-bottom:4px;}p{color:#888;margin-bottom:16px;}</style></head>
+    <body><h2>🌸 GlowBar Beauty Clinic — Reorder List</h2><p>${sub}</p>${c}</body></html>`);
+  w.document.close();w.print();
+}
+
+function shareReorder(){
+  const items=S.products.filter(p=>p.unit!=='sessions'&&p.stock<=(p.parLevel||p.lowAt));
+  if(!items.length){showToast('Nothing to reorder','ok');return;}
+  const lines=['🌸 GlowBar Reorder List','─────────────────────',
+    `Date: ${new Date().toLocaleDateString('en-PH')}`, '',
+    ...items.map(p=>{
+      const needed=Math.max(0,(p.parLevel||p.lowAt*3)-p.stock);
+      const containers=p.containerSize?Math.ceil(needed/p.containerSize):null;
+      return `• ${p.name}: ${containers?containers+' containers ('+needed+' '+p.unit+')':needed+' '+p.unit}`;
+    }),'','─────────────────────','Generated by GlowBar POS'
+  ].join('\n');
+  if(navigator.share) navigator.share({title:'GlowBar Reorder List',text:lines}).catch(()=>{});
+  else navigator.clipboard.writeText(lines).then(()=>showToast('Reorder list copied!','ok'));
+}
 function updateContainerLabel(){
   const unit=document.getElementById('apUnit')?.value;
   const wrap=document.getElementById('containerSizeWrap');
@@ -4254,6 +4834,8 @@ function saveAppt(){
   else S.bookings.push({id:Date.now(),...appt});
   closeM('apptModal');sync('bookings');renderBookings();renderCalendar();renderDashboard();
   showToast((editApptId?'Appointment updated':'Appointment booked')+' for '+client,'ok');
+  // Auto-send confirmation message for new bookings
+  if(!editApptId) setTimeout(()=>sendBookingConfirmation({...appt,id:S.bookings[S.bookings.length-1]?.id}),500);
   editApptId=null;
   if(appt.reminder)showToast('📱 Reminder will be sent to '+client,'ok');
 }
@@ -4502,24 +5084,64 @@ function renderServiceRows(items){
       const profit=p.price-(p.cost||0);
       const margin=p.price>0?Math.round(profit/p.price*100):0;
       const addons=p.addons&&p.addons.length?p.addons.map(a=>a.name).join(', '):'—';
-      return `<tr>
-        <td><div style="font-weight:500;font-size:13px;">${p.name}</div>${p.notes?`<div style="font-size:10px;color:var(--ink3);">${p.notes}</div>`:''}</td>
+      const hasConsumables=p.consumables&&p.consumables.length>0;
+      const consumableRows=hasConsumables?p.consumables.map(c=>{
+        const prod=S.products.find(x=>x.id===c.productId||x.name===c.name);
+        const stock=prod?prod.stock:0;
+        const unit=prod?prod.unit:c.unit||'units';
+        const sessions=c.qty>0?Math.floor(stock/c.qty):0;
+        const statusColor=stock===0?'var(--danger)':sessions<=3?'var(--warn)':'var(--success)';
+        const statusText=stock===0?'Out of stock':sessions<=3?`Only ${sessions} sessions left`:`~${sessions} sessions`;
+        return `<tr style="background:var(--cream2);">
+          <td style="padding-left:32px;font-size:12px;">
+            <span style="color:var(--ink3);margin-right:6px;">↳</span>
+            <strong>${c.name||prod?.name||'Unknown'}</strong>
+            <span style="color:var(--ink4);margin-left:6px;">${c.qty} ${unit} per session</span>
+            ${prod?.containerSize?`<span style="color:var(--ink4);font-size:10px;margin-left:6px;">(1 container = ${prod.containerSize} ${unit})</span>`:''}
+          </td>
+          <td colspan="2"><span style="font-size:12px;font-weight:600;color:${statusColor};">● ${statusText}</span></td>
+          <td><span style="font-size:11px;color:var(--ink3);">${stock} ${unit} in stock</span></td>
+          <td></td>
+          <td><button class="btn btn-outline btn-sm" onclick="openRestock(${prod?.id||0})" ${!prod?'disabled':''}>Restock</button></td>
+        </tr>`;
+      }).join(''):'';
+      return `<tr style="cursor:${hasConsumables?'pointer':'default'};" onclick="${hasConsumables?`toggleConsumableRows(${p.id})`:''}">
+        <td>
+          <div style="display:flex;align-items:center;gap:8px;">
+            ${hasConsumables?`<span id="csArrow_${p.id}" style="color:var(--ink3);font-size:11px;transition:transform .2s;">▸</span>`:'<span style="width:16px;"></span>'}
+            <div>
+              <div style="font-weight:500;font-size:13px;">${p.name}</div>
+              ${p.notes?`<div style="font-size:10px;color:var(--ink3);">${p.notes}</div>`:''}
+              ${hasConsumables?`<div style="font-size:10px;color:var(--ink4);">${p.consumables.length} consumable${p.consumables.length!==1?'s':''}</div>`:''}
+            </div>
+          </div>
+        </td>
         <td style="font-weight:600;">${fmtPrice(p.price)}</td>
         <td style="font-size:12px;color:var(--ink3);">${p.cost?fmtPrice(p.cost):'—'}</td>
         <td><span style="font-size:12px;font-weight:600;color:var(--success);">${fmtPrice(profit)}</span><span style="font-size:10px;color:var(--ink4);margin-left:4px;">${margin}%</span></td>
         <td style="font-size:11px;color:var(--ink3);max-width:160px;">${addons}</td>
-        <td><div style="display:flex;gap:5px;">
+        <td onclick="event.stopPropagation()"><div style="display:flex;gap:5px;">
           <button class="btn btn-outline btn-sm" onclick="editProd(${p.id})">Edit</button>
           <button class="btn btn-danger btn-sm" onclick="deleteProd(${p.id})">✕</button>
         </div></td>
-      </tr>`;
+      </tr>
+      <tbody id="csRows_${p.id}" style="display:none;">${consumableRows}</tbody>`;
     }).join('')}</tbody>
   </table>`;
+}
+
+function toggleConsumableRows(id){
+  const rows=document.getElementById('csRows_'+id);
+  const arrow=document.getElementById('csArrow_'+id);
+  if(!rows)return;
+  const open=rows.style.display==='none'||rows.style.display==='';
+  rows.style.display=open?'table-row-group':'none';
+  if(arrow) arrow.style.transform=open?'rotate(90deg)':'rotate(0deg)';
 }
 function openAddProd(){
   editProdId=null;
   document.getElementById('addProdTitle').textContent='Add Product / Service';
-  ['apName','apPrice','apCost','apStock','apLowAt','apNotes','apContainerSize'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['apName','apPrice','apCost','apStock','apLowAt','apNotes','apContainerSize','apParLevel','apReorderQty'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('apUnit').value='sessions';
   document.getElementById('apCat').value='Facial Treatments';
   if(document.getElementById('apSubcat')) document.getElementById('apSubcat').value='';
@@ -4540,6 +5162,11 @@ function editProd(id){
   document.getElementById('apCost').value=p.cost||'';
   document.getElementById('apStock').value=p.stock;
   document.getElementById('apLowAt').value=p.lowAt||5;
+  const parEl=document.getElementById('apParLevel');
+  const reorderEl=document.getElementById('apReorderQty');
+  if(parEl) parEl.value=p.parLevel||'';
+  if(reorderEl) reorderEl.value=p.reorderQty||'';
+  updateParPreview();
   document.getElementById('apNotes').value=p.notes||'';
   document.getElementById('apShowInPOS').checked=p.inPOS!==false;
   if(document.getElementById('apSubcat')) document.getElementById('apSubcat').value=p.subcat||'';
@@ -4558,7 +5185,7 @@ function saveProd(){
   const addons=getAddonsFromForm();
   const containerSize=parseFloat(document.getElementById('apContainerSize')?.value)||0;
   const unit=document.getElementById('apUnit').value;
-  const data={name,cat:document.getElementById('apCat').value,subcat:(document.getElementById('apSubcat')?.value||'').trim(),unit,price,cost:parseFloat(document.getElementById('apCost').value)||0,stock:parseFloat(document.getElementById('apStock').value)||0,lowAt:parseFloat(document.getElementById('apLowAt').value)||5,notes:document.getElementById('apNotes').value.trim(),inPOS:document.getElementById('apShowInPOS').checked,consumables,addons,containerSize:containerSize||null};
+  const data={name,cat:document.getElementById('apCat').value,subcat:(document.getElementById('apSubcat')?.value||'').trim(),unit,price,cost:parseFloat(document.getElementById('apCost').value)||0,stock:parseFloat(document.getElementById('apStock').value)||0,lowAt:parseFloat(document.getElementById('apLowAt').value)||5,parLevel:parseFloat(document.getElementById('apParLevel')?.value)||null,reorderQty:parseFloat(document.getElementById('apReorderQty')?.value)||null,notes:document.getElementById('apNotes').value.trim(),inPOS:document.getElementById('apShowInPOS').checked,consumables,addons,containerSize:containerSize||null};
   if(editProdId){const i=S.products.findIndex(x=>x.id===editProdId);if(i>=0)S.products[i]={...S.products[i],...data};}
   else S.products.push({id:Date.now(),...data});
   closeM('addProdModal');renderProducts();renderCatTabs();renderSvcs();populateForms();sync('products');
@@ -5002,11 +5629,13 @@ function saveUser(){
 
 // ══ MESSAGING ══
 const MSG_TEMPLATES=[
-  {label:'Appointment Reminder',text:'Hi [Name], just a reminder of your appointment tomorrow at [Time] at GlowBar. Please arrive 5 minutes early. See you! 🌸'},
-  {label:'Follow-up',text:'Hi [Name], how are you feeling after your treatment? We hope you\'re glowing! Feel free to message us if you have questions. 💛'},
-  {label:'Promo Offer',text:'Hi [Name]! 🌟 Exclusive offer just for you — enjoy 20% off your next visit this month. Book now at GlowBar!'},
-  {label:'Birthday Greeting',text:'Happy Birthday, [Name]! 🎂🌸 Celebrate your special day with a complimentary consultation at GlowBar. You deserve to glow!'},
-  {label:'Rebook Reminder',text:'Hi [Name], it\'s been a while! Your skin deserves some love. Book your next session at GlowBar today. 💆‍♀️'},
+  {label:'Appointment Reminder',subject:'Your GlowBar Appointment Reminder 🌸',text:'Hi [Name], just a reminder of your appointment tomorrow at [Time] at GlowBar Beauty Clinic. Please arrive 5 minutes early. See you! 🌸'},
+  {label:'Booking Confirmation',subject:'Your GlowBar Appointment is Confirmed ✨',text:'Hi [Name]! Your appointment at GlowBar Beauty Clinic has been confirmed for [Time]. We look forward to seeing you! If you need to reschedule, please message us at least 24 hours in advance. 🌸'},
+  {label:'Follow-up',subject:'How are you feeling after your GlowBar treatment? 💛',text:'Hi [Name], how are you feeling after your treatment? We hope you\'re glowing! Feel free to message us if you have questions or concerns. 💛 — GlowBar Beauty Clinic'},
+  {label:'Promo Offer',subject:'Exclusive Offer Just for You — GlowBar 🌟',text:'Hi [Name]! 🌟 Exclusive offer just for you — enjoy 20% off your next visit this month. Book now at GlowBar!'},
+  {label:'Birthday Greeting',subject:'Happy Birthday from GlowBar! 🎂',text:'Happy Birthday, [Name]! 🎂🌸 Celebrate your special day with a complimentary consultation at GlowBar. You deserve to glow!'},
+  {label:'Rebook Reminder',subject:'We Miss You at GlowBar! 💆',text:'Hi [Name], it\'s been a while! Your skin deserves some love. Book your next session at GlowBar today. 💆'},
+  {label:'No-Show Follow-up',subject:'We Missed You Today — GlowBar',text:'Hi [Name], we noticed you weren\'t able to make it today. We\'d love to reschedule at a time that works for you! Please message us to book a new slot. 🌸'},
 ];
 function renderMsgClients(){
   const list=document.getElementById('msgClientList');if(!list)return;
@@ -5029,8 +5658,24 @@ function msgClient(id){selMsgClient(id);goPage('messaging');}
 function applyTemplate(i){
   if(!msgClientId)return;
   const c=S.clients.find(x=>x.id===msgClientId);
-  let txt=MSG_TEMPLATES[i].text.replace('[Name]',c.name.split(' ')[0]).replace('[Time]','10:00 AM');
+  const tmpl=MSG_TEMPLATES[i];
+  // Find client's next upcoming appointment for [Time] placeholder
+  const nextAppt=S.bookings.filter(b=>
+    (b.client===c.name||(c.phone&&b.phone&&b.phone===c.phone))&&
+    b.date>=td()&&b.status!=='cancelled'
+  ).sort((a,b2)=>a.date.localeCompare(b2.date)||a.time.localeCompare(b2.time))[0];
+  const timeStr=nextAppt?fmtDate(nextAppt.date)+' at '+nextAppt.time:'your next appointment';
+  let txt=tmpl.text.replace(/\[Name\]/g,c.name.split(' ')[0]).replace(/\[Time\]/g,timeStr);
   document.getElementById('msgBody').value=txt;
+  // Auto-fill email subject if email channel is active
+  const subjectEl=document.getElementById('emailSubject');
+  if(subjectEl&&tmpl.subject){
+    subjectEl.value=tmpl.subject.replace(/\[Name\]/g,c.name.split(' ')[0]);
+  }
+  // Switch to email channel if not on mobile channels and subject is relevant
+  if(msgChannel==='email'&&subjectEl){
+    document.getElementById('emailSubjectWrap').style.display='block';
+  }
 }
 function setChannel(ch,el){
   msgChannel=ch;
@@ -5053,7 +5698,7 @@ function sendMsg(){
   const body=document.getElementById('msgBody').value.trim();
   if(!body){showToast('Type a message','err');return;}
   const c=S.clients.find(x=>x.id===msgClientId);
-  S.messages.push({id:Date.now(),clientId:msgClientId,text:body,channel:msgChannel,dir:'sent',time:new Date().toISOString()});
+  S.messages.push({id:Date.now(),clientId:msgClientId,text:body,channel:msgChannel,dir:'sent',staff:currentUser?.name||'',time:new Date().toISOString()});
   // Open the appropriate app
   if(msgChannel==='sms')window.open('sms:'+c.phone+'?body='+encodeURIComponent(body),'_blank');
   else if(msgChannel==='email'){const sub=document.getElementById('emailSubject')?.value||'Message from GlowBar';window.open('mailto:'+c.email+'?subject='+encodeURIComponent(sub)+'&body='+encodeURIComponent(body),'_blank');}
@@ -5080,7 +5725,8 @@ function renderDashboard(){
   if(document.getElementById('mRevSub'))document.getElementById('mRevSub').textContent=todayTxns.length+' transaction'+(todayTxns.length!==1?'s':'');
   if(document.getElementById('mSess'))document.getElementById('mSess').textContent=activeSess;
   if(document.getElementById('mAppts'))document.getElementById('mAppts').textContent=todayBk.length;
-  if(document.getElementById('mLow'))document.getElementById('mLow').textContent=S.products.filter(p=>p.stock<=p.lowAt).length;
+  const lowStockCount=S.products.filter(p=>p.stock<=p.lowAt).length;
+  if(document.getElementById('mLow'))document.getElementById('mLow').textContent=lowStockCount;
   const tc=document.getElementById('dashTxns');
   if(tc)tc.innerHTML=todayTxns.length?[...todayTxns].reverse().slice(0,6).map(t=>`
     <div style="padding:9px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;">
@@ -5098,6 +5744,99 @@ function renderDashboard(){
         <span class="pill pill-${b.status==='confirmed'?'green':'amber'}">${cap(b.status)}</span>
       </div>`).join(''):'<div style="padding:24px;text-align:center;color:var(--ink3);font-size:12px;">No appointments today</div>';
   }
+
+  // ── Alerts panel ──
+  renderDashAlerts();
+}
+
+function renderDashAlerts(){
+  const today=td();
+  const alerts=[];
+
+  // 1. New unconfirmed online bookings
+  const newOnline=S.bookings.filter(b=>b.source==='online'&&b.status==='pending');
+  if(newOnline.length){
+    alerts.push({
+      type:'booking', color:'#007AFF', icon:'📲',
+      title:`${newOnline.length} new online booking${newOnline.length!==1?'s':''} waiting for confirmation`,
+      body:newOnline.map(b=>`${b.client} — ${b.service} on ${fmtDate(b.date)} at ${b.time}`).join('<br>'),
+      action:'goPage(\'bookings\')', actionLabel:'View Appointments'
+    });
+  }
+
+  // 2. Pending appointments today (not confirmed)
+  const pendingToday=S.bookings.filter(b=>b.date===today&&b.status==='pending');
+  if(pendingToday.length){
+    alerts.push({
+      type:'pending', color:'var(--warn)', icon:'⏳',
+      title:`${pendingToday.length} appointment${pendingToday.length!==1?'s':''} today still pending confirmation`,
+      body:pendingToday.map(b=>`${b.time} — ${b.client}`).join(' · '),
+      action:'goPage(\'bookings\')', actionLabel:'Confirm Now'
+    });
+  }
+
+  // 3. Low stock items
+  const lowStock=S.products.filter(p=>p.stock<=p.lowAt&&p.stock>0);
+  if(lowStock.length){
+    alerts.push({
+      type:'stock', color:'var(--warn)', icon:'📦',
+      title:`${lowStock.length} item${lowStock.length!==1?'s':''} running low on stock`,
+      body:lowStock.map(p=>`${p.name} (${p.stock} ${p.unit} left)`).join(' · '),
+      action:'goPage(\'products\')', actionLabel:'View Inventory'
+    });
+  }
+
+  // 4. Out of stock items
+  const outStock=S.products.filter(p=>p.stock===0&&p.unit!=='sessions');
+  if(outStock.length){
+    alerts.push({
+      type:'out', color:'var(--danger)', icon:'🚨',
+      title:`${outStock.length} item${outStock.length!==1?'s':''} out of stock`,
+      body:outStock.map(p=>p.name).join(' · '),
+      action:'goPage(\'products\')', actionLabel:'Restock Now'
+    });
+  }
+
+  // 5. Client birthdays today
+  const todayMMDD=today.slice(5);
+  const bdays=S.clients.filter(c=>c.bday&&c.bday.slice(5)===todayMMDD);
+  if(bdays.length){
+    alerts.push({
+      type:'bday', color:'#E87DB8', icon:'🎂',
+      title:`${bdays.length} client birthday${bdays.length!==1?'s':''} today!`,
+      body:bdays.map(c=>c.name).join(', '),
+      action:'goPage(\'clients\')', actionLabel:'Send Greetings'
+    });
+  }
+
+  // 6. No-shows from yesterday
+  const yesterday=new Date(); yesterday.setDate(yesterday.getDate()-1);
+  const yStr=yesterday.toISOString().split('T')[0];
+  const noShows=S.bookings.filter(b=>b.date===yStr&&b.status==='no-show');
+  if(noShows.length){
+    alerts.push({
+      type:'noshow', color:'var(--danger)', icon:'🚫',
+      title:`${noShows.length} no-show${noShows.length!==1?'s':''} from yesterday`,
+      body:noShows.map(b=>`${b.client} — ${b.service}`).join(' · '),
+      action:'setBkRange(\'all\')||goPage(\'bookings\')', actionLabel:'View'
+    });
+  }
+
+  // Render
+  const wrap=document.getElementById('dashAlertsWrap');
+  const el=document.getElementById('dashAlerts');
+  if(!wrap||!el)return;
+  if(!alerts.length){wrap.style.display='none';return;}
+  wrap.style.display='block';
+  el.innerHTML=alerts.map(a=>`
+    <div style="background:#fff;border:1.5px solid ${a.color};border-left:4px solid ${a.color};border-radius:10px;padding:12px 14px;display:flex;align-items:flex-start;gap:10px;">
+      <div style="font-size:20px;flex-shrink:0;">${a.icon}</div>
+      <div style="flex:1;">
+        <div style="font-size:13px;font-weight:600;color:var(--ink);margin-bottom:3px;">${a.title}</div>
+        <div style="font-size:11px;color:var(--ink3);line-height:1.6;">${a.body}</div>
+      </div>
+      <button onclick="${a.action}" style="background:${a.color};color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:'Jost',sans-serif;flex-shrink:0;">${a.actionLabel}</button>
+    </div>`).join('');
 }
 
 // ══ REPORTS ══
@@ -5930,11 +6669,38 @@ function viewClientProfile(id){
   }
 
   // Notes
-  // Notes
   const notesWrap=document.getElementById('cpNotesWrap');
   const allNotes=[c.notes,c.machineNotes].filter(Boolean).join('\n\n');
   if(allNotes){notesWrap.style.display='block';document.getElementById('cpNotes').textContent=allNotes;}
   else notesWrap.style.display='none';
+
+  // Message history
+  const msgWrap=document.getElementById('cpMsgHistoryWrap');
+  const msgEl=document.getElementById('cpMsgHistory');
+  const msgs=S.messages.filter(m=>m.clientId===id).sort((a,b)=>new Date(a.time)-new Date(b.time));
+  if(msgs.length){
+    msgWrap.style.display='block';
+    document.getElementById('cpMsgCount').textContent=msgs.length+' message'+(msgs.length!==1?'s':'');
+    msgEl.innerHTML=msgs.map(m=>{
+      const d=new Date(m.time);
+      const timeStr=d.toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'numeric'})+' · '+d.toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'});
+      const isSent=m.dir==='sent'||!m.dir;
+      const channelIcon={sms:'📱',messenger:'💬',viber:'📳',email:'📧',whatsapp:'🟢'}[m.channel]||'💬';
+      return `<div style="display:flex;flex-direction:column;align-items:${isSent?'flex-end':'flex-start'};">
+        <div style="max-width:85%;background:${isSent?'var(--gold-lt)':'var(--cream2)'};border:1.5px solid ${isSent?'var(--gold)':'var(--border2)'};border-radius:${isSent?'12px 12px 4px 12px':'12px 12px 12px 4px'};padding:10px 14px;">
+          <div style="font-size:13px;color:var(--ink);line-height:1.6;white-space:pre-wrap;">${m.text}</div>
+          <div style="font-size:10px;color:var(--ink4);margin-top:4px;display:flex;align-items:center;gap:6px;">
+            ${channelIcon} ${m.channel||'message'} · ${timeStr}
+            ${m.staff?`· <span style="color:var(--ink3);">${m.staff}</span>`:''}
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+    // Scroll to bottom
+    setTimeout(()=>{msgEl.scrollTop=msgEl.scrollHeight;},100);
+  } else {
+    msgWrap.style.display='none';
+  }
 
   // Photos
   window._cpClientId=id;
