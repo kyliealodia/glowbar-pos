@@ -676,11 +676,18 @@ html{height:-webkit-fill-available;}
         <div class="bk-layout">
           <div class="card" style="display:flex;flex-direction:column;gap:12px;padding:16px;">
             <div style="font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:500;">Filter</div>
-            <div class="form-group"><label class="form-label">Date</label><input class="form-input" type="date" id="bkFilterDate" onchange="renderBookings()"></div>
+            <!-- View range tabs -->
+            <div style="display:flex;border:1px solid var(--border2);border-radius:9px;overflow:hidden;">
+              <button id="bkRangeDay" onclick="setBkRange('day')" style="flex:1;padding:6px 4px;font-size:11px;font-weight:600;border:none;background:var(--gold);color:#fff;cursor:pointer;font-family:'Jost',sans-serif;">Day</button>
+              <button id="bkRangeWeek" onclick="setBkRange('week')" style="flex:1;padding:6px 4px;font-size:11px;font-weight:600;border:none;background:var(--cream2);color:var(--ink2);cursor:pointer;font-family:'Jost',sans-serif;">Week</button>
+              <button id="bkRangeMonth" onclick="setBkRange('month')" style="flex:1;padding:6px 4px;font-size:11px;font-weight:600;border:none;background:var(--cream2);color:var(--ink2);cursor:pointer;font-family:'Jost',sans-serif;">Month</button>
+              <button id="bkRangeAll" onclick="setBkRange('all')" style="flex:1;padding:6px 4px;font-size:11px;font-weight:600;border:none;background:var(--cream2);color:var(--ink2);cursor:pointer;font-family:'Jost',sans-serif;">All</button>
+            </div>
+            <div class="form-group"><label class="form-label">Date</label><input class="form-input" type="date" id="bkFilterDate" onchange="setBkRange('day')"></div>
             <div class="form-group"><label class="form-label">Status</label>
               <select class="form-select" id="bkFilterStatus" onchange="renderBookings()">
                 <option value="">All statuses</option>
-                <option>confirmed</option><option>pending</option><option>completed</option><option>cancelled</option>
+                <option>confirmed</option><option>pending</option><option>completed</option><option>cancelled</option><option>no-show</option>
               </select>
             </div>
             <div class="form-group"><label class="form-label">Staff</label>
@@ -4008,8 +4015,9 @@ function showDayAppts(ds){
   if(document.getElementById('qbDate'))document.getElementById('qbDate').value=ds;
 }
 function openApptDetail(id){
-  const b=S.bookings.find(x=>x.id===id);if(!b)return;
-  editApptId=id;
+  const b=S.bookings.find(x=>String(x.id)===String(id));
+  if(!b)return;
+  editApptId=b.id;
   document.getElementById('apptModalTitle').textContent='Edit Appointment';
   document.getElementById('apClient').value=b.client;
   document.getElementById('apService').value=b.service;
@@ -4117,21 +4125,16 @@ function isClinicOpen(dateStr){
 }
 
 function isSlotAvailable(dateStr, timeStr, excludeId=null){
-  if(!S.settings)return true;
-  const cfg=S.settings;
-  // Check if clinic is open that day
+  const cfg=S.settings||{openTime:'09:00',closeTime:'19:00',maxStaff:2,breakStart:'',breakEnd:''};
   if(!isClinicOpen(dateStr)) return false;
-  // Check time within opening hours
   if(timeStr<cfg.openTime||timeStr>=cfg.closeTime) return false;
-  // Check break time
   if(cfg.breakStart&&cfg.breakEnd&&timeStr>=cfg.breakStart&&timeStr<cfg.breakEnd) return false;
-  // Count active bookings at this exact time slot
   const active=S.bookings.filter(b=>
     b.date===dateStr &&
     b.time===timeStr &&
     b.status!=='cancelled' &&
     b.status!=='no-show' &&
-    b.id!==excludeId
+    String(b.id)!==String(excludeId)
   ).length;
   return active<(cfg.maxStaff||2);
 }
@@ -4156,36 +4159,72 @@ function getAvailableSlots(dateStr){
 
 // ── Overbooked calendar indicator ──
 // ══ APPOINTMENTS ══
+let bkRange='day';
+function setBkRange(range){
+  bkRange=range;
+  // Update tab styles
+  ['day','week','month','all'].forEach(r=>{
+    const btn=document.getElementById('bkRange'+r.charAt(0).toUpperCase()+r.slice(1));
+    if(btn){btn.style.background=r===range?'var(--gold)':'var(--cream2)';btn.style.color=r===range?'#fff':'var(--ink2)';}
+  });
+  renderBookings();
+}
+
 function renderBookings(){
-  const dateF=document.getElementById('bkFilterDate')?.value||'';
+  const dateF=document.getElementById('bkFilterDate')?.value||td();
   const statusF=document.getElementById('bkFilterStatus')?.value||'';
   const staffF=document.getElementById('bkFilterStaff')?.value||'';
-  let bks=S.bookings;
-  if(dateF)bks=bks.filter(b=>b.date===dateF);
-  if(statusF)bks=bks.filter(b=>b.status===statusF);
-  if(staffF)bks=bks.filter(b=>b.staff===staffF);
+  let bks=[...S.bookings];
+
+  // Range filter
+  if(bkRange==='day'){
+    bks=bks.filter(b=>b.date===dateF);
+    document.getElementById('bkListTitle').textContent=fmtDate(dateF);
+  } else if(bkRange==='week'){
+    const d=new Date(dateF+'T12:00');
+    const day=d.getDay();
+    const mon=new Date(d); mon.setDate(d.getDate()-(day===0?6:day-1));
+    const sun=new Date(mon); sun.setDate(mon.getDate()+6);
+    const monStr=mon.toISOString().split('T')[0];
+    const sunStr=sun.toISOString().split('T')[0];
+    bks=bks.filter(b=>b.date>=monStr&&b.date<=sunStr);
+    document.getElementById('bkListTitle').textContent='Week of '+fmtDate(monStr);
+  } else if(bkRange==='month'){
+    const ym=dateF.slice(0,7);
+    bks=bks.filter(b=>b.date.startsWith(ym));
+    const d=new Date(dateF+'T12:00');
+    document.getElementById('bkListTitle').textContent=d.toLocaleDateString('en-PH',{month:'long',year:'numeric'});
+  } else {
+    document.getElementById('bkListTitle').textContent='All Appointments';
+  }
+
+  if(statusF) bks=bks.filter(b=>b.status===statusF);
+  if(staffF) bks=bks.filter(b=>b.staff===staffF);
   bks=bks.sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time));
   document.getElementById('bkCount').textContent=bks.length+' appointment'+(bks.length!==1?'s':'');
   const el=document.getElementById('bkList');
   el.innerHTML=bks.length?bks.map(b=>`
     <div class="bk-entry">
-      <div class="bk-time">${b.time}</div>
+      <div class="bk-time">${b.time}<div style="font-size:10px;color:var(--ink3);">${fmtDate(b.date)}</div></div>
       <div style="flex:1;">
         <div class="bk-client">${b.client}</div>
-        <div class="bk-svc">${b.service} · ${b.staff||'Unassigned'} · ${fmtDate(b.date)}</div>
+        <div class="bk-svc">${b.service} · ${b.staff||'Unassigned'}</div>
         ${b.notes?`<div style="font-size:10px;color:var(--ink3);">${b.notes}</div>`:''}
       </div>
       <span class="pill pill-${b.status==='confirmed'?'green':b.status==='pending'?'amber':b.status==='completed'?'gray':'red'}">${cap(b.status)}</span>
-      <div style="display:flex;gap:5px;margin-left:8px;">
-        ${b.status==='pending'?`<button class="btn btn-outline btn-sm" onclick="updBk(${b.id},'confirmed')">Confirm</button>`:''}
-        ${b.status!=='completed'&&b.status!=='cancelled'&&b.status!=='no-show'?`<button class="btn btn-outline btn-sm" onclick="updBk(${b.id},'completed')">Done</button>`:''}
-        ${b.status!=='cancelled'&&b.status!=='no-show'&&b.status!=='completed'?`<button class="btn btn-danger btn-sm" onclick="updBk(${b.id},'no-show')" title="Mark no-show">🚫</button>`:''}
-        ${b.status!=='cancelled'&&b.status!=='completed'&&b.status!=='no-show'?`<button class="btn btn-danger btn-sm" onclick="updBk(${b.id},'cancelled')">Cancel</button>`:''}
-        <button class="btn btn-outline btn-sm" onclick="openApptDetail(${b.id})">Edit</button>
+      <div style="display:flex;gap:5px;margin-left:8px;flex-wrap:wrap;">
+        ${b.status==='pending'?`<button class="btn btn-outline btn-sm" onclick="updBk('${b.id}','confirmed')">✓ Confirm</button>`:''}
+        ${b.status!=='completed'&&b.status!=='cancelled'&&b.status!=='no-show'?`<button class="btn btn-outline btn-sm" onclick="updBk('${b.id}','completed')">Done</button>`:''}
+        ${b.status!=='cancelled'&&b.status!=='no-show'&&b.status!=='completed'?`<button class="btn btn-danger btn-sm" onclick="updBk('${b.id}','no-show')">🚫</button>`:''}
+        ${b.status!=='cancelled'&&b.status!=='completed'&&b.status!=='no-show'?`<button class="btn btn-danger btn-sm" onclick="updBk('${b.id}','cancelled')">Cancel</button>`:''}
+        <button class="btn btn-outline btn-sm" onclick="openApptDetail('${b.id}')">Edit</button>
       </div>
     </div>`).join(''):'<div style="padding:30px;text-align:center;color:var(--ink3);font-size:13px;">No appointments found</div>';
 }
-function updBk(id,status){const b=S.bookings.find(x=>x.id===id);if(b){b.status=status;renderBookings();renderCalendar();renderDashboard();sync('bookings');showToast('Appointment '+status);}}
+function updBk(id,status){
+  const b=S.bookings.find(x=>String(x.id)===String(id));
+  if(b){b.status=status;renderBookings();renderCalendar();renderDashboard();sync('bookings');showToast('Appointment '+status,'ok');}
+}
 function openNewAppt(){
   editApptId=null;
   document.getElementById('apptModalTitle').textContent='New Appointment';
@@ -4211,7 +4250,7 @@ function saveAppt(){
     showToast(`This slot is fully booked — max ${max} appointment${max!==1?'s':''} at this time`,'err');return;
   }
   const appt={client,service,staff:document.getElementById('apStaff').value||'',date,time,duration:parseInt(document.getElementById('apDuration').value)||60,status:'pending',notes:document.getElementById('apNotes').value.trim(),reminder:document.getElementById('apSendReminder').checked};
-  if(editApptId){const i=S.bookings.findIndex(x=>x.id===editApptId);if(i>=0){S.bookings[i]={...S.bookings[i],...appt};}}
+  if(editApptId){const i=S.bookings.findIndex(x=>String(x.id)===String(editApptId));if(i>=0)S.bookings[i]={...S.bookings[i],...appt};}
   else S.bookings.push({id:Date.now(),...appt});
   closeM('apptModal');sync('bookings');renderBookings();renderCalendar();renderDashboard();
   showToast((editApptId?'Appointment updated':'Appointment booked')+' for '+client,'ok');
