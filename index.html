@@ -6575,8 +6575,11 @@ function addAttLog(){
   const action=prompt('Action (clockin or clockout):');if(!action)return;
   const time=prompt('Date & time (YYYY-MM-DDTHH:MM:SS):',new Date().toISOString().slice(0,19));if(!time)return;
   const user=S.users.find(u=>u.name===name);
-  const entry={name,action,time,userId:user?user.id:'manual',role:user?user.role:'Staff'};
-  firebase.database().ref('gb/loginLogs').push(entry).then(()=>{alert('Added!');loadCloud();});
+  const entry={id:Date.now(),name,action,time,userId:user?user.id:'manual',role:user?user.role:'Staff'};
+  S.loginLogs.push(entry);
+  sync('loginLogs');
+  alert('Added!');
+  renderAttendance();
 }
 
 function exportAttendance(){
