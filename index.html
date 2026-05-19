@@ -6539,7 +6539,7 @@ function renderAttendance(){
       <td style="font-size:12px;color:var(--ink2);">${dateStr}</td>
       <td style="font-size:13px;font-weight:500;">${timeStr}</td>
       <td style="font-size:12px;color:var(--ink3);">${duration}</td>
-<td><button onclick="editAttLog('${log.id}')" style="font-size:11px;padding:3px 8px;border:1px solid var(--border);border-radius:6px;background:var(--cream);cursor:pointer;margin-right:4px;">✏ Edit</button><button onclick="deleteAttLog('${log.id}')" style="font-size:11px;padding:3px 8px;border:1px solid var(--danger);border-radius:6px;background:var(--cream);color:var(--danger);cursor:pointer;">🗑 Delete</button></td>
+<td><button onclick="event.stopPropagation();editAttLog('${log.id}')" style="font-size:11px;padding:3px 8px;border:1px solid var(--border);border-radius:6px;background:var(--cream);cursor:pointer;margin-right:4px;">✏ Edit</button><button onclick="event.stopPropagation();deleteAttLog('${log.id}')" style="font-size:11px;padding:3px 8px;border:1px solid var(--danger);border-radius:6px;background:var(--cream);color:var(--danger);cursor:pointer;">🗑 Delete</button></td>
     </tr>`;
   }).join('');
 }
