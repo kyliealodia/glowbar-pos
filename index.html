@@ -911,11 +911,12 @@ html{height:-webkit-fill-available;}
           <div style="display:flex;gap:8px;">
             <input type="date" class="form-input" id="attFilterDate" style="width:160px;font-size:12px;" onchange="renderAttendance()">
             <button class="btn btn-outline btn-sm" onclick="exportAttendance()">⬇ Export CSV</button>
+            <button class="btn btn-outline btn-sm" onclick="addAttLog()">+ Add Record</button>
           </div>
         </div>
         <div class="card" style="overflow:hidden;">
           <table class="inv-table" style="width:100%;">
-            <thead><tr><th>Selfie</th><th>Staff</th><th>Role</th><th>Action</th><th>Date</th><th>Time</th><th>Duration</th></tr></thead>
+            <thead><tr><th>Selfie</th><th>Staff</th><th>Role</th><th>Action</th><th>Date</th><th>Time</th><th>Duration</th><th>Actions</th></tr></thead>
             <tbody id="attendanceBody"></tbody>
           </table>
           <div id="attendanceEmpty" style="padding:40px;text-align:center;color:var(--ink3);font-size:13px;display:none;">No login records yet.</div>
@@ -6538,6 +6539,7 @@ function renderAttendance(){
       <td style="font-size:12px;color:var(--ink2);">${dateStr}</td>
       <td style="font-size:13px;font-weight:500;">${timeStr}</td>
       <td style="font-size:12px;color:var(--ink3);">${duration}</td>
+<td><button onclick="editAttLog('${log.id}')" style="font-size:11px;padding:3px 8px;border:1px solid var(--border);border-radius:6px;background:var(--cream);cursor:pointer;margin-right:4px;">✏ Edit</button><button onclick="deleteAttLog('${log.id}')" style="font-size:11px;padding:3px 8px;border:1px solid var(--danger);border-radius:6px;background:var(--cream);color:var(--danger);cursor:pointer;">🗑 Delete</button></td>
     </tr>`;
   }).join('');
 }
@@ -6546,6 +6548,29 @@ function viewSelfie(src, label){
   document.getElementById('selfieViewImg').src=src;
   document.getElementById('selfieViewLabel').textContent=label;
   openM('selfieViewModal');
+}
+
+function editAttLog(id){
+  const log=S.loginLogs.find(l=>l.id===id);
+  if(!log) return;
+  const newTime=prompt('Edit date & time (YYYY-MM-DDTHH:MM:SS):',log.time);
+  if(!newTime) return;
+  const newAction=prompt('Action (clockin or clockout):',log.action);
+  if(!newAction) return;
+  const ref=firebase.database().ref('gb/loginLogs/'+id);
+  ref.update({time:newTime,action:newAction}).then(()=>{alert('Updated!');loadCloud();});
+}
+function deleteAttLog(id){
+  if(!confirm('Delete this attendance record?')) return;
+  firebase.database().ref('gb/loginLogs/'+id).remove().then(()=>{alert('Deleted!');loadCloud();});
+}
+function addAttLog(){
+  const name=prompt('Staff name:');if(!name)return;
+  const action=prompt('Action (clockin or clockout):');if(!action)return;
+  const time=prompt('Date & time (YYYY-MM-DDTHH:MM:SS):',new Date().toISOString().slice(0,19));if(!time)return;
+  const user=S.users.find(u=>u.name===name);
+  const entry={name,action,time,userId:user?user.id:'manual',role:user?user.role:'Staff'};
+  firebase.database().ref('gb/loginLogs').push(entry).then(()=>{alert('Added!');loadCloud();});
 }
 
 function exportAttendance(){
