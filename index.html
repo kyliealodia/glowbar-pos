@@ -6551,7 +6551,7 @@ function viewSelfie(src, label){
 }
 
 function editAttLog(id){
-  const log=S.loginLogs.find(l=>l.id==id);
+  const log=S.loginLogs.find(l=>String(l.id)===String(id));
   if(!log) return;
   const newTime=prompt('Edit date & time (YYYY-MM-DDTHH:MM:SS):',log.time.slice(0,19));
   if(!newTime) return;
@@ -6565,7 +6565,7 @@ function editAttLog(id){
 }
 function deleteAttLog(id){
   if(!confirm('Delete this attendance record?')) return;
-  S.loginLogs=S.loginLogs.filter(l=>l.id!=id);
+  S.loginLogs=S.loginLogs.filter(l=>String(l.id)!==String(id));
   sync('loginLogs');
   setTimeout(()=>renderAttendance(),500);
   alert('Deleted!');
