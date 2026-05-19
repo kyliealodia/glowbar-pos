@@ -6553,7 +6553,9 @@ function viewSelfie(src, label){
 function editAttLog(id){
   const log=S.loginLogs.find(l=>String(l.id)===String(id));
   if(!log) return;
-  const newTime=prompt('Edit date & time (YYYY-MM-DDTHH:MM:SS):',log.time.slice(0,19));
+  const rawTime=new Date(log.time);
+  const localTime=new Date(rawTime.getTime()-rawTime.getTimezoneOffset()*60000).toISOString().slice(0,19);
+  const newTime=prompt('Edit date & time (YYYY-MM-DDTHH:MM:SS):',localTime);
   if(!newTime) return;
   const newAction=prompt('Action (clockin or clockout):',log.action);
   if(!newAction) return;
@@ -6573,7 +6575,9 @@ function deleteAttLog(id){
 function addAttLog(){
   const name=prompt('Staff name:');if(!name)return;
   const action=prompt('Action (clockin or clockout):');if(!action)return;
-  const time=prompt('Date & time (YYYY-MM-DDTHH:MM:SS):',new Date().toISOString().slice(0,19));if(!time)return;
+  const now=new Date();
+  const localISO=new Date(now.getTime()-now.getTimezoneOffset()*60000).toISOString().slice(0,19);
+  const time=prompt('Date & time (YYYY-MM-DDTHH:MM:SS):',localISO);if(!time)return;
   const user=S.users.find(u=>u.name===name);
   const entry={id:Date.now(),name,action,time,userId:user?user.id:'manual',role:user?user.role:'Staff'};
   S.loginLogs.push(entry);
