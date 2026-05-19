@@ -6551,18 +6551,24 @@ function viewSelfie(src, label){
 }
 
 function editAttLog(id){
-  const log=S.loginLogs.find(l=>l.id===id);
+  const log=S.loginLogs.find(l=>l.id==id);
   if(!log) return;
   const newTime=prompt('Edit date & time (YYYY-MM-DDTHH:MM:SS):',log.time);
   if(!newTime) return;
   const newAction=prompt('Action (clockin or clockout):',log.action);
   if(!newAction) return;
-  const ref=firebase.database().ref('gb/loginLogs/'+id);
-  ref.update({time:newTime,action:newAction}).then(()=>{alert('Updated!');loadCloud();});
+  log.time=newTime;
+  log.action=newAction;
+  sync('loginLogs');
+  setTimeout(()=>renderAttendance(),500);
+  alert('Updated!');
 }
 function deleteAttLog(id){
   if(!confirm('Delete this attendance record?')) return;
-  firebase.database().ref('gb/loginLogs/'+id).remove().then(()=>{alert('Deleted!');loadCloud();});
+  S.loginLogs=S.loginLogs.filter(l=>l.id!=id);
+  sync('loginLogs');
+  setTimeout(()=>renderAttendance(),500);
+  alert('Deleted!');
 }
 function addAttLog(){
   const name=prompt('Staff name:');if(!name)return;
