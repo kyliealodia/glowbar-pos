@@ -6553,7 +6553,7 @@ function viewSelfie(src, label){
 function editAttLog(id){
   const log=S.loginLogs.find(l=>l.id==id);
   if(!log) return;
-  const newTime=prompt('Edit date & time (YYYY-MM-DDTHH:MM:SS):',log.time);
+  const newTime=prompt('Edit date & time (YYYY-MM-DDTHH:MM:SS):',log.time.slice(0,19));
   if(!newTime) return;
   const newAction=prompt('Action (clockin or clockout):',log.action);
   if(!newAction) return;
