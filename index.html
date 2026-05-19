@@ -6656,7 +6656,7 @@ function computeDeductions(u, grossPay){
 
 function renderCommissionRates(){
   const g=document.getElementById('commissionRatesGrid');if(!g)return;
-  g.innerHTML=S.users.filter(u=>u.role!=='owner').map(u=>{
+  g.innerHTML=S.users.map(u=>{
     const salary=u.salary||0;
     return `<div style="background:var(--cream2);border:1px solid var(--border2);border-radius:12px;padding:14px 16px;">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
