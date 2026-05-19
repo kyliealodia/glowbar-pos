@@ -909,6 +909,12 @@ html{height:-webkit-fill-available;}
         <div class="sec-hdr">
           <h2 class="sec-title">Attendance Log</h2>
           <div style="display:flex;gap:8px;">
+            <div style="display:flex;border:1px solid var(--border2);border-radius:9px;overflow:hidden;margin-right:8px;">
+              <button id="attRangeDay" onclick="setAttRange('day')" style="flex:1;padding:6px 8px;font-size:11px;font-weight:600;border:none;background:var(--gold);color:#fff;cursor:pointer;font-family:'Jost',sans-serif;">Day</button>
+              <button id="attRangeWeek" onclick="setAttRange('week')" style="flex:1;padding:6px 8px;font-size:11px;font-weight:600;border:none;background:var(--cream2);color:var(--ink2);cursor:pointer;font-family:'Jost',sans-serif;">Week</button>
+              <button id="attRangeMonth" onclick="setAttRange('month')" style="flex:1;padding:6px 8px;font-size:11px;font-weight:600;border:none;background:var(--cream2);color:var(--ink2);cursor:pointer;font-family:'Jost',sans-serif;">Month</button>
+              <button id="attRangeAll" onclick="setAttRange('all')" style="flex:1;padding:6px 8px;font-size:11px;font-weight:600;border:none;background:var(--cream2);color:var(--ink2);cursor:pointer;font-family:'Jost',sans-serif;">All</button>
+            </div>
             <input type="date" class="form-input" id="attFilterDate" style="width:160px;font-size:12px;" onchange="renderAttendance()">
             <button class="btn btn-outline btn-sm" onclick="exportAttendance()">⬇ Export CSV</button>
             <button class="btn btn-outline btn-sm" onclick="addAttLog()">+ Add Record</button>
@@ -6496,13 +6502,40 @@ function updateReceiptFab(){
   fab.style.display = (onPOS && cart.length > 0) ? 'flex' : 'none';
 }
 
+let attRange='day';
+function setAttRange(range){
+  attRange=range;
+  ['day','week','month','all'].forEach(r=>{
+    const btn=document.getElementById('attRange'+r.charAt(0).toUpperCase()+r.slice(1));
+    if(btn){btn.style.background=r===range?'var(--gold)':'var(--cream2)';btn.style.color=r===range?'#fff':'var(--ink2)';}
+  });
+  if(range!=='all'){
+    const now=new Date();
+    if(range==='day'){
+      document.getElementById('attFilterDate').value=now.toISOString().slice(0,10);
+    } else if(range==='week'){
+      const day=now.getDay();
+      const monday=new Date(now);
+      monday.setDate(now.getDate()-(day===0?6:day-1));
+      document.getElementById('attFilterDate').value=monday.toISOString().slice(0,10);
+    } else if(range==='month'){
+      document.getElementById('attFilterDate').value=now.getFullYear()+'-'+(String(now.getMonth()+1).padStart(2,'0'))+'-01';
+    }
+  } else {
+    document.getElementById('attFilterDate').value='';
+  }
+  renderAttendance();
+}
+
 // ══ ATTENDANCE LOG ══
 function renderAttendance(){
   const filterDate = document.getElementById('attFilterDate')?.value || '';
   // Only show clock-in and clock-out records (not device login/logout)
   let logs = S.loginLogs.filter(l=>l.action==='clockin'||l.action==='clockout');
   logs = [...logs].reverse();
-  if(filterDate) logs = logs.filter(l => l.time.startsWith(filterDate));
+  if(attRange==='day'&&filterDate) logs=logs.filter(l=>l.time.startsWith(filterDate));
+else if(attRange==='week'&&filterDate){const from=new Date(filterDate);const to=new Date(from);to.setDate(from.getDate()+6);logs=logs.filter(l=>{const d=l.time.slice(0,10);return d>=filterDate&&d<=to.toISOString().slice(0,10);});}
+else if(attRange==='month'&&filterDate) logs=logs.filter(l=>l.time.startsWith(filterDate.slice(0,7)));
   const tbody = document.getElementById('attendanceBody');
   const emptyEl = document.getElementById('attendanceEmpty');
   if(!tbody) return;
