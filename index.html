@@ -6917,7 +6917,7 @@ function renderPayslip(){
     return d.getFullYear()===py && d.getMonth()+1===pm;
   });
   const g=document.getElementById('payslipGrid');if(!g)return;
-  const staffList=S.users.filter(u=>u.role!=='owner');
+  const staffList=S.users;
   if(!staffList.length){g.innerHTML='<div style="color:var(--ink3);font-size:13px;">No staff found.</div>';return;}
 
   // Render owner summary first
