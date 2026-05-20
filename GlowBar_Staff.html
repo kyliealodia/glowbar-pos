@@ -1262,5 +1262,346 @@ function rejectLeave(id){
 // ══ START ══
 loadFromCloud();
 </script>
+<!-- ═══ GLOW BAR PH — COMPLIANCE DASHBOARD (Gold Theme) ═══ -->
+<!-- Paste just before </body> in GlowBar_Staff.html -->
+
+<style>
+  .cw{font-family:'Georgia',serif;max-width:960px;margin:2rem auto;padding:0 1.5rem}
+  .cw *{box-sizing:border-box}
+  .c-hdr{background:#1A1410;color:#C9A84C;border-radius:12px;padding:1.5rem 2rem;margin-bottom:1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;border:1px solid #3a2e1e}
+  .c-hdr h2{margin:0;font-size:19px;letter-spacing:.06em;color:#C9A84C}
+  .c-hdr p{margin:0;font-size:12px;color:#8a7a5a}
+  .c-hdr-date{font-size:12px;color:#8a7a5a}
+  .c-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:1.5rem}
+  .c-metric{background:#fff;border-radius:10px;padding:1rem;border:1px solid #e8dfc8;border-left:3px solid #C9A84C}
+  .c-metric-lbl{font-size:10px;color:#8a7a5a;margin-bottom:4px;text-transform:uppercase;letter-spacing:.06em}
+  .c-metric-val{font-size:20px;font-weight:700;color:#C9A84C}
+  .c-metric-val.dark{color:#1A1410}
+  .c-tabs{display:flex;gap:0;border-bottom:2px solid #e8dfc8;margin-bottom:1.5rem;overflow-x:auto}
+  .c-tab{padding:10px 16px;font-size:13px;cursor:pointer;color:#8a7a5a;border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap;font-weight:500;background:none;border-top:none;border-left:none;border-right:none;font-family:inherit}
+  .c-tab.active{color:#C9A84C;border-bottom-color:#C9A84C}
+  .c-tab-content{display:none}
+  .c-tab-content.active{display:block}
+  .c-card{background:#fff;border:1px solid #e8dfc8;border-radius:12px;padding:1.25rem;margin-bottom:1rem}
+  .c-card-title{font-size:14px;font-weight:700;color:#1A1410;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+  .c-sec-lbl{font-size:10px;font-weight:700;color:#C9A84C;text-transform:uppercase;letter-spacing:.1em;margin:1.25rem 0 10px;padding-bottom:6px;border-bottom:1px solid #e8dfc8}
+  .c-input-row{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+  .c-input-row label{font-size:13px;color:#5a4a2e;min-width:160px;font-weight:500}
+  .c-input-row input,.c-input-row select{padding:8px 12px;font-size:13px;border:1px solid #d4c89a;border-radius:8px;width:180px;color:#1A1410;font-family:inherit;background:#fffdf5}
+  .c-table{width:100%;border-collapse:collapse;font-size:13px}
+  .c-table th{text-align:left;padding:8px 10px;color:#fff;background:#1A1410;font-weight:600}
+  .c-table th:first-child{border-radius:8px 0 0 0}
+  .c-table th:last-child{border-radius:0 8px 0 0}
+  .c-table td{padding:8px 10px;border-bottom:1px solid #f5f0e4;color:#333}
+  .c-table tr:last-child td{border-bottom:none;font-weight:700;color:#C9A84C;background:#fffdf5}
+  .c-table .muted{color:#8a7a5a;font-weight:400}
+  .c-rem-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:1.5rem}
+  .c-rem{background:#fff;border:1px solid #e8dfc8;border-radius:10px;padding:1rem}
+  .c-rem-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+  .c-rem-name{font-size:13px;font-weight:700;color:#1A1410}
+  .c-badge{font-size:11px;padding:3px 9px;border-radius:20px;font-weight:600}
+  .badge-ok{background:#e8f5ee;color:#0f6e56}
+  .badge-soon{background:#fdf5dc;color:#7a5f00}
+  .badge-urgent{background:#fceaea;color:#a32d2d}
+  .c-rem-dl{font-size:11px;color:#8a7a5a;margin-bottom:4px}
+  .c-rem-amt{font-size:18px;font-weight:700;color:#1A1410}
+  .c-rem-note{font-size:11px;color:#aaa;margin-top:3px}
+  .c-tax-row{display:flex;justify-content:space-between;align-items:flex-start;padding:9px 0;border-bottom:1px solid #f5f0e4;font-size:13px;gap:12px}
+  .c-tax-row:last-child{border-bottom:none}
+  .c-tax-lbl{color:#5a4a2e;flex:1}
+  .c-tax-rt{text-align:right}
+  .c-tax-val{color:#1A1410;font-weight:500}
+  .c-tax-freq{font-size:11px;color:#C9A84C;display:block}
+  .c-net-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f5f0e4;font-size:13px}
+  .c-net-row:last-child{border-bottom:none;font-weight:700;font-size:15px;padding-top:12px}
+  .c-net-lbl{color:#5a4a2e}
+  .c-net-val{color:#1A1410}
+  .c-net-row:last-child .c-net-lbl{color:#1A1410}
+  .c-net-row:last-child .c-net-val{color:#C9A84C}
+  .c-total-bar{background:#1A1410;border-radius:10px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;margin-top:12px}
+  .c-total-lbl{font-size:13px;color:#8a7a5a;font-weight:600}
+  .c-total-val{font-size:20px;font-weight:700;color:#C9A84C}
+  .c-cl{list-style:none;padding:0;margin:0}
+  .c-cl li{display:flex;align-items:center;gap:10px;padding:9px 0;font-size:13px;color:#333;border-bottom:1px solid #f5f0e4;cursor:pointer;user-select:none}
+  .c-cl li:last-child{border-bottom:none}
+  .c-cl li.done{color:#aaa;text-decoration:line-through}
+  .c-cl li .chk{width:20px;height:20px;border-radius:50%;border:2px solid #C9A84C;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:12px;color:#fff;background:transparent}
+  .c-cl li.done .chk{background:#C9A84C}
+  .c-mo-btns{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:1rem}
+  .c-mo-btn{padding:5px 13px;font-size:12px;border:1px solid #d4c89a;border-radius:20px;cursor:pointer;background:#fff;color:#8a7a5a;font-weight:500;font-family:inherit}
+  .c-mo-btn.active{background:#1A1410;color:#C9A84C;border-color:#1A1410}
+  .c-divider{height:1px;background:#f5f0e4;margin:10px 0}
+  .c-guide{font-size:11px;color:#8a7a5a;margin-top:8px;font-style:italic}
+  .c-owner-box{background:#fffdf5;border:1px solid #e8dfc8;border-left:3px solid #C9A84C;border-radius:10px;padding:1rem 1.25rem;margin-bottom:1rem}
+  .c-owner-title{font-size:13px;font-weight:700;color:#1A1410;margin-bottom:8px}
+  .c-owner-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f5f0e4;font-size:13px}
+  .c-owner-row:last-child{border-bottom:none}
+  .c-owner-lbl{color:#5a4a2e}
+  .c-owner-val{color:#C9A84C;font-weight:600}
+</style>
+
+<div class="cw">
+  <div class="c-hdr">
+    <div>
+      <h2>✦ Compliance & Payroll Dashboard</h2>
+      <p>Tax reminders · Contributions · Payroll · Monthly checklist</p>
+    </div>
+    <div class="c-hdr-date" id="cdate"></div>
+  </div>
+
+  <div class="c-metrics">
+    <div class="c-metric"><div class="c-metric-lbl">Staff count</div><div class="c-metric-val dark">2</div></div>
+    <div class="c-metric"><div class="c-metric-lbl">Total monthly salary</div><div class="c-metric-val" id="ctotsal">₱0</div></div>
+    <div class="c-metric"><div class="c-metric-lbl">Employer contributions</div><div class="c-metric-val" id="ctotcont">₱0</div></div>
+    <div class="c-metric"><div class="c-metric-lbl">Next deadline</div><div class="c-metric-val dark" style="font-size:13px" id="cnextdl">—</div></div>
+  </div>
+
+  <div class="c-tabs">
+    <button class="c-tab active" onclick="cTab('contributions')">Contributions</button>
+    <button class="c-tab" onclick="cTab('taxes')">Tax Calendar</button>
+    <button class="c-tab" onclick="cTab('payroll')">Payroll Calculator</button>
+    <button class="c-tab" onclick="cTab('owner')">Owner (Kylie)</button>
+    <button class="c-tab" onclick="cTab('checklist')">Monthly Checklist</button>
+  </div>
+
+  <!-- Contributions -->
+  <div class="c-tab-content active" id="ctab-contributions">
+    <div class="c-sec-lbl">Staff salary setup</div>
+    <div class="c-card">
+      <div class="c-card-title">👥 Staff salaries</div>
+      <div class="c-input-row"><label>Zara (Lead Therapist)</label><input type="number" id="czara" value="20000" oninput="cAll()"></div>
+      <div class="c-input-row"><label>Reyna Jean (Therapist)</label><input type="number" id="creyna" value="16000" oninput="cAll()"></div>
+    </div>
+    <div class="c-sec-lbl">SSS — Social Security System</div>
+    <div class="c-card"><table class="c-table"><thead><tr><th>Staff</th><th>Employee share</th><th>Employer share</th><th>Total</th></tr></thead><tbody id="csss"></tbody></table></div>
+    <div class="c-sec-lbl">PhilHealth</div>
+    <div class="c-card"><table class="c-table"><thead><tr><th>Staff</th><th>Employee share</th><th>Employer share</th><th>Total</th></tr></thead><tbody id="cph"></tbody></table></div>
+    <div class="c-sec-lbl">Pag-IBIG (HDMF)</div>
+    <div class="c-card"><table class="c-table"><thead><tr><th>Staff</th><th>Employee share</th><th>Employer share</th><th>Total</th></tr></thead><tbody id="cpi"></tbody></table></div>
+    <div class="c-total-bar"><div class="c-total-lbl">Total monthly employer obligation</div><div class="c-total-val" id="cgrand">₱0</div></div>
+  </div>
+
+  <!-- Taxes -->
+  <div class="c-tab-content" id="ctab-taxes">
+    <div class="c-sec-lbl">Payment reminders this month</div>
+    <div class="c-rem-grid" id="crems"></div>
+    <div class="c-sec-lbl">BIR Tax Calendar</div>
+    <div class="c-card">
+      <div class="c-tax-row"><span class="c-tax-lbl">BIR Form 2551Q — Percentage Tax (quarterly)</span><div class="c-tax-rt"><span class="c-tax-val">25th of April, July, Oct, Jan</span><span class="c-tax-freq">Quarterly</span></div></div>
+      <div class="c-tax-row"><span class="c-tax-lbl">BIR Form 1601C — Withholding on compensation</span><div class="c-tax-rt"><span class="c-tax-val">10th of following month</span><span class="c-tax-freq">Monthly</span></div></div>
+      <div class="c-tax-row"><span class="c-tax-lbl">BIR Form 1604C — Annual withholding return</span><div class="c-tax-rt"><span class="c-tax-val">January 31</span><span class="c-tax-freq">Annual</span></div></div>
+      <div class="c-tax-row"><span class="c-tax-lbl">BIR Form 1701A — Annual income tax (sole prop)</span><div class="c-tax-rt"><span class="c-tax-val">April 15</span><span class="c-tax-freq">Annual</span></div></div>
+      <div class="c-tax-row"><span class="c-tax-lbl">Official receipts per transaction</span><div class="c-tax-rt"><span class="c-tax-val">Always</span><span class="c-tax-freq">Per transaction</span></div></div>
+    </div>
+    <div class="c-sec-lbl">Government Contribution Deadlines</div>
+    <div class="c-card">
+      <div class="c-tax-row"><span class="c-tax-lbl">SSS monthly contribution</span><div class="c-tax-rt"><span class="c-tax-val">Last working day of month</span><span class="c-tax-freq">Monthly</span></div></div>
+      <div class="c-tax-row"><span class="c-tax-lbl">PhilHealth monthly contribution</span><div class="c-tax-rt"><span class="c-tax-val">11th–15th of following month</span><span class="c-tax-freq">Monthly</span></div></div>
+      <div class="c-tax-row"><span class="c-tax-lbl">Pag-IBIG monthly contribution</span><div class="c-tax-rt"><span class="c-tax-val">10th–15th of following month</span><span class="c-tax-freq">Monthly</span></div></div>
+      <div class="c-tax-row"><span class="c-tax-lbl">13th month pay</span><div class="c-tax-rt"><span class="c-tax-val">On or before December 24</span><span class="c-tax-freq">Annual</span></div></div>
+    </div>
+  </div>
+
+  <!-- Payroll -->
+  <div class="c-tab-content" id="ctab-payroll">
+    <div class="c-sec-lbl">Net pay calculator</div>
+    <div class="c-card">
+      <div class="c-card-title">🧮 Calculate take-home pay</div>
+      <div class="c-input-row">
+        <label>Staff member</label>
+        <select id="cstaffsel" onchange="cStaffChg()">
+          <option value="20000">Zara (Lead Therapist)</option>
+          <option value="16000">Reyna Jean (Therapist)</option>
+        </select>
+      </div>
+      <div class="c-input-row"><label>Basic salary (₱)</label><input type="number" id="cnetsal" value="20000" oninput="cNet()"></div>
+      <div class="c-input-row"><label>Housing deduction (₱)</label><input type="number" id="cnthouse" value="1500" oninput="cNet()"></div>
+      <div class="c-input-row"><label>Service commission (₱)</label><input type="number" id="cntcomm" value="0" oninput="cNet()"></div>
+      <div class="c-input-row"><label>Other deductions (₱)</label><input type="number" id="cntother" value="0" oninput="cNet()"></div>
+    </div>
+    <div class="c-card" id="cnetresult"></div>
+  </div>
+
+  <!-- Owner Tab -->
+  <div class="c-tab-content" id="ctab-owner">
+    <div class="c-sec-lbl">Kylie — Owner contributions (voluntary/self-employed)</div>
+    <div class="c-owner-box">
+      <div class="c-owner-title">💡 As the owner, you enroll separately as self-employed — not through Glow Bar PH</div>
+      <div class="c-owner-row"><span class="c-owner-lbl">SSS — Voluntary/Self-employed</span><span class="c-owner-val">Enroll at my.sss.gov.ph</span></div>
+      <div class="c-owner-row"><span class="c-owner-lbl">PhilHealth — Self-employed</span><span class="c-owner-val">Enroll at philhealth.gov.ph</span></div>
+      <div class="c-owner-row"><span class="c-owner-lbl">Pag-IBIG — Voluntary</span><span class="c-owner-val">Enroll at pagibigfund.gov.ph</span></div>
+    </div>
+    <div class="c-sec-lbl">Owner contribution calculator</div>
+    <div class="c-card">
+      <div class="c-card-title">🌸 Kylie's monthly contributions</div>
+      <div class="c-input-row"><label>Your monthly income (₱)</label><input type="number" id="cownersal" value="30000" oninput="cOwner()"></div>
+    </div>
+    <div class="c-card" id="cownerresult"></div>
+    <div class="c-sec-lbl">Benefits of enrolling</div>
+    <div class="c-card">
+      <div class="c-tax-row"><span class="c-tax-lbl">SSS — Maternity, sickness, disability & retirement benefits</span><div class="c-tax-rt"><span class="c-tax-val">Highly recommended</span><span class="c-tax-freq">₱500–₱4,000/month</span></div></div>
+      <div class="c-tax-row"><span class="c-tax-lbl">PhilHealth — Hospital & medical coverage</span><div class="c-tax-rt"><span class="c-tax-val">Required for HMO</span><span class="c-tax-freq">5% of income</span></div></div>
+      <div class="c-tax-row"><span class="c-tax-lbl">Pag-IBIG — Housing loan access & savings</span><div class="c-tax-rt"><span class="c-tax-val">Access to low-cost loans</span><span class="c-tax-freq">₱200/month min</span></div></div>
+    </div>
+  </div>
+
+  <!-- Checklist -->
+  <div class="c-tab-content" id="ctab-checklist">
+    <div class="c-sec-lbl">Select month</div>
+    <div class="c-mo-btns" id="cmobns"></div>
+    <div class="c-sec-lbl">Monthly compliance tasks — tap to mark done</div>
+    <div class="c-card"><ul class="c-cl" id="ccl"></ul></div>
+    <div class="c-total-bar">
+      <div class="c-total-lbl" id="cclprog">0 of 0 done</div>
+      <div class="c-total-val" id="cclpct">0%</div>
+    </div>
+    <p class="c-guide">Quarterly months (March, June, September, December) include BIR Form 2551Q filing reminder.</p>
+  </div>
+</div>
+
+<script>
+(function(){
+  const MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const QM=[2,5,8,11];
+  const NOW=new Date();
+  let activeMo=NOW.getMonth();
+  let clSt={};
+
+  const CLItems=[
+    {id:'sss',label:'Pay SSS contributions (last working day of month)'},
+    {id:'ph',label:'Pay PhilHealth contributions (11th–15th of next month)'},
+    {id:'pi',label:'Pay Pag-IBIG contributions (10th–15th of next month)'},
+    {id:'bir',label:'File & pay BIR Form 1601C (10th of next month)'},
+    {id:'pay',label:'Issue payslips to all staff'},
+    {id:'or',label:'Verify all official receipts issued'},
+    {id:'books',label:'Update books of accounts'},
+    {id:'cash',label:'Reconcile cash & POS transactions'},
+    {id:'comm',label:'Calculate and pay staff commissions'},
+    {id:'house',label:'Record housing deductions in payroll'},
+  ];
+  const QItems=[{id:'q2551',label:'File BIR Form 2551Q — Percentage Tax (25th after quarter end)'}];
+
+  document.getElementById('cdate').textContent=NOW.toLocaleDateString('en-PH',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+
+  const f=n=>'₱'+Math.round(n).toLocaleString();
+  const gSal=k=>parseFloat(document.getElementById(k).value)||0;
+  const cSSS=s=>{const ee=Math.round(s*.045),er=Math.round(s*.095);return{ee,er,t:ee+er};};
+  const cPH=s=>{const sh=Math.round(s*.025);return{ee:sh,er:sh,t:sh*2};};
+  const cPI=s=>{const sh=Math.min(Math.round(s*.02),100);return{ee:sh,er:sh,t:sh*2};};
+
+  function bldTbl(id,fn){
+    const staff=[{n:'Zara',k:'czara'},{n:'Reyna Jean',k:'creyna'}];
+    let h='',tEE=0,tER=0,tT=0;
+    staff.forEach(s=>{const c=fn(gSal(s.k));tEE+=c.ee;tER+=c.er;tT+=c.t;
+      h+=`<tr><td>${s.n}</td><td class="muted">${f(c.ee)}</td><td>${f(c.er)}</td><td>${f(c.t)}</td></tr>`;});
+    h+=`<tr><td><strong>Total</strong></td><td class="muted"><strong>${f(tEE)}</strong></td><td><strong>${f(tER)}</strong></td><td><strong>${f(tT)}</strong></td></tr>`;
+    document.getElementById(id).innerHTML=h;
+    return tER;
+  }
+
+  function cAll(){
+    const sE=bldTbl('csss',cSSS),pE=bldTbl('cph',cPH),iE=bldTbl('cpi',cPI),g=sE+pE+iE;
+    const ts=gSal('czara')+gSal('creyna');
+    document.getElementById('ctotsal').textContent=f(ts);
+    document.getElementById('ctotcont').textContent=f(g);
+    document.getElementById('cgrand').textContent=f(g);
+    bldRems(g); cNet();
+  }
+  window.cAll=cAll;
+
+  function bldRems(g){
+    const d=NOW.getDate();
+    const ag=[
+      {n:'SSS',dl:'Last working day',amt:g*.58,u:d>=25?'urgent':d>=20?'soon':'ok'},
+      {n:'PhilHealth',dl:'11th–15th next month',amt:g*.28,u:'ok'},
+      {n:'Pag-IBIG',dl:'10th–15th next month',amt:g*.14,u:'ok'},
+      {n:'BIR 1601C',dl:'10th of next month',amt:0,u:'ok',note:'File via eBIRForms'},
+    ];
+    document.getElementById('crems').innerHTML=ag.map(a=>`
+      <div class="c-rem">
+        <div class="c-rem-top"><span class="c-rem-name">${a.n}</span>
+        <span class="c-badge badge-${a.u}">${a.u==='urgent'?'Urgent':a.u==='soon'?'Due soon':'On track'}</span></div>
+        <div class="c-rem-dl">📅 ${a.dl}</div>
+        ${a.amt>0?`<div class="c-rem-amt">${f(a.amt)}</div><div class="c-rem-note">Employer share only</div>`:`<div class="c-rem-note">${a.note||''}</div>`}
+      </div>`).join('');
+    const urg=ag.filter(a=>a.u!=='ok');
+    document.getElementById('cnextdl').textContent=urg.length?urg[0].n+' — '+urg[0].dl:'All on track ✓';
+  }
+
+  function cNet(){
+    const s=parseFloat(document.getElementById('cnetsal').value)||0;
+    const h=parseFloat(document.getElementById('cnthouse').value)||0;
+    const cm=parseFloat(document.getElementById('cntcomm').value)||0;
+    const o=parseFloat(document.getElementById('cntother').value)||0;
+    const sc=cSSS(s),pc=cPH(s),ic=cPI(s);
+    const gross=s+cm,ded=sc.ee+pc.ee+ic.ee+h+o,net=gross-ded;
+    document.getElementById('cnetresult').innerHTML=`
+      <div class="c-net-row"><span class="c-net-lbl">Basic salary</span><span class="c-net-val">${f(s)}</span></div>
+      <div class="c-net-row"><span class="c-net-lbl">+ Service commission</span><span class="c-net-val">${f(cm)}</span></div>
+      <div class="c-net-row" style="font-weight:600"><span class="c-net-lbl">Gross pay</span><span class="c-net-val">${f(gross)}</span></div>
+      <div class="c-divider"></div>
+      <div class="c-net-row"><span class="c-net-lbl">– SSS employee share (4.5%)</span><span class="c-net-val" style="color:#c0392b">${f(sc.ee)}</span></div>
+      <div class="c-net-row"><span class="c-net-lbl">– PhilHealth employee share (2.5%)</span><span class="c-net-val" style="color:#c0392b">${f(pc.ee)}</span></div>
+      <div class="c-net-row"><span class="c-net-lbl">– Pag-IBIG employee share (2%)</span><span class="c-net-val" style="color:#c0392b">${f(ic.ee)}</span></div>
+      <div class="c-net-row"><span class="c-net-lbl">– Housing deduction</span><span class="c-net-val" style="color:#c0392b">${f(h)}</span></div>
+      <div class="c-net-row"><span class="c-net-lbl">– Other deductions</span><span class="c-net-val" style="color:#c0392b">${f(o)}</span></div>
+      <div class="c-net-row"><span class="c-net-lbl">✦ Net take-home pay</span><span class="c-net-val">${f(net)}</span></div>`;
+  }
+  window.cNet=cNet;
+
+  function cStaffChg(){
+    document.getElementById('cnetsal').value=document.getElementById('cstaffsel').value;
+    cNet();
+  }
+  window.cStaffChg=cStaffChg;
+
+  function cOwner(){
+    const s=parseFloat(document.getElementById('cownersal').value)||0;
+    const sss=Math.min(Math.round(s*.14),4000);
+    const ph=Math.round(s*.05);
+    const pi=200;
+    const total=sss+ph+pi;
+    document.getElementById('cownerresult').innerHTML=`
+      <div class="c-net-row"><span class="c-net-lbl">SSS voluntary contribution (~14%)</span><span class="c-net-val">${f(sss)}</span></div>
+      <div class="c-net-row"><span class="c-net-lbl">PhilHealth self-employed (5%)</span><span class="c-net-val">${f(ph)}</span></div>
+      <div class="c-net-row"><span class="c-net-lbl">Pag-IBIG voluntary (minimum)</span><span class="c-net-val">${f(pi)}</span></div>
+      <div class="c-net-row"><span class="c-net-lbl">✦ Total monthly (your share only)</span><span class="c-net-val">${f(total)}</span></div>`;
+  }
+  window.cOwner=cOwner;
+
+  function bldMoBtns(){
+    document.getElementById('cmobns').innerHTML=MO.map((m,i)=>
+      `<button class="c-mo-btn ${i===activeMo?'active':''}" onclick="cSelMo(${i})">${m}</button>`).join('');
+  }
+
+  function bldCL(){
+    const k=activeMo;
+    if(!clSt[k])clSt[k]={};
+    const st=clSt[k],isQ=QM.includes(activeMo);
+    const items=[...CLItems,...(isQ?QItems:[])];
+    document.getElementById('ccl').innerHTML=items.map(it=>`
+      <li class="${st[it.id]?'done':''}" onclick="cTog(${activeMo},'${it.id}')">
+        <div class="chk">${st[it.id]?'✓':''}</div>${it.label}
+        ${isQ&&QItems.find(q=>q.id===it.id)?'<span class="c-badge badge-soon" style="margin-left:auto">Quarterly</span>':''}
+      </li>`).join('');
+    const done=items.filter(it=>st[it.id]).length;
+    document.getElementById('cclprog').textContent=`${done} of ${items.length} done`;
+    document.getElementById('cclpct').textContent=Math.round(done/items.length*100)+'%';
+  }
+
+  window.cTog=function(mo,id){if(!clSt[mo])clSt[mo]={};clSt[mo][id]=!clSt[mo][id];bldCL();};
+  window.cSelMo=function(i){activeMo=i;bldMoBtns();bldCL();};
+  window.cTab=function(n){
+    document.querySelectorAll('.c-tab').forEach((t,i)=>{
+      t.classList.toggle('active',['contributions','taxes','payroll','owner','checklist'][i]===n);});
+    document.querySelectorAll('.c-tab-content').forEach(c=>c.classList.remove('active'));
+    document.getElementById('ctab-'+n).classList.add('active');
+    if(n==='owner')cOwner();
+  };
+
+  bldMoBtns(); bldCL(); cAll(); cOwner();
+})();
+</script>
+<!-- ═══ END COMPLIANCE DASHBOARD ═══ -->
 </body>
 </html>
