@@ -487,8 +487,7 @@ nav{flex:1;padding:12px 0;overflow-y:auto;}
     <div class="c-sec-lbl">Staff salary setup</div>
     <div class="c-card">
       <div class="c-card-title">👥 Staff salaries</div>
-      <div class="c-input-row"><label>Zara (Lead Therapist)</label><input type="number" id="czara" value="20000" oninput="cAll()"></div>
-      <div class="c-input-row"><label>Reyna Jean (Therapist)</label><input type="number" id="creyna" value="16000" oninput="cAll()"></div>
+      <div id="c-staff-inputs"></div>
     </div>
     <div class="c-sec-lbl">SSS — Social Security System</div>
     <div class="c-card"><table class="c-table"><thead><tr><th>Staff</th><th>Employee share</th><th>Employer share</th><th>Total</th></tr></thead><tbody id="csss"></tbody></table></div>
@@ -630,7 +629,7 @@ nav{flex:1;padding:12px 0;overflow-y:auto;}
   }
 
   function bldTbl(id,fn){
-    const staff=[{n:'Zara',k:'czara'},{n:'Reyna Jean',k:'creyna'}];
+    const staff=S.users.filter(u=>u.role==='staff').map(u=>({n:u.name,k:'csal_'+u.id}));
     let h='',tEE=0,tER=0,tT=0;
     staff.forEach(s=>{const c=fn(gSal(s.k));tEE+=c.ee;tER+=c.er;tT+=c.t;
       h+=`<tr><td>${s.n}</td><td class="muted">${f(c.ee)}</td><td>${f(c.er)}</td><td>${f(c.t)}</td></tr>`;});
@@ -641,7 +640,9 @@ nav{flex:1;padding:12px 0;overflow-y:auto;}
 
   window.cAll=function(){
     const sE=bldTbl('csss',cSSS),pE=bldTbl('cph',cPH),iE=bldTbl('cpi',cPI);
-    const zSal=gSal('czara'),rSal=gSal('creyna');
+    const staff=S.users.filter(u=>u.role==='staff');
+const salaries=staff.map(u=>gSal('csal_'+u.id));
+const zSal=salaries[0]||0,rSal=salaries[1]||0;
     const g=Math.round((zSal*.095+rSal*.095)+(zSal*.025+rSal*.025)+(Math.min(zSal*.02,100)+Math.min(rSal*.02,100)));
     const ts=zSal+rSal;
     if(el('ctotsal')) el('ctotsal').textContent=f(ts);
@@ -743,11 +744,20 @@ nav{flex:1;padding:12px 0;overflow-y:auto;}
     if(el('ctab-'+n)) el('ctab-'+n).classList.add('active');
     if(n==='owner') window.cOwner();
   };
-  window.renderCompliance=function(){
+ window.renderCompliance=function(){
   const pg=document.getElementById('page-compliance');
   const main=document.querySelector('.main');
   if(pg&&main&&!main.contains(pg)){main.appendChild(pg);}
   if(pg) pg.style.display='block';
+  const container=document.getElementById('c-staff-inputs');
+  if(container){
+    const staff=S.users.filter(u=>u.role==='staff');
+    container.innerHTML=staff.map(u=>`
+      <div class="c-input-row">
+        <label>${u.name} (${u.specialty})</label>
+        <input type="number" id="csal_${u.id}" value="${(u.dailyRate||700)*26}" oninput="cAll()">
+      </div>`).join('');
+  }
   bldMobtns();bldCL();window.cAll();window.cOwner();
 };
   bldMoBtns();bldCL();window.cAll();window.cOwner();
