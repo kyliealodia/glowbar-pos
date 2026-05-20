@@ -1264,15 +1264,13 @@ function rejectLeave(id){
 // ══ START ══
 loadFromCloud();
 </script>
-
+<div id="page-compliance" class="page" style="display:none;">
 <style>
-  <div id="page-compliance" class="page" style="display:none;">
-  .cw{font-family:'Georgia',serif;max-width:960px;margin:0 auto;padding:0 1.5rem}
+  .cw{font-family:'Georgia',serif;max-width:960px;margin:0 auto;padding:1.5rem}
   .cw *{box-sizing:border-box}
   .c-hdr{background:#1A1410;color:#C9A84C;border-radius:12px;padding:1.5rem 2rem;margin-bottom:1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;border:1px solid #3a2e1e}
   .c-hdr h2{margin:0;font-size:19px;letter-spacing:.06em;color:#C9A84C}
   .c-hdr p{margin:0;font-size:12px;color:#8a7a5a}
-  .c-hdr-date{font-size:12px;color:#8a7a5a}
   .c-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:1.5rem}
   .c-metric{background:#fff;border-radius:10px;padding:1rem;border:1px solid #e8dfc8;border-left:3px solid #C9A84C}
   .c-metric-lbl{font-size:10px;color:#8a7a5a;margin-bottom:4px;text-transform:uppercase;letter-spacing:.06em}
@@ -1339,6 +1337,8 @@ loadFromCloud();
   .c-owner-row:last-child{border-bottom:none}
   .c-owner-lbl{color:#5a4a2e}
   .c-owner-val{color:#C9A84C;font-weight:600}
+  .tax-free{background:#e8f5ee;color:#0f6e56;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:600}
+  .tax-due{background:#fceaea;color:#a32d2d;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:600}
 </style>
 
 <div class="cw">
@@ -1347,7 +1347,7 @@ loadFromCloud();
       <h2>✦ Compliance & Payroll Dashboard</h2>
       <p>Tax reminders · Contributions · Payroll · Monthly checklist</p>
     </div>
-    <div class="c-hdr-date" id="cdate"></div>
+    <div style="font-size:12px;color:#8a7a5a" id="cdate"></div>
   </div>
 
   <div class="c-metrics">
@@ -1405,7 +1405,7 @@ loadFromCloud();
 
   <!-- Payroll -->
   <div class="c-tab-content" id="ctab-payroll">
-    <div class="c-sec-lbl">Net pay calculator</div>
+    <div class="c-sec-lbl">Net pay calculator — with withholding tax (TRAIN Law)</div>
     <div class="c-card">
       <div class="c-card-title">🧮 Calculate take-home pay</div>
       <div class="c-input-row">
@@ -1419,6 +1419,18 @@ loadFromCloud();
       <div class="c-input-row"><label>Housing deduction (₱)</label><input type="number" id="cnthouse" value="1500" oninput="cNet()"></div>
       <div class="c-input-row"><label>Service commission (₱)</label><input type="number" id="cntcomm" value="0" oninput="cNet()"></div>
       <div class="c-input-row"><label>Other deductions (₱)</label><input type="number" id="cntother" value="0" oninput="cNet()"></div>
+    </div>
+    <div class="c-card">
+      <div class="c-sec-lbl">TRAIN Law — Withholding Tax Brackets (Annual)</div>
+      <table class="c-table">
+        <thead><tr><th>Annual Taxable Income</th><th>Tax Rate</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>Up to ₱250,000</td><td>0%</td><td><span class="tax-free">Tax Free</span></td></tr>
+          <tr><td>₱250,001 – ₱400,000</td><td>15% on excess over ₱250,000</td><td><span class="tax-due">Taxable</span></td></tr>
+          <tr><td>₱400,001 – ₱800,000</td><td>₱22,500 + 20% on excess over ₱400,000</td><td><span class="tax-due">Taxable</span></td></tr>
+          <tr><td>₱800,001 – ₱2,000,000</td><td>₱102,500 + 25% on excess over ₱800,000</td><td><span class="tax-due">Taxable</span></td></tr>
+        </tbody>
+      </table>
     </div>
     <div class="c-card" id="cnetresult"></div>
   </div>
@@ -1481,27 +1493,46 @@ loadFromCloud();
   ];
   const QItems=[{id:'q2551',label:'File BIR Form 2551Q — Percentage Tax (25th after quarter end)'}];
   const el=id=>document.getElementById(id);
-  document.getElementById('cdate').textContent=NOW.toLocaleDateString('en-PH',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  if(el('cdate')) el('cdate').textContent=NOW.toLocaleDateString('en-PH',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   const f=n=>'₱'+Math.round(n).toLocaleString();
-  const gSal=k=>parseFloat(el(k).value)||0;
+  const gSal=k=>parseFloat(el(k)?el(k).value:0)||0;
   const cSSS=s=>{const ee=Math.round(s*.045),er=Math.round(s*.095);return{ee,er,t:ee+er};};
   const cPH=s=>{const sh=Math.round(s*.025);return{ee:sh,er:sh,t:sh*2};};
   const cPI=s=>{const sh=Math.min(Math.round(s*.02),100);return{ee:sh,er:sh,t:sh*2};};
+
+  // TRAIN Law withholding tax calculator
+  function calcWithholding(monthlyBasic){
+    const annual=monthlyBasic*12;
+    let annualTax=0;
+    if(annual<=250000) annualTax=0;
+    else if(annual<=400000) annualTax=(annual-250000)*0.15;
+    else if(annual<=800000) annualTax=22500+(annual-400000)*0.20;
+    else if(annual<=2000000) annualTax=102500+(annual-800000)*0.25;
+    else annualTax=402500+(annual-2000000)*0.30;
+    return Math.round(annualTax/12);
+  }
+
   function bldTbl(id,fn){
     const staff=[{n:'Zara',k:'czara'},{n:'Reyna Jean',k:'creyna'}];
     let h='',tEE=0,tER=0,tT=0;
     staff.forEach(s=>{const c=fn(gSal(s.k));tEE+=c.ee;tER+=c.er;tT+=c.t;
       h+=`<tr><td>${s.n}</td><td class="muted">${f(c.ee)}</td><td>${f(c.er)}</td><td>${f(c.t)}</td></tr>`;});
     h+=`<tr><td><strong>Total</strong></td><td class="muted"><strong>${f(tEE)}</strong></td><td><strong>${f(tER)}</strong></td><td><strong>${f(tT)}</strong></td></tr>`;
-    el(id).innerHTML=h; return tEE+tER;
+    if(el(id)) el(id).innerHTML=h;
+    return tER;
   }
+
   window.cAll=function(){
     const sE=bldTbl('csss',cSSS),pE=bldTbl('cph',cPH),iE=bldTbl('cpi',cPI);
-    const g=Math.round((gSal('czara')*.095+gSal('creyna')*.095)+(gSal('czara')*.025+gSal('creyna')*.025)+(Math.min(gSal('czara')*.02,100)+Math.min(gSal('creyna')*.02,100)));
-    const ts=gSal('czara')+gSal('creyna');
-    el('ctotsal').textContent=f(ts); el('ctotcont').textContent=f(g); el('cgrand').textContent=f(g);
+    const zSal=gSal('czara'),rSal=gSal('creyna');
+    const g=Math.round((zSal*.095+rSal*.095)+(zSal*.025+rSal*.025)+(Math.min(zSal*.02,100)+Math.min(rSal*.02,100)));
+    const ts=zSal+rSal;
+    if(el('ctotsal')) el('ctotsal').textContent=f(ts);
+    if(el('ctotcont')) el('ctotcont').textContent=f(g);
+    if(el('cgrand')) el('cgrand').textContent=f(g);
     bldRems(g); window.cNet();
   };
+
   function bldRems(g){
     const d=NOW.getDate();
     const ag=[
@@ -1510,45 +1541,71 @@ loadFromCloud();
       {n:'Pag-IBIG',dl:'10th–15th next month',amt:g*.15,u:'ok'},
       {n:'BIR 1601C',dl:'10th of next month',amt:0,u:'ok',note:'File via eBIRForms'},
     ];
-    el('crems').innerHTML=ag.map(a=>`
+    if(el('crems')) el('crems').innerHTML=ag.map(a=>`
       <div class="c-rem"><div class="c-rem-top"><span class="c-rem-name">${a.n}</span>
       <span class="c-badge badge-${a.u}">${a.u==='urgent'?'Urgent':a.u==='soon'?'Due soon':'On track'}</span></div>
       <div class="c-rem-dl">📅 ${a.dl}</div>
       ${a.amt>0?`<div class="c-rem-amt">${f(a.amt)}</div><div class="c-rem-note">Employer share only</div>`:`<div class="c-rem-note">${a.note||''}</div>`}
       </div>`).join('');
     const urg=ag.filter(a=>a.u!=='ok');
-    el('cnextdl').textContent=urg.length?urg[0].n+' — '+urg[0].dl:'All on track ✓';
+    if(el('cnextdl')) el('cnextdl').textContent=urg.length?urg[0].n+' — '+urg[0].dl:'All on track ✓';
   }
+
   window.cNet=function(){
-    const s=parseFloat(el('cnetsal').value)||0,h=parseFloat(el('cnthouse').value)||0;
-    const cm=parseFloat(el('cntcomm').value)||0,o=parseFloat(el('cntother').value)||0;
-    const sc=cSSS(s),pc=cPH(s),ic=cPI(s),gross=s+cm,ded=sc.ee+pc.ee+ic.ee+h+o,net=gross-ded;
-    el('cnetresult').innerHTML=`
+    const s=parseFloat(el('cnetsal')?el('cnetsal').value:0)||0;
+    const h=parseFloat(el('cnthouse')?el('cnthouse').value:0)||0;
+    const cm=parseFloat(el('cntcomm')?el('cntcomm').value:0)||0;
+    const o=parseFloat(el('cntother')?el('cntother').value:0)||0;
+    const sc=cSSS(s),pc=cPH(s),ic=cPI(s);
+    const wt=calcWithholding(s);
+    const gross=s+cm;
+    const ded=sc.ee+pc.ee+ic.ee+h+o+wt;
+    const net=gross-ded;
+    const annualSal=s*12;
+    const taxStatus=annualSal<=250000?'<span class="tax-free">Tax Free — below ₱250,000/year threshold</span>':'<span class="tax-due">Taxable — above ₱250,000/year threshold</span>';
+    if(el('cnetresult')) el('cnetresult').innerHTML=`
       <div class="c-net-row"><span class="c-net-lbl">Basic salary</span><span class="c-net-val">${f(s)}</span></div>
+      <div class="c-net-row"><span class="c-net-lbl">Annual equivalent</span><span class="c-net-val">${f(annualSal)} — ${taxStatus}</span></div>
       <div class="c-net-row"><span class="c-net-lbl">+ Service commission</span><span class="c-net-val">${f(cm)}</span></div>
       <div class="c-net-row" style="font-weight:600"><span class="c-net-lbl">Gross pay</span><span class="c-net-val">${f(gross)}</span></div>
       <div class="c-divider"></div>
       <div class="c-net-row"><span class="c-net-lbl">– SSS employee share (4.5%)</span><span class="c-net-val" style="color:#c0392b">${f(sc.ee)}</span></div>
       <div class="c-net-row"><span class="c-net-lbl">– PhilHealth employee share (2.5%)</span><span class="c-net-val" style="color:#c0392b">${f(pc.ee)}</span></div>
       <div class="c-net-row"><span class="c-net-lbl">– Pag-IBIG employee share (2%)</span><span class="c-net-val" style="color:#c0392b">${f(ic.ee)}</span></div>
+      <div class="c-net-row"><span class="c-net-lbl">– Withholding tax (TRAIN Law)</span><span class="c-net-val" style="color:#c0392b">${wt===0?'<span class="tax-free">₱0 — Tax exempt</span>':f(wt)}</span></div>
       <div class="c-net-row"><span class="c-net-lbl">– Housing deduction</span><span class="c-net-val" style="color:#c0392b">${f(h)}</span></div>
       <div class="c-net-row"><span class="c-net-lbl">– Other deductions</span><span class="c-net-val" style="color:#c0392b">${f(o)}</span></div>
       <div class="c-net-row"><span class="c-net-lbl">✦ Net take-home pay</span><span class="c-net-val">${f(net)}</span></div>`;
   };
-  window.cStaffChg=function(){el('cnetsal').value=el('cstaffsel').value;window.cNet();};
+
+  window.cStaffChg=function(){
+    if(el('cstaffsel')&&el('cnetsal')){el('cnetsal').value=el('cstaffsel').value;window.cNet();}
+  };
+
   window.cOwner=function(){
-    const s=parseFloat(el('cownersal').value)||0;
-    const sss=Math.min(Math.round(s*.14),4000),ph=Math.round(s*.05),pi=200,total=sss+ph+pi;
-    el('cownerresult').innerHTML=`
+    const s=parseFloat(el('cownersal')?el('cownersal').value:0)||0;
+    const sss=Math.min(Math.round(s*.14),4000),ph=Math.round(s*.05),pi=200;
+    const annualOwner=s*12;
+    let ownerTax=0;
+    if(annualOwner>250000&&annualOwner<=400000) ownerTax=(annualOwner-250000)*0.15;
+    else if(annualOwner>400000) ownerTax=22500+(annualOwner-400000)*0.20;
+    const monthlyOwnerTax=Math.round(ownerTax/12);
+    const total=sss+ph+pi+monthlyOwnerTax;
+    if(el('cownerresult')) el('cownerresult').innerHTML=`
       <div class="c-net-row"><span class="c-net-lbl">SSS voluntary contribution (~14%)</span><span class="c-net-val">${f(sss)}</span></div>
       <div class="c-net-row"><span class="c-net-lbl">PhilHealth self-employed (5%)</span><span class="c-net-val">${f(ph)}</span></div>
       <div class="c-net-row"><span class="c-net-lbl">Pag-IBIG voluntary (minimum)</span><span class="c-net-val">${f(pi)}</span></div>
-      <div class="c-net-row"><span class="c-net-lbl">✦ Total monthly (your share only)</span><span class="c-net-val">${f(total)}</span></div>`;
+      <div class="c-net-row"><span class="c-net-lbl">Income tax (TRAIN Law estimate)</span><span class="c-net-val">${monthlyOwnerTax===0?'<span class="tax-free">₱0 — Tax exempt</span>':f(monthlyOwnerTax)}</span></div>
+      <div class="c-net-row"><span class="c-net-lbl">✦ Total monthly obligations</span><span class="c-net-val">${f(total)}</span></div>`;
   };
+
   function bldMoBtns(){
+    if(!el('cmobns')) return;
     el('cmobns').innerHTML=MO.map((m,i)=>`<button class="c-mo-btn ${i===activeMo?'active':''}" onclick="cSelMo(${i})">${m}</button>`).join('');
   }
+
   function bldCL(){
+    if(!el('ccl')) return;
     const k=activeMo;if(!clSt[k])clSt[k]={};
     const st=clSt[k],isQ=QM.includes(activeMo),items=[...CLItems,...(isQ?QItems:[])];
     el('ccl').innerHTML=items.map(it=>`
@@ -1557,18 +1614,21 @@ loadFromCloud();
       ${isQ&&QItems.find(q=>q.id===it.id)?'<span class="c-badge badge-soon" style="margin-left:auto">Quarterly</span>':''}
       </li>`).join('');
     const done=items.filter(it=>st[it.id]).length;
-    el('cclprog').textContent=`${done} of ${items.length} done`;
-    el('cclpct').textContent=Math.round(done/items.length*100)+'%';
+    if(el('cclprog')) el('cclprog').textContent=`${done} of ${items.length} done`;
+    if(el('cclpct')) el('cclpct').textContent=Math.round(done/items.length*100)+'%';
   }
+
   window.cTog=function(mo,id){if(!clSt[mo])clSt[mo]={};clSt[mo][id]=!clSt[mo][id];bldCL();};
   window.cSelMo=function(i){activeMo=i;bldMoBtns();bldCL();};
   window.cTab=function(n){
     document.querySelectorAll('.c-tab').forEach((t,i)=>{t.classList.toggle('active',['contributions','taxes','payroll','owner','checklist'][i]===n);});
     document.querySelectorAll('.c-tab-content').forEach(c=>c.classList.remove('active'));
-    el('ctab-'+n).classList.add('active');
-    if(n==='owner')window.cOwner();
+    if(el('ctab-'+n)) el('ctab-'+n).classList.add('active');
+    if(n==='owner') window.cOwner();
   };
-  window.renderCompliance=function(){window.cAll();window.cOwner();bldMoBtns();bldCL();};
+  window.renderCompliance=function(){
+    bldMoBtns();bldCL();window.cAll();window.cOwner();
+  };
   bldMoBtns();bldCL();window.cAll();window.cOwner();
 })();
 </script>
