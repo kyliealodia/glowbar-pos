@@ -744,8 +744,12 @@ nav{flex:1;padding:12px 0;overflow-y:auto;}
     if(n==='owner') window.cOwner();
   };
   window.renderCompliance=function(){
-    bldMoBtns();bldCL();window.cAll();window.cOwner();
-  };
+  const pg=document.getElementById('page-compliance');
+  const main=document.querySelector('.main');
+  if(pg&&main&&!main.contains(pg)){main.appendChild(pg);}
+  if(pg) pg.style.display='block';
+  bldMobtns();bldCL();window.cAll();window.cOwner();
+};
   bldMoBtns();bldCL();window.cAll();window.cOwner();
 })();
 </script>
@@ -949,7 +953,7 @@ function goPage(name){
   else if(name==='leave') renderLeave();
   else if(name==='schedule') renderSchedule();
   else if(name==='admin') renderAdmin();
-  else if(name==='compliance') window.renderCompliance();
+  else if(name==='compliance') renderCompliance();
 }
 
 function toggleSidebar(){
