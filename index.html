@@ -4363,12 +4363,19 @@ function openEmailSummary(){
 function sendClientEmail(){
   const to=document.getElementById('emailToInput').value.trim();
   if(!to){showToast('Please enter an email address','err');return;}
-  const cl=S.clients.find(c=>c.id===window._lastPaidClientId);
-  const subject=encodeURIComponent(`Your Glow Bar Treatment Summary — ${new Date().toLocaleDateString('en-PH',{month:'long',day:'numeric',year:'numeric'})}`);
-  const bodyEncoded=encodeURIComponent(window._emailBody||'');
+  const subject=encodeURIComponent(`Your GlowBar Treatment Summary – ${new Date().toLocaleDateString('en-PH',{month:'long',day:'numeric',year:'numeric'})}`);
+  // Use only a short version for mailto (browsers block long URLs)
+  const tx=window.lastTx;
+  let shortBody=`Hi!\n\nThank you for visiting GlowBar today.\n\n`;
+  if(tx){
+    shortBody+=`TOTAL PAID: ₱${tx.total.toFixed(2)} (${(tx.method||'cash').toUpperCase()})\n`;
+    shortBody+=`Reference: ${tx.id}\n\n`;
+  }
+  shortBody+=`For your full treatment history, please contact us at your next visit.\n\nWith love,\nThe GlowBar Team\nBeauty · Confidence · Glow`;
+  const bodyEncoded=encodeURIComponent(shortBody);
   window.location.href=`mailto:${to}?subject=${subject}&body=${bodyEncoded}`;
   closeM('emailSummaryModal');
-  showToast('Mail app opened — ready to send! 📧','ok');
+  showToast('Mail app opened — ready to send! 💌','ok');
 }
 
 function sendClientSummary(id){
