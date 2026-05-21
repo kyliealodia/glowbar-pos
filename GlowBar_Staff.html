@@ -1083,12 +1083,17 @@ function computeWithholdingTax(t){
   return 183667+(t-666667)*0.35;
 }
 
-function getWorkingDaysSP(yr, mo){
+function getWorkingDaysSP(yr, mo, from, to, shiftDays){
+  const dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const workDays=shiftDays&&shiftDays.length?shiftDays:['Tue','Wed','Thu','Fri','Sat','Sun'];
+  const monthStart=new Date(yr,mo-1,1);
+  const monthEnd=new Date(yr,mo,0);
+  const rangeStart=from&&from>monthStart?from:monthStart;
+  const rangeEnd=to&&to<monthEnd?to:monthEnd;
   let count=0;
-  const days=new Date(yr,mo,0).getDate();
-  for(let d=1;d<=days;d++){
-    const dow=new Date(yr,mo-1,d).getDay();
-    if(dow!==0) count++;
+  for(let d=new Date(rangeStart);d<=rangeEnd;d.setDate(d.getDate()+1)){
+    const dayName=dayNames[new Date(d).getDay()];
+    if(workDays.includes(dayName)) count++;
   }
   return count;
 }
@@ -1109,9 +1114,11 @@ function renderPayslip(){
   const pagibigNo=userRecord.pagibigNo||'—';
   const tinNo=userRecord.tinNo||'—';
 
-  // Working days (Mon–Sat)
-  const workingDays=getWorkingDaysSP(yr,mo);
-  const dailyRate=basicPay>0?Math.round(basicPay/workingDays*100)/100:0;
+  // Working days (Mon-Sat, after start date, up to today)
+const today=new Date(); today.setHours(23,59,59,0);
+const staffStart=userRecord.startDate?new Date(userRecord.startDate):new Date('2026-06-02');
+const workingDays=getWorkingDaysSP(yr,mo,staffStart,today,userRecord.shiftDays);
+const dailyRate=basicPay>0?Math.round(basicPay/workingDays*100)/100:0;
 
   // Days present from clock-in logs
   const inLogs=(S.loginLogs||[]).filter(l=>{
