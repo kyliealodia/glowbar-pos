@@ -838,24 +838,18 @@ function loadFromCloud(){
   if(!db) return;
   ['users','bookings','loginLogs','settings'].forEach(key=>{
     db.ref('gb/'+key).on('value',snap=>{
-      if(snap.exists()){
-        const val=snap.val();
-        S[key]=Array.isArray(val)?val:Object.values(val);
-if(key==='users'){
-  const container=document.getElementById('c-staff-inputs');
-  if(container){{
-    const staff=S.users.filter(u=>u.role==='staff');
-    container.innerHTML=staff.map(u=>`
-      <div class="c-input-row">
-        <label>${u.name} (${u.specialty})</label>
-        <input type="number" id="csal_${u.id}" value="${(u.dailyRate||700)*26}" oninput="cAll()">
-      </div>`).join('');
-    if(typeof window.cAll==='function') window.cAll();
+if(snap.exists()){
+  const val=snap.val();
+  S[key]=Array.isArray(val)?val:Object.values(val);
+  if(key==='users'){
+    const container=document.getElementById('c-staff-inputs');
+    if(container){
+      const staff=S.users.filter(u=>u.role==='staff');
+      container.innerHTML=staff.map(u=>`<div class="c-input-row"><label>${u.name} (${u.specialty})</label><input type="number" id="csal_${u.id}" value="${(u.dailyRate||700)*26}" onchange="cAll()"></div>`).join('');
+      if(typeof window.cAll==='function') window.cAll();
+    }
   }
-}
-      }
-    });
-  });
+});      
   db.ref('gb/leaveRequests').on('value',snap=>{
     if(snap.exists()){
       const val=snap.val();
