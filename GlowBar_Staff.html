@@ -849,9 +849,9 @@ function loadFromCloud(){
             if(typeof window.cAll==='function') window.cAll();
           }
         }
-      }         // ← closes if(snap.exists())
-    });         // ← closes .on('value', snap=>{ 
-  });           // ← closes forEach
+      }
+    });
+  });
   db.ref('gb/leaveRequests').on('value',snap=>{
     if(snap.exists()){
       const val=snap.val();
