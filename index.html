@@ -5946,8 +5946,10 @@ dailyRate:parseFloat(document.getElementById('auDailyRate').value)||700
   };
   if(editUserId!==null&&editUserId!==undefined){
   const i=S.users.findIndex(x=>x.id===editUserId);
-  if(i>=0) S.users[i]={...S.users[i],...data,color:S.users[i].color};
-  else S.users.push({id:Date.now(),...data});
+  // Auto-sync salary from dailyRate
+  const salary=Math.round(data.dailyRate*26);
+  if(i>=0) S.users[i]={...S.users[i],...data,color:S.users[i].color,salary};
+  else S.users.push({id:Date.now(),...data,salary});
 } else {
   S.users.push({id:Date.now(),...data});
 }
@@ -6786,15 +6788,20 @@ function previewComp(){
 
 function saveStaffComp(){
   const u=S.users.find(x=>x.id===editCompUserId);if(!u)return;
-  u.salary=parseFloat(document.getElementById('scSalary').value)||0;
-  u.commission=parseFloat(document.getElementById('scCommission').value)||0;
-  u.sssVoluntary=document.getElementById('scSSS').checked;
-  u.philhealthVoluntary=document.getElementById('scPhilHealth').checked;
-  u.pagibigVoluntary=document.getElementById('scPagibig').checked;
-  u.withholdingTax=document.getElementById('scTax').checked;
-  u.otherDeductions=parseFloat(document.getElementById('scOtherDeduct').value)||0;
-  u.allowances=parseFloat(document.getElementById('scAllowance').value)||0;
-  closeM('staffCompModal');sync('users');renderPayslip();
+const salary=parseFloat(document.getElementById('scSalary').value)||0;
+const commission=parseFloat(document.getElementById('scCommission').value)||0;
+const sssVoluntary=document.getElementById('scSSS').checked;
+const philhealthVoluntary=document.getElementById('scPhilHealth').checked;
+const pagibigVoluntary=document.getElementById('scPagibig').checked;
+const withholdingTax=document.getElementById('scTax').checked;
+const otherDeductions=parseFloat(document.getElementById('scOtherDeduct').value)||0;
+const allowances=parseFloat(document.getElementById('scAllowance').value)||0;
+// Auto-sync dailyRate from salary
+const dailyRate=Math.round(salary/26);
+const i=S.users.findIndex(x=>x.id===editCompUserId);
+if(i>=0) S.users[i]={...S.users[i],salary,commission,sssVoluntary,philhealthVoluntary,pagibigVoluntary,withholdingTax,otherDeductions,allowances,dailyRate};
+closeM('staffCompModal');sync('users');renderPayslip();
+showToast(u.name+'\'s compensation saved','ok');
   showToast(u.name+'\'s compensation saved','ok');
 }
 
