@@ -5050,7 +5050,7 @@ function saveClient(){
   if(editUserId){const i=S.clients.findIndex(x=>x.id===editUserId);if(i>=0)S.clients[i]={...S.clients[i],...data};}
   else S.clients.push({id:Date.now(),...data,visits:0,totalSpent:0,vip:false,color:COLORS[S.clients.length%COLORS.length],intakeForms:[],photos:[]});
   closeM('addClientModal');renderClientsTable();populateForms();sync('clients');
-  showToast(name+(editUserId?' updated':' added'),'ok');editUserId=null;
+  showToast(name+(editUserId!==null?' updated':' added'),'ok');editUserId=null;
 }
 
 // ══ PRODUCTS ══
@@ -5941,7 +5941,7 @@ function saveUser(){
   S.users.push({id:Date.now(),...data});
 }
   closeM('addUserModal');renderUsersGrid();renderStaff();sync('users');
-  showToast(name+(editUserId?' updated':' added'),'ok');editUserId=null;
+  showToast(name+(editUserId!==null?' updated':' added'),'ok');editUserId=null;
 }
 
 // ══ MESSAGING ══
