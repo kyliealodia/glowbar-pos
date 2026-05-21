@@ -257,7 +257,7 @@ nav{flex:1;padding:12px 0;overflow-y:auto;}
         <div class="nav-item" onclick="goPage('leave')"><span class="nav-icon">🌿</span>Leave</div>
         <div class="nav-item" onclick="goPage('schedule')"><span class="nav-icon">📅</span>My Schedule</div>
         <div class="nav-item" id="navAdmin" style="display:none;" onclick="goPage('admin')"><span class="nav-icon">⚙️</span>Staff Admin</div>
-        <div class="nav-item" id="navCompliance" onclick="goPage('compliance')"><span class="nav-icon">📊</span>Compliance</div>
+        <div class="nav-item" id="navCompliance" style="display:none;" onclick="goPage('compliance')"><span class="nav-icon">📊</span>Compliance</div>
       </nav>
       <div class="sidebar-logout" onclick="logout()">🚪 Sign Out</div>
     </div>
@@ -941,10 +941,12 @@ function startApp(){
   document.getElementById('sbRole').textContent=cap(currentUser.role);
 
   // Show admin tab for owner/admin
-  if(currentUser.role==='owner'||currentUser.role==='admin'){
-    document.getElementById('navAdmin').style.display='flex';
-  }
-
+if(currentUser.role==='owner'||currentUser.role==='admin'){
+  document.getElementById('navAdmin').style.display='flex';
+}
+if(currentUser.role==='owner'){
+  document.getElementById('navCompliance').style.display='flex';
+}
   // Populate month selects
   populateMonthSelects();
   populateScheduleWeek();
