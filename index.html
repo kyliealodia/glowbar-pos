@@ -4373,7 +4373,7 @@ function sendClientEmail(){
   }
   shortBody+=`For your full treatment history, please contact us at your next visit.\n\nWith love,\nThe GlowBar Team\nBeauty · Confidence · Glow`;
   const bodyEncoded=encodeURIComponent(shortBody);
-  window.location.href=`mailto:${to}?subject=${subject}&body=${bodyEncoded}`;
+  window.open(`https://mail.google.com/mail/?view=cm&to=${to}&su=${subject}&body=${bodyEncoded}`,'_blank');
   closeM('emailSummaryModal');
   showToast('Mail app opened — ready to send! 💌','ok');
 }
