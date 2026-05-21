@@ -2047,11 +2047,12 @@ html{height:-webkit-fill-available;}
         <div class="form-group"><label class="form-label">Full Name *</label><input class="form-input" id="auName" placeholder="Staff member name"></div>
         <div class="form-group"><label class="form-label">Role *</label>
           <select class="form-select" id="auRole">
-            <option value="admin">Admin (full access)</option>
-            <option value="manager">Manager</option>
-            <option value="staff">Staff / Therapist</option>
-            <option value="reception">Reception</option>
-          </select>
+  <option value="owner">Owner</option>
+  <option value="admin">Admin (full access)</option>
+  <option value="manager">Manager</option>
+  <option value="staff">Staff / Therapist</option>
+  <option value="reception">Reception</option>
+</select>
         </div>
       </div>
       <div class="form-row">
@@ -5861,12 +5862,12 @@ function openAddUser(){
 function editUser(id){
   const canEdit=currentUser?.role==='owner'||currentUser?.role==='admin'||S.users.find(u=>u.id===currentUser?.id)?.role==='owner';
   if(!canEdit){showToast('Admin access required','err');return;}
-  document.getElementById('auDailyRate').value=u.dailyRate||700;
   const u=S.users.find(x=>x.id===id);if(!u)return;
   editUserId=id;
   document.getElementById('auName').value=u.name;
   document.getElementById('auPin').value=u.pin||'';
   document.getElementById('auSpecialty').value=u.specialty||'';
+  document.getElementById('auDailyRate').value=u.dailyRate||700;
   document.getElementById('auRole').value=u.role;
   document.getElementById('auEmpStatus').value=u.empStatus||'regular';
   document.getElementById('auStartDate').value=u.startDate||'';
@@ -5874,6 +5875,9 @@ function editUser(id){
   document.getElementById('auShiftEnd').value=u.shiftEnd||'18:00';
   setShiftDays(u.shiftDays||['Mon','Tue','Wed','Thu','Fri','Sat']);
   updateEmpStatusHint();
+  // Lock role if owner
+  const roleSelect=document.getElementById('auRole');
+  roleSelect.disabled=u.role==='owner';
   renderPermCheckboxes(u.role,u.perms);openM('addUserModal');
 }
 function renderPermCheckboxes(role,customPerms){
@@ -5933,7 +5937,7 @@ function saveUser(){
   const shiftStart=document.getElementById('auShiftStart')?.value||'09:00';
   const shiftEnd=document.getElementById('auShiftEnd')?.value||'18:00';
   const data={
-    name,role:document.getElementById('auRole').value,
+    name,role:editUserId===0?'owner':document.getElementById('auRole').value,
     pin:document.getElementById('auPin').value,
     specialty:document.getElementById('auSpecialty').value.trim(),
     perms,color:COLORS[Math.floor(Math.random()*COLORS.length)],
