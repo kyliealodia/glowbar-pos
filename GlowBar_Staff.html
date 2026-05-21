@@ -835,6 +835,9 @@ let selectedLeaveType='sick';
 
 // Load from Firebase
 function loadFromCloud(){
+  db.ref('gb/users').once('value', snap => {
+  console.log('RAW USERS:', JSON.stringify(snap.val()));
+});
   if(!db) return;
   ['users','bookings','loginLogs','settings'].forEach(key=>{
     db.ref('gb/'+key).on('value',snap=>{
