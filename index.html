@@ -6792,12 +6792,15 @@ function getDaysPresent(userId, period){
   );
   return new Set(logs.map(l=>l.time.split('T')[0])).size;
 }
-function getWorkingDays(yr, mo){
+function getWorkingDays(yr, mo, from, to){
+  const monthStart=new Date(yr,mo-1,1);
+  const monthEnd=new Date(yr,mo,0);
+  const rangeStart=from&&from>monthStart?from:monthStart;
+  const rangeEnd=to&&to<monthEnd?to:monthEnd;
   let count=0;
-  const days=new Date(yr,mo,0).getDate();
-  for(let d=1;d<=days;d++){
-    const dow=new Date(yr,mo-1,d).getDay();
-    if(dow!==0) count++;
+  for(let d=new Date(rangeStart);d<=rangeEnd;d.setDate(d.getDate()+1)){
+    const dow=new Date(d).getDay();
+    if(dow!==1) count++; // skip Monday — clinic closed
   }
   return count;
 }
@@ -6826,7 +6829,11 @@ function renderPayrollSummary(staffList, txns, period){
     const inLogs=S.loginLogs.filter(l=>(l.userId===u.id||l.user===u.name)&&(l.action==='clockin'||l.action==='in')&&l.time?.startsWith(period));
     const daysPresent=new Set(inLogs.map(l=>l.time.split('T')[0])).size;
     const leaveDays=(S.leaveRequests||[]).filter(l=>l.userId===u.id&&l.status==='approved'&&l.from?.startsWith(period)).reduce((s,l)=>s+(l.days||1),0);
-    const daysAbsent=Math.max(0,workingDays-daysPresent-leaveDays);
+    const today=new Date(); today.setHours(23,59,59,0);
+const staffStart=u.startDate?new Date(u.startDate):new Date('2026-06-02');
+const [py2,pm2]=period.split('-').map(Number);
+const actualWorkingDays=getWorkingDays(py2,pm2,staffStart,today);
+const daysAbsent=Math.max(0,actualWorkingDays-daysPresent-leaveDays);
     const dailyRate=workingDays>0?salary/workingDays:0;
     const earnedBasic=salary-Math.round(dailyRate*daysAbsent);
     const grossPay=Math.max(0,earnedBasic)+commAmt;
@@ -6998,9 +7005,13 @@ function renderPayslip(){
     })||[];
     const leaveDays=approvedLeave.reduce((s,l)=>s+(l.days||1),0);
 
-    const daysAbsent=Math.max(0, workingDays - daysPresent - leaveDays);
-    const salary=u.salary||0;
-    const dailyRate=workingDays>0?salary/workingDays:0;
+    const today=new Date(); today.setHours(23,59,59,0);
+const staffStart=u.startDate?new Date(u.startDate):new Date('2026-06-02');
+const [py2,pm2]=period.split('-').map(Number);
+const actualWorkingDays=getWorkingDays(py2,pm2,staffStart,today);
+const daysAbsent=Math.max(0,actualWorkingDays-daysPresent-leaveDays);
+const salary=u.salary||0;
+const dailyRate=actualWorkingDays>0?salary/actualWorkingDays:0;
     const absenceDeduction=Math.round(dailyRate*daysAbsent);
     const earnedBasic=salary-absenceDeduction;
 
