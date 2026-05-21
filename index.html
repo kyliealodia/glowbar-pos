@@ -3175,9 +3175,9 @@ function selStaff(id){
   pinEl.value='';
   pinEl.focus();
   snapTaken=false;
-  document.getElementById('snapPrev').style.display='none';
-  document.getElementById('camPrompt').style.display='flex';
-  document.getElementById('camCtrls').style.display='none';
+document.getElementById('snapPrev')?.style && (document.getElementById('snapPrev').style.display='none');
+document.getElementById('camPrompt')?.style && (document.getElementById('camPrompt').style.display='flex');
+document.getElementById('camCtrls')?.style && (document.getElementById('camCtrls').style.display='none');
   if(camStream){camStream.getTracks().forEach(t=>t.stop());camStream=null;}
   // Show correct button state
   document.getElementById('loginBtn').disabled=true;
@@ -5809,7 +5809,7 @@ function togglePkgActive(id){const p=S.packages.find(x=>x.id===id);if(p){p.activ
 function renderUsersGrid(){
   const ROLE_LABELS={owner:'Owner',admin:'Admin',manager:'Manager',staff:'Staff',reception:'Reception'};
   const ROLE_CLASSES={owner:'role-admin',admin:'role-admin',manager:'role-staff',staff:'role-staff',reception:'role-reception'};
-  const canEdit=currentUser?.role==='owner'||currentUser?.role==='admin';
+  const canEdit=currentUser?.role==='owner'||currentUser?.role==='admin'||S.users.find(u=>u.id===currentUser?.id)?.role==='owner';
   document.getElementById('usersGrid').innerHTML=S.users.map(u=>`
     <div class="user-card">
       <div class="user-av" style="background:${u.color}">${initials(u.name)}</div>
@@ -5841,7 +5841,7 @@ function deleteUser(id){
   showToast(u.name+' deleted','ok');
 }
 function openAddUser(){
-  const canEdit=currentUser?.role==='owner'||currentUser?.role==='admin';
+  const canEdit=currentUser?.role==='owner'||currentUser?.role==='admin'||S.users.find(u=>u.id===currentUser?.id)?.role==='owner';
   if(!canEdit){showToast('Admin access required','err');return;}
   editUserId=null;['auName','auPin','auSpecialty'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('auRole').value='staff';
@@ -5854,7 +5854,7 @@ function openAddUser(){
   renderPermCheckboxes('staff');openM('addUserModal');
 }
 function editUser(id){
-  const canEdit=currentUser?.role==='owner'||currentUser?.role==='admin';
+  const canEdit=currentUser?.role==='owner'||currentUser?.role==='admin'||S.users.find(u=>u.id===currentUser?.id)?.role==='owner';
   if(!canEdit){showToast('Admin access required','err');return;}
   const u=S.users.find(x=>x.id===id);if(!u)return;
   editUserId=id;
