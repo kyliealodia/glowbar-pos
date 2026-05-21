@@ -5933,8 +5933,13 @@ function saveUser(){
     perms,color:COLORS[Math.floor(Math.random()*COLORS.length)],
     empStatus,startDate,shiftDays,shiftStart,shiftEnd
   };
-  if(editUserId){const i=S.users.findIndex(x=>x.id===editUserId);if(i>=0)S.users[i]={...S.users[i],...data};}
+  if(editUserId!==null&&editUserId!==undefined){
+  const i=S.users.findIndex(x=>x.id===editUserId);
+  if(i>=0) S.users[i]={...S.users[i],...data,color:S.users[i].color};
   else S.users.push({id:Date.now(),...data});
+} else {
+  S.users.push({id:Date.now(),...data});
+}
   closeM('addUserModal');renderUsersGrid();renderStaff();sync('users');
   showToast(name+(editUserId?' updated':' added'),'ok');editUserId=null;
 }
