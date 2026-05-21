@@ -6044,7 +6044,7 @@ function sendMsg(){
   S.messages.push({id:Date.now(),clientId:msgClientId,text:body,channel:msgChannel,dir:'sent',staff:currentUser?.name||'',time:new Date().toISOString()});
   // Open the appropriate app
   if(msgChannel==='sms')window.open('sms:'+c.phone+'?body='+encodeURIComponent(body),'_blank');
-  else if(msgChannel==='email'){const sub=document.getElementById('emailSubject')?.value||'Message from GlowBar';window.open('mailto:'+c.email+'?subject='+encodeURIComponent(sub)+'&body='+encodeURIComponent(body),'_blank');}
+else if(msgChannel==='email'){const sub=document.getElementById('emailSubject')?.value||'Message from GlowBar';window.open(`https://mail.google.com/mail/?view=cm&to=${c.email}&su=${encodeURIComponent(sub)}&body=${encodeURIComponent(body)}`,'_blank');}
   else if(msgChannel==='messenger')window.open('https://m.me/'+(c.messenger?.replace('@','')||''),'_blank');
   document.getElementById('msgBody').value='';
   renderMsgHistory();showToast('Message sent via '+msgChannel,'ok');
