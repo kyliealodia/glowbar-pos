@@ -2058,7 +2058,12 @@ html{height:-webkit-fill-available;}
         <div class="form-group"><label class="form-label">PIN (4-6 digits)</label><input class="form-input" id="auPin" type="password" maxlength="6" placeholder="••••"></div>
         <div class="form-group"><label class="form-label">Specialty / Title</label><input class="form-input" id="auSpecialty" placeholder="e.g. Dermatologist"></div>
       </div>
-
+<div class="form-row">
+  <div class="form-group">
+    <label class="form-label">Daily Rate (₱)</label>
+    <input class="form-input" id="auDailyRate" type="number" placeholder="e.g. 700" min="0">
+  </div>
+</div>
       <!-- Employment Status -->
       <div style="background:var(--cream2);border-radius:10px;padding:12px;border:1px solid var(--border);margin-bottom:12px;">
         <div style="font-size:11px;font-weight:600;color:var(--ink2);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.8px;">Employment Details</div>
@@ -5856,6 +5861,7 @@ function openAddUser(){
 function editUser(id){
   const canEdit=currentUser?.role==='owner'||currentUser?.role==='admin'||S.users.find(u=>u.id===currentUser?.id)?.role==='owner';
   if(!canEdit){showToast('Admin access required','err');return;}
+  document.getElementById('auDailyRate').value=u.dailyRate||700;
   const u=S.users.find(x=>x.id===id);if(!u)return;
   editUserId=id;
   document.getElementById('auName').value=u.name;
@@ -5931,7 +5937,8 @@ function saveUser(){
     pin:document.getElementById('auPin').value,
     specialty:document.getElementById('auSpecialty').value.trim(),
     perms,color:COLORS[Math.floor(Math.random()*COLORS.length)],
-    empStatus,startDate,shiftDays,shiftStart,shiftEnd
+    empStatus,startDate,shiftDays,shiftStart,shiftEnd,
+dailyRate:parseFloat(document.getElementById('auDailyRate').value)||700
   };
   if(editUserId!==null&&editUserId!==undefined){
   const i=S.users.findIndex(x=>x.id===editUserId);
