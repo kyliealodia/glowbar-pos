@@ -843,7 +843,7 @@ function loadFromCloud(){
         S[key]=Array.isArray(val)?val:Object.values(val);
 if(key==='users'){
   const container=document.getElementById('c-staff-inputs');
-  if(container&&container.innerHTML===''){
+  if(container){{
     const staff=S.users.filter(u=>u.role==='staff');
     container.innerHTML=staff.map(u=>`
       <div class="c-input-row">
@@ -958,6 +958,8 @@ function logout(){
   currentUser=null;
   document.getElementById('loginScreen').style.display='flex';
   document.getElementById('app').style.display='none';
+  document.getElementById('navCompliance').style.display='none';
+  document.getElementById('navAdmin').style.display='none';
   pin='';
   updateDots();
 }
