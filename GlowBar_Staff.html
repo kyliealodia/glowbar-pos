@@ -1136,7 +1136,10 @@ const dailyRate=basicPay>0?Math.round(basicPay/workingDays*100)/100:0;
   const vacTaken=getLeaveDays(period,'vacation');
 
   // Absences = working days not covered by presence or leave
-  const daysAbsent=Math.max(0, workingDays - daysPresent - leaveDays);
+  const today2=new Date(); today2.setHours(23,59,59,0);
+const staffStart2=userRecord.startDate?new Date(userRecord.startDate):new Date('2026-06-02');
+const notStartedYet=staffStart2>today2;
+const daysAbsent=notStartedYet?0:Math.max(0, workingDays - daysPresent - leaveDays);
   const absenceDeduction=Math.round(dailyRate*daysAbsent);
   const earnedBasic=Math.max(0, basicPay - absenceDeduction);
 
