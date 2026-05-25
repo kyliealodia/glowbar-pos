@@ -996,21 +996,27 @@ function setSvcCons(svcId,ci,f,v){
   st.consumables[ci]=c;
   c[f]=v;
   if(f==='itemIdx'){
+    const target=parseInt(v);
     let flat=0;
-    for(const g of CONS_DATA){
+    let found=false;
+    for(let gi=0;gi<CONS_DATA.length;gi++){
+      const g=CONS_DATA[gi];
       for(let ii=0;ii<g.items.length;ii++){
-        if(flat===parseInt(v)){
+        if(flat===target){
           c.groupId=g.id;
           c.iIdx=ii;
           // Auto-set unit to match consumable UOM
           const cs=getCS(g.id,ii);
           c.unit=cs.uom||g.items[ii].uom||'ml';
+          found=true;
           break;
         }
         flat++;
       }
+      if(found) break;
     }
-    // Save and refresh immediately when selecting a consumable
+    console.log('setSvcCons itemIdx resolved:', {target, groupId:c.groupId, iIdx:c.iIdx});
+    // Save immediately and refresh
     svcCatState[svcId]=st;
     saveSvcState();
     refreshSvcCard(svcId);
