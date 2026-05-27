@@ -313,6 +313,19 @@ nav{flex:1;padding:12px 0;overflow-y:auto;}
             </table>
           </div>
         </div>
+        <!-- Overtime Requests -->
+        <div class="card" style="margin-top:16px;">
+          <div class="card-hdr">
+            <h3>⏱ Overtime Requests</h3>
+            <button class="btn btn-gold btn-sm" onclick="openOtModal()">+ Log Overtime</button>
+          </div>
+          <div class="card-body" style="padding:0;">
+            <table class="tbl">
+              <thead><tr><th>Date</th><th>Hours</th><th>OT Pay</th><th>Reason</th><th>Status</th></tr></thead>
+              <tbody id="otBody"></tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
       <!-- LEAVE -->
@@ -364,6 +377,17 @@ nav{flex:1;padding:12px 0;overflow-y:auto;}
             </table>
           </div>
         </div>
+        <!-- Overtime requests pending -->
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-hdr"><h3>⏱ Pending Overtime Requests</h3></div>
+          <div class="card-body" style="padding:0;">
+            <table class="tbl">
+              <thead><tr><th>Staff</th><th>Date</th><th>Hours</th><th>OT Pay</th><th>Reason</th><th>Actions</th></tr></thead>
+              <tbody id="adminOTBody"></tbody>
+            </table>
+          </div>
+        </div>
+
         <!-- All staff attendance summary -->
         <div class="card">
           <div class="card-hdr">
@@ -534,6 +558,8 @@ nav{flex:1;padding:12px 0;overflow-y:auto;}
       <div class="c-input-row"><label>Basic salary (₱)</label><input type="number" id="cnetsal" value="20000" oninput="cNet()"></div>
       <div class="c-input-row"><label>Housing deduction (₱)</label><input type="number" id="cnthouse" value="1500" oninput="cNet()"></div>
       <div class="c-input-row"><label>Service commission (₱)</label><input type="number" id="cntcomm" value="0" oninput="cNet()"></div>
+      <div class="c-input-row"><label>Holiday pay (₱)</label><input type="number" id="cntholiday" value="0" oninput="cNet()" title="Extra pay for working on regular or special holidays"></div>
+      <div class="c-input-row"><label>Overtime pay (₱)</label><input type="number" id="cntovertme" value="0" oninput="cNet()" title="Approved overtime — 125% of hourly rate per PH law"></div>
       <div class="c-input-row"><label>Other deductions (₱)</label><input type="number" id="cntother" value="0" oninput="cNet()"></div>
     </div>
     <div class="c-card">
@@ -673,10 +699,12 @@ const zSal=salaries[0]||0,rSal=salaries[1]||0;
     const s=parseFloat(el('cnetsal')?el('cnetsal').value:0)||0;
     const h=parseFloat(el('cnthouse')?el('cnthouse').value:0)||0;
     const cm=parseFloat(el('cntcomm')?el('cntcomm').value:0)||0;
+    const hp=parseFloat(el('cntholiday')?el('cntholiday').value:0)||0;
+    const ot=parseFloat(el('cntovertme')?el('cntovertme').value:0)||0;
     const o=parseFloat(el('cntother')?el('cntother').value:0)||0;
     const sc=cSSS(s),pc=cPH(s),ic=cPI(s);
     const wt=calcWithholding(s);
-    const gross=s+cm;
+    const gross=s+cm+hp+ot;
     const ded=sc.ee+pc.ee+ic.ee+h+o+wt;
     const net=gross-ded;
     const annualSal=s*12;
@@ -685,6 +713,8 @@ const zSal=salaries[0]||0,rSal=salaries[1]||0;
       <div class="c-net-row"><span class="c-net-lbl">Basic salary</span><span class="c-net-val">${f(s)}</span></div>
       <div class="c-net-row"><span class="c-net-lbl">Annual equivalent</span><span class="c-net-val">${f(annualSal)} — ${taxStatus}</span></div>
       <div class="c-net-row"><span class="c-net-lbl">+ Service commission</span><span class="c-net-val">${f(cm)}</span></div>
+      ${hp>0?`<div class="c-net-row"><span class="c-net-lbl">+ Holiday pay</span><span class="c-net-val" style="color:#C9A84C">${f(hp)}</span></div>`:''}
+      ${ot>0?`<div class="c-net-row"><span class="c-net-lbl">+ Overtime pay</span><span class="c-net-val" style="color:#4A7CB8">${f(ot)}</span></div>`:''}
       <div class="c-net-row" style="font-weight:600"><span class="c-net-lbl">Gross pay</span><span class="c-net-val">${f(gross)}</span></div>
       <div class="c-divider"></div>
       <div class="c-net-row"><span class="c-net-lbl">– SSS employee share (4.5%)</span><span class="c-net-val" style="color:#c0392b">${f(sc.ee)}</span></div>
@@ -769,6 +799,22 @@ const zSal=salaries[0]||0,rSal=salaries[1]||0;
 </div>
 
 <!-- Leave Request Modal -->
+<div class="overlay hidden" id="otModal">
+  <div class="modal">
+    <div class="modal-hdr"><div class="modal-title">⏱ Log Overtime</div><div class="modal-x" onclick="closeModal('otModal')">✕</div></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Date</label><input class="form-input" type="date" id="otDate" oninput="previewOT()"></div>
+      <div class="form-group"><label class="form-label">Overtime Hours</label><input class="form-input" type="number" id="otHours" min="0.5" max="12" step="0.5" placeholder="e.g. 2" oninput="previewOT()"></div>
+      <div class="form-group"><label class="form-label">Reason</label><textarea class="form-textarea" id="otReason" placeholder="Brief reason for overtime…"></textarea></div>
+      <div id="otPreview" style="background:var(--cream);border-radius:8px;padding:10px;font-size:12px;color:var(--ink2);margin-top:4px;display:none;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('otModal')">Cancel</button>
+      <button class="btn btn-gold" onclick="submitOT()">Submit for Approval</button>
+    </div>
+  </div>
+</div>
+
 <div class="overlay hidden" id="leaveModal">
   <div class="modal">
     <div class="modal-hdr"><div class="modal-title">🌿 Request Leave</div><div class="modal-x" onclick="closeModal('leaveModal')">✕</div></div>
@@ -826,6 +872,7 @@ let S={
   bookings:[],
   loginLogs:[],
   leaveRequests:[], // {id, userId, type, from, to, days, reason, status, createdAt}
+  overtimeRequests:[], // {id, userId, userName, date, hours, rate, amount, reason, status, createdAt}
   settings:{}
 };
 
@@ -861,6 +908,13 @@ function loadFromCloud(){
       S.leaveRequests=Array.isArray(val)?val:Object.values(val);
     } else { S.leaveRequests=[]; }
   });
+  db.ref('gb/overtimeRequests').on('value',snap=>{
+    if(snap.exists()){
+      const val=snap.val();
+      S.overtimeRequests=Array.isArray(val)?val:Object.values(val);
+    } else { S.overtimeRequests=[]; }
+    if(document.getElementById('otBody')) renderOTHistory();
+  });
 }
 
 function syncLeave(){
@@ -869,6 +923,21 @@ function syncLeave(){
   S.leaveRequests.forEach((l,i)=>{ obj[l.id||i]=l; });
   db.ref('gb/leaveRequests').set(obj);
 }
+
+function syncOvertime(){
+  if(!db) return;
+  const obj={};
+  S.overtimeRequests.forEach((o,i)=>{ obj[o.id||i]=o; });
+  db.ref('gb/overtimeRequests').set(obj);
+}
+
+// Philippine public holidays — regular (200%) and special non-working (130%)
+const PH_HOLIDAYS={
+  regular:['2026-01-01','2026-04-02','2026-04-03','2026-04-09','2026-05-01',
+           '2026-06-12','2026-08-25','2026-11-30','2026-12-25','2026-12-30'],
+  special:['2026-01-30','2026-02-25','2026-04-04','2026-08-21',
+           '2026-11-01','2026-11-02','2026-12-08','2026-12-24','2026-12-31']
+};
 
 // ══ HELPERS ══
 function td(){return new Date().toISOString().split('T')[0];}
@@ -974,7 +1043,7 @@ function goPage(name){
   closeSidebar();
   if(name==='home') renderHome();
   else if(name==='payslip') renderPayslip();
-  else if(name==='attendance') renderAttendance();
+  else if(name==='attendance'){renderAttendance();renderOTHistory();}
   else if(name==='leave') renderLeave();
   else if(name==='schedule') renderSchedule();
   else if(name==='admin') renderAdmin();
@@ -1151,7 +1220,26 @@ const daysAbsent=notStartedYet?0:Math.max(0, workingDays - daysPresent - leaveDa
   const txnRevenue=txns.reduce((s,t)=>s+t.total,0);
   const commEarned=Math.round(txnRevenue*(commRate/100));
 
-  const grossPay=earnedBasic+commEarned+allowances;
+  // Holiday pay — check each present date against PH holidays
+  const presentDates=[...new Set(inLogs.map(l=>l.time.split('T')[0]))];
+  let holidayRegularDays=0, holidaySpecialDays=0;
+  presentDates.forEach(dateStr=>{
+    if(PH_HOLIDAYS.regular.includes(dateStr)) holidayRegularDays++;
+    else if(PH_HOLIDAYS.special.includes(dateStr)) holidaySpecialDays++;
+  });
+  // Regular holiday worked → extra 100% of daily rate; special → extra 30%
+  const holidayPayRegular=Math.round(dailyRate*holidayRegularDays);
+  const holidayPaySpecial=Math.round(dailyRate*0.30*holidaySpecialDays);
+  const totalHolidayPay=holidayPayRegular+holidayPaySpecial;
+
+  // Approved overtime for this period
+  const approvedOT=(S.overtimeRequests||[]).filter(o=>
+    o.userId===currentUser.id&&o.status==='approved'&&o.date?.startsWith(period)
+  );
+  const totalOTPay=approvedOT.reduce((s,o)=>s+(o.amount||0),0);
+  const totalOTHours=approvedOT.reduce((s,o)=>s+(o.hours||0),0);
+
+  const grossPay=earnedBasic+commEarned+allowances+totalHolidayPay+totalOTPay;
 
   // Statutory deductions
   const sss=computeSSS(grossPay);
@@ -1238,6 +1326,9 @@ const daysAbsent=notStartedYet?0:Math.max(0, workingDays - daysPresent - leaveDa
             ${row('Earned Basic Pay',fmtPrice(earnedBasic))}
             ${commEarned>0?row('Commission ('+commRate+'%)','+'+fmtPrice(commEarned)):''}
             ${allowances>0?row('Allowances','+'+fmtPrice(allowances)):''}
+            ${holidayPayRegular>0?row('Holiday Pay — Regular ('+holidayRegularDays+' day'+(holidayRegularDays!==1?'s':'')+', +100%)','<span style="color:#B8935A;">+'+fmtPrice(holidayPayRegular)+'</span>'):''}
+            ${holidayPaySpecial>0?row('Holiday Pay — Special ('+holidaySpecialDays+' day'+(holidaySpecialDays!==1?'s':'')+', +30%)','<span style="color:#B8935A;">+'+fmtPrice(holidayPaySpecial)+'</span>'):''}
+            ${totalOTPay>0?row('Overtime Pay ('+totalOTHours.toFixed(1)+' hrs approved)','<span style="color:#4A7CB8;">+'+fmtPrice(totalOTPay)+'</span>'):''}
             <div style="display:flex;justify-content:space-between;padding:8px 0;border-top:1.5px solid #2C2318;margin-top:6px;font-weight:700;font-size:13px;">
               <span>Gross Pay</span><span style="color:#4A8C5C;">${fmtPrice(grossPay)}</span>
             </div>
@@ -1380,6 +1471,80 @@ function renderAttendance(){
       <td><span class="pill ${late?'pill-amber':'pill-green'}">${late?'Late':'On Time'}</span></td>
     </tr>`;
   }).join('');
+}
+
+// ══ OVERTIME ══
+function openOtModal(){
+  const today=td();
+  document.getElementById('otDate').value=today;
+  document.getElementById('otHours').value='';
+  document.getElementById('otReason').value='';
+  const prev=document.getElementById('otPreview');
+  if(prev){prev.style.display='none';prev.innerHTML='';}
+  openModal('otModal');
+}
+
+function previewOT(){
+  const userRecord=S.users.find(u=>u.id===currentUser.id)||currentUser;
+  const basicPay=userRecord.salary||userRecord.basicPay||0;
+  const hrs=parseFloat(document.getElementById('otHours')?.value)||0;
+  const prev=document.getElementById('otPreview');
+  if(!prev||!hrs||!basicPay){if(prev)prev.style.display='none';return;}
+  const dailyR=Math.round(basicPay/26*100)/100;
+  const hrlyR=Math.round(dailyR/8*100)/100;
+  const otRate=Math.round(hrlyR*1.25*100)/100;
+  const amount=Math.round(otRate*hrs);
+  prev.style.display='block';
+  prev.innerHTML=`Estimated OT pay: <strong>${fmtPrice(amount)}</strong> (${fmtPrice(hrlyR)}/hr × 125% = ${fmtPrice(otRate)}/hr × ${hrs} hrs)`;
+}
+
+function submitOT(){
+  const date=document.getElementById('otDate')?.value;
+  const hrs=parseFloat(document.getElementById('otHours')?.value)||0;
+  const reason=document.getElementById('otReason')?.value||'';
+  if(!date){showToast('Please select a date','err');return;}
+  if(hrs<=0){showToast('Please enter overtime hours','err');return;}
+  const userRecord=S.users.find(u=>u.id===currentUser.id)||currentUser;
+  const basicPay=userRecord.salary||userRecord.basicPay||0;
+  const dailyR=Math.round(basicPay/26*100)/100;
+  const hrlyR=Math.round(dailyR/8*100)/100;
+  const otRate=Math.round(hrlyR*1.25*100)/100;
+  const amount=Math.round(otRate*hrs);
+  const req={
+    id:Date.now(),
+    userId:currentUser.id,
+    userName:currentUser.name,
+    date,
+    hours:hrs,
+    rate:otRate,
+    amount,
+    reason,
+    status:'pending',
+    createdAt:new Date().toISOString()
+  };
+  S.overtimeRequests.push(req);
+  syncOvertime();
+  closeModal('otModal');
+  renderOTHistory();
+  showToast('Overtime request submitted — pending admin approval','ok');
+}
+
+function renderOTHistory(){
+  const tbody=document.getElementById('otBody');
+  if(!tbody) return;
+  const myOT=(S.overtimeRequests||[]).filter(o=>o.userId===currentUser.id)
+    .sort((a,b)=>new Date(b.date)-new Date(a.date));
+  if(!myOT.length){
+    tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--ink3);padding:20px;">No overtime requests yet</td></tr>';
+    return;
+  }
+  tbody.innerHTML=myOT.map(o=>`<tr>
+    <td style="font-size:12px;">${fmtDate(o.date)}</td>
+    <td>${o.hours} hr${o.hours!==1?'s':''}</td>
+    <td>${fmtPrice(o.amount)}</td>
+    <td style="font-size:12px;color:var(--ink3);">${o.reason||'—'}</td>
+    <td><span class="pill ${o.status==='approved'?'pill-green':o.status==='rejected'?'pill-red':'pill-amber'}">${cap(o.status)}</span></td>
+  </tr>`).join('');
 }
 
 // ══ LEAVE ══
@@ -1616,6 +1781,29 @@ function renderAdmin(){
     </tr>`).join('');
   }
 
+  // Pending overtime requests
+  const pendingOT=(S.overtimeRequests||[]).filter(o=>o.status==='pending');
+  const otTbody=document.getElementById('adminOTBody');
+  if(otTbody){
+    if(!pendingOT.length){
+      otTbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--ink3);padding:24px;">No pending overtime requests</td></tr>';
+    } else {
+      otTbody.innerHTML=pendingOT.map(o=>`<tr>
+        <td style="font-weight:500;">${o.userName||'Unknown'}</td>
+        <td style="font-size:12px;">${fmtDate(o.date)}</td>
+        <td>${o.hours} hr${o.hours!==1?'s':''}</td>
+        <td style="font-weight:600;color:var(--gold-dk);">${fmtPrice(o.amount)}</td>
+        <td style="font-size:12px;color:var(--ink3);">${o.reason||'—'}</td>
+        <td>
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-sm" style="background:var(--success);color:#fff;border:none;border-radius:7px;padding:5px 10px;font-size:11px;font-family:'Jost',sans-serif;cursor:pointer;" onclick="approveOT(${o.id})">✓ Approve</button>
+            <button class="btn btn-sm" style="background:var(--danger);color:#fff;border:none;border-radius:7px;padding:5px 10px;font-size:11px;font-family:'Jost',sans-serif;cursor:pointer;" onclick="rejectOT(${o.id})">✕ Reject</button>
+          </div>
+        </td>
+      </tr>`).join('');
+    }
+  }
+
   // Staff overview
   const [yr,mo]=period.split('-').map(Number);
   const staffTbody=document.getElementById('adminStaffBody');
@@ -1669,6 +1857,24 @@ function rejectLeave(id){
   renderAdmin();
   renderLeave();
   showToast('Leave rejected','warn');
+}
+
+function approveOT(id){
+  const req=S.overtimeRequests.find(o=>o.id===id);
+  if(!req) return;
+  req.status='approved';
+  syncOvertime();
+  renderAdmin();
+  showToast('Overtime approved ✓ — ₱'+req.amount.toLocaleString()+' will be added to payslip','ok');
+}
+
+function rejectOT(id){
+  const req=S.overtimeRequests.find(o=>o.id===id);
+  if(!req) return;
+  req.status='rejected';
+  syncOvertime();
+  renderAdmin();
+  showToast('Overtime request rejected','warn');
 }
 
 // ══ START ══
