@@ -893,6 +893,7 @@ function rebuildBody(id){
   const tb=document.querySelector(`#body-${id} tbody`);if(!tb)return;
   tb.innerHTML=cat.items.map((item,i)=>rowHtml(cat,item,i)).join('');
   refreshCat(id);
+  cat.items.forEach((_,i)=>refreshRowBal(id,i));
 }
 
 function delRow(catId,idx){
@@ -922,7 +923,7 @@ function delCat(id){
 }
 
 function updN(c,i,v){const cat=CATS.find(x=>x.id===c);if(cat&&cat.items[i])cat.items[i].name=v;refreshCat(c);refreshSummary();}
-function updP(c,i,v){const cat=CATS.find(x=>x.id===c);if(cat&&cat.items[i])cat.items[i].p=parseFloat(v)||0;refreshCat(c);refreshSummary();}
+function updP(c,i,v){const cat=CATS.find(x=>x.id===c);if(cat&&cat.items[i])cat.items[i].p=parseFloat(v)||0;refreshRowBal(c,i);refreshCat(c);refreshSummary();}
 
 function buildCats(){
   const con=document.getElementById('cats-container');con.innerHTML='';
@@ -955,6 +956,7 @@ function buildCats(){
         <button class="add-row" onclick="addRow('${cat.id}')">＋ Add item</button>
       </div>`;
     con.appendChild(div);refreshCat(cat.id);
+    cat.items.forEach((_,i)=>refreshRowBal(cat.id,i));
   });
 }
 
