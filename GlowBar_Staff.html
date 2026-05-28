@@ -397,6 +397,21 @@ nav{flex:1;padding:12px 0;overflow-y:auto;}
           </div>
         </div>
 
+        <!-- Staff Payroll -->
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-hdr" style="flex-wrap:wrap;gap:10px;">
+            <h3>💰 Staff Payroll</h3>
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+              <select class="form-select" id="adminPayrollMonth" onchange="renderAdminPayroll()" style="width:150px;font-size:12px;"></select>
+              <button id="apr1btn" onclick="selectAdminCutoff(1)" style="padding:6px 12px;border-radius:8px;border:1.5px solid #C9A84C;background:#C9A84C;color:#fff;font-family:inherit;font-size:11px;font-weight:600;cursor:pointer;">1st Cut-off (1–15)</button>
+              <button id="apr2btn" onclick="selectAdminCutoff(2)" style="padding:6px 12px;border-radius:8px;border:1.5px solid #C9A84C;background:#fff;color:#C9A84C;font-family:inherit;font-size:11px;font-weight:600;cursor:pointer;">2nd Cut-off (16–end)</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div id="adminPayrollBody"></div>
+          </div>
+        </div>
+
         <!-- All staff attendance summary -->
         <div class="card">
           <div class="card-hdr">
@@ -1061,7 +1076,7 @@ function goPage(name){
   else if(name==='attendance'){renderAttendance();renderOTHistory();}
   else if(name==='leave') renderLeave();
   else if(name==='schedule') renderSchedule();
-  else if(name==='admin') renderAdmin();
+  else if(name==='admin'){renderAdmin();renderAdminPayroll();}
   else if(name==='compliance') renderCompliance();
 }
 
@@ -1289,7 +1304,7 @@ function populateMonthSelects(){
     const lbl=d.toLocaleDateString('en-PH',{month:'long',year:'numeric'});
     opts.push(`<option value="${val}">${lbl}</option>`);
   }
-  ['payPeriodSel','attMonth','adminMonth'].forEach(id=>{
+  ['payPeriodSel','attMonth','adminMonth','adminPayrollMonth'].forEach(id=>{
     const el=document.getElementById(id);
     if(el) el.innerHTML=opts.join('');
   });
@@ -2027,6 +2042,145 @@ function renderAdmin(){
     </tr>`;
   });
   staffTbody.innerHTML=staffRows.join('')||'<tr><td colspan="5" style="text-align:center;color:var(--ink3);padding:20px;">No staff data</td></tr>';
+}
+
+// ══ ADMIN PAYROLL ══
+let adminCutoff=1;
+
+function selectAdminCutoff(n){
+  adminCutoff=n;
+  const a=document.getElementById('apr1btn'),b=document.getElementById('apr2btn');
+  if(a&&b){
+    a.style.background=n===1?'#C9A84C':'#fff';a.style.color=n===1?'#fff':'#C9A84C';
+    b.style.background=n===2?'#C9A84C':'#fff';b.style.color=n===2?'#fff':'#C9A84C';
+  }
+  renderAdminPayroll();
+}
+
+function renderAdminPayroll(){
+  const el=document.getElementById('adminPayrollBody');if(!el)return;
+  const period=document.getElementById('adminPayrollMonth')?.value||td().slice(0,7);
+  const [yr,mo]=period.split('-').map(Number);
+  const n=adminCutoff;
+  const f=fmtPrice;
+
+  const daysInMonth=new Date(yr,mo,0).getDate();
+  const coStart=n===1?1:16;
+  const coEnd=n===1?15:daysInMonth;
+  const pad=x=>String(x).padStart(2,'0');
+  const coStartStr=`${yr}-${pad(mo)}-${pad(coStart)}`;
+  const coEndStr=`${yr}-${pad(mo)}-${pad(coEnd)}`;
+  const payDate=n===1
+    ?new Date(yr,mo-1,15).toLocaleDateString('en-PH',{month:'long',day:'numeric',year:'numeric'})
+    :new Date(yr,mo,1).toLocaleDateString('en-PH',{month:'long',day:'numeric',year:'numeric'});
+  const periodLabel=`${new Date(yr,mo-1,coStart).toLocaleDateString('en-PH',{month:'short',day:'numeric'})} – ${new Date(yr,mo-1,coEnd).toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'numeric'})}`;
+
+  const today=new Date();today.setHours(23,59,59,0);
+  const dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const staff=S.users.filter(u=>u.role!=='owner');
+
+  if(!staff.length){el.innerHTML='<p style="color:var(--ink3);font-size:13px;text-align:center;padding:20px;">No staff found.</p>';return;}
+
+  // Summary totals
+  let totalGross=0,totalDed=0,totalNet=0;
+
+  const cards=staff.map(u=>{
+    const dailyRate=u.dailyRate||0;
+    const commRate=u.commission||0;
+    const allowances=u.allowances||0;
+    const otherDeductions=u.otherDeductions||0;
+
+    // Working days in cut-off
+    const staffStart=u.startDate?new Date(u.startDate):new Date('2026-06-02');
+    const shiftDays=u.shiftDays||['Tue','Wed','Thu','Fri','Sat','Sun'];
+    const coStartDate=new Date(yr,mo-1,coStart);
+    const coEndDate=new Date(yr,mo-1,coEnd,23,59,59);
+    const rangeStart=staffStart>coStartDate?staffStart:coStartDate;
+    const rangeEnd=today<coEndDate?today:coEndDate;
+    let workingDaysInCO=0;
+    for(let d=new Date(rangeStart);d<=rangeEnd;d.setDate(d.getDate()+1)){
+      if(shiftDays.includes(dayNames[new Date(d).getDay()])) workingDaysInCO++;
+    }
+
+    // Days present
+    const inLogs=(S.loginLogs||[]).filter(l=>{
+      const matchU=l.userId===u.id||l.user===u.name||l.name===u.name;
+      if(!matchU)return false;
+      if(!(l.action==='clockin'||l.action==='in'))return false;
+      const d=(l.time||'').slice(0,10);
+      return d>=coStartStr&&d<=coEndStr;
+    });
+    const daysPresent=new Set(inLogs.map(l=>l.time.slice(0,10))).size;
+    const baseEarned=Math.round(dailyRate*daysPresent);
+    const coAllowances=Math.round(allowances/2);
+
+    // Commission
+    const txns=(S.transactions||[]).filter(t=>{
+      const d=(t.time||'').slice(0,10);
+      return t.staff===u.name&&d>=coStartStr&&d<=coEndStr;
+    });
+    const commEarned=Math.round(txns.reduce((s,t)=>s+t.total,0)*(commRate/100));
+
+    // OT
+    const otPay=(S.overtimeRequests||[]).filter(o=>
+      o.userId===u.id&&o.status==='approved'&&o.date>=coStartStr&&o.date<=coEndStr
+    ).reduce((s,o)=>s+(o.amount||0),0);
+
+    const grossPay=baseEarned+commEarned+coAllowances+otPay;
+    const estMonthlyGross=grossPay*2;
+    const sss=Math.round(computeSSS(estMonthlyGross)/2);
+    const philhealth=Math.round(computePhilHealth(estMonthlyGross)/2);
+    const pagibig=Math.round(computePagibig()/2);
+    const govTotal=sss+philhealth+pagibig;
+    const taxable=Math.max(0,estMonthlyGross-computeSSS(estMonthlyGross)-computePhilHealth(estMonthlyGross)-computePagibig());
+    const taxForCO=Math.round(computeWithholdingTax(taxable)/2);
+    const otherDed=Math.round(otherDeductions/2);
+    const totalDed2=govTotal+taxForCO+otherDed;
+    const netPay=grossPay-totalDed2;
+
+    totalGross+=grossPay;totalDed+=totalDed2;totalNet+=netPay;
+
+    const absent=workingDaysInCO-daysPresent;
+
+    return `<div style="background:#fff;border:1px solid #E8DFD0;border-radius:12px;overflow:hidden;margin-bottom:12px;">
+      <div style="background:#F5EFE3;padding:10px 16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:34px;height:34px;border-radius:50%;background:${u.color||'var(--gold)'};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;">${initials(u.name)}</div>
+          <div>
+            <div style="font-weight:700;color:#2C2318;font-size:13px;">${u.name}</div>
+            <div style="font-size:11px;color:#8C7B65;">${cap(u.role||'Staff')}${u.specialty?' · '+u.specialty:''} · ${f(dailyRate)}/day</div>
+          </div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:10px;color:#8C7B65;">Net Pay</div>
+          <div style="font-size:18px;font-weight:700;color:#2C2318;">${f(netPay)}</div>
+        </div>
+      </div>
+      <div style="padding:10px 16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;font-size:12px;">
+        <div><span style="color:#8C7B65;">Days worked</span><br><strong>${daysPresent} / ${workingDaysInCO}</strong>${absent>0?` <span style="color:#c0392b;font-size:10px;">(${absent} absent)</span>`:''}</div>
+        <div><span style="color:#8C7B65;">Basic Pay</span><br><strong>${f(baseEarned)}</strong></div>
+        ${commEarned>0?`<div><span style="color:#8C7B65;">Commission</span><br><strong>+${f(commEarned)}</strong></div>`:''}
+        ${otPay>0?`<div><span style="color:#8C7B65;">Overtime</span><br><strong>+${f(otPay)}</strong></div>`:''}
+        ${coAllowances>0?`<div><span style="color:#8C7B65;">Allowances</span><br><strong>+${f(coAllowances)}</strong></div>`:''}
+        <div><span style="color:#8C7B65;">Gross Pay</span><br><strong style="color:#4A8C5C;">${f(grossPay)}</strong></div>
+        <div><span style="color:#8C7B65;">Deductions</span><br><strong style="color:#c0392b;">−${f(totalDed2)}</strong><div style="font-size:10px;color:#8C7B65;">SSS ${f(sss)} · PH ${f(philhealth)} · PI ${f(pagibig)}${taxForCO>0?' · Tax '+f(taxForCO):''}</div></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const summary=`<div style="background:linear-gradient(135deg,#2C2318,#5C4F3D);border-radius:12px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
+    <div>
+      <div style="font-size:10px;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:1px;">Payroll Summary · ${periodLabel}</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:2px;">Pay date: <strong style="color:#C9A84C;">${payDate}</strong> · ${staff.length} employee${staff.length!==1?'s':''}</div>
+    </div>
+    <div style="display:flex;gap:20px;flex-wrap:wrap;">
+      <div style="text-align:center;"><div style="font-size:10px;color:rgba(255,255,255,0.5);">Total Gross</div><div style="font-size:16px;font-weight:700;color:#C9A84C;">${f(totalGross)}</div></div>
+      <div style="text-align:center;"><div style="font-size:10px;color:rgba(255,255,255,0.5);">Deductions</div><div style="font-size:16px;font-weight:700;color:#e88;">${f(totalDed)}</div></div>
+      <div style="text-align:center;"><div style="font-size:10px;color:rgba(255,255,255,0.5);">Total Net</div><div style="font-size:16px;font-weight:700;color:#fff;">${f(totalNet)}</div></div>
+    </div>
+  </div>`;
+
+  el.innerHTML=summary+cards;
 }
 
 function approveLeave(id){
