@@ -1023,8 +1023,10 @@ function calcSvcCost(svc){
   const roleId=st.staffRole||svc.staffRole||'';
   const hourly=getHourlyRate(roleId);
   const laborCost=(durationMins/60)*hourly;
-  const elec=parseFloat(document.getElementById('elec-rate')?.value||15);
-  const water=parseFloat(document.getElementById('water-rate')?.value||9);
+  const elecRate=parseFloat(document.getElementById('elec-rate')?.value||15);
+  const waterRate=parseFloat(document.getElementById('water-rate')?.value||9);
+  const elec=st.noElec?0:elecRate;
+  const water=st.noWater?0:waterRate;
   const commPct=parseFloat(document.getElementById('comm-pct')?.value||10)/100;
   const commission=price*commPct;
   const cardFee=price*0.03;
@@ -1256,10 +1258,21 @@ function buildSvcCardInner(svc, catId){
     <div><div style="font-size:10px;color:var(--muted);margin-bottom:2px">Free sessions</div><input class="ii" type="number" style="width:100%" value="${svc.freeSessions||0}" oninput="updSvcProp('${catId}','${svc.id}','freeSessions',+this.value)"></div>
   </div>`:''}
   ${isPkg?`<div style="margin-bottom:8px"><div style="font-size:10px;color:var(--muted);margin-bottom:2px">Discount (&#8369;)</div><input class="ii" type="number" style="width:100%" value="${discount}" oninput="debounce('disc_${svc.id}',()=>{setSvcStateField('${svc.id}','discount',+this.value);refreshSvcCard('${svc.id}');},400)"></div>`:''}
+  <div style="display:flex;gap:14px;margin-bottom:6px;font-size:11px;flex-wrap:wrap;">
+    <label style="display:flex;align-items:center;gap:4px;cursor:pointer;color:var(--ink2);">
+      <input type="checkbox" ${!st.noElec?'checked':''} onchange="setSvcStateField('${svc.id}','noElec',!this.checked);refreshSvcCard('${svc.id}')">
+      Electricity (&#8369;${parseFloat(document.getElementById('elec-rate')?.value||15)}/svc)
+    </label>
+    <label style="display:flex;align-items:center;gap:4px;cursor:pointer;color:var(--ink2);">
+      <input type="checkbox" ${!st.noWater?'checked':''} onchange="setSvcStateField('${svc.id}','noWater',!this.checked);refreshSvcCard('${svc.id}')">
+      Water (&#8369;${parseFloat(document.getElementById('water-rate')?.value||9)}/svc)
+    </label>
+  </div>
   ${isLaser?pkgBreakdown:`<div style="font-size:11px;margin-bottom:6px">
     <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:0.5px solid var(--border-l)"><span style="color:var(--muted)">Labor (${durationMins}m)</span><span>&#8369;${laborCost.toFixed(2)}</span></div>
-    <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:0.5px solid var(--border-l)"><span style="color:var(--muted)">Electricity</span><span>&#8369;${elec.toFixed(2)}</span></div>
-    <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:0.5px solid var(--border-l)"><span style="color:var(--muted)">Water</span><span>&#8369;${water.toFixed(2)}</span></div>
+    ${elec>0?`<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:0.5px solid var(--border-l)"><span style="color:var(--muted)">Electricity</span><span>&#8369;${elec.toFixed(2)}</span></div>`:''}
+    ${water>0?`<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:0.5px solid var(--border-l)"><span style="color:var(--muted)">Water</span><span>&#8369;${water.toFixed(2)}</span></div>`:''}
+
     <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:0.5px solid var(--border-l)"><span style="color:var(--muted)">Consumables</span><span>&#8369;${consCost.toFixed(2)}</span></div>
     <div style="display:flex;justify-content:space-between;padding:2px 0;font-weight:600"><span>Total cost</span><span>&#8369;${totalCost.toFixed(2)}</span></div>
   </div>
