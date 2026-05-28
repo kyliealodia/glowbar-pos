@@ -791,11 +791,17 @@ function getS(c,i){return state[c+'_'+i]||{actual:'',dp:0,notes:''}}
 function setS(c,i,f,v){const k=c+'_'+i;if(!state[k])state[k]={actual:'',dp:0,notes:''};state[k][f]=v;refreshRowBal(c,i);refreshCat(c);refreshSummary();}
 function refreshRowBal(c,i){
   const s=getS(c,i);
-  const isA=s.actual!==''&&!isNaN(parseFloat(s.actual));
+  const isA=s.actual!==''&&parseFloat(s.actual)>0;
   const actualVal=isA?parseFloat(s.actual):0;
   const dp=Number(s.dp)||0;
   const unp=actualVal-dp;
   const hasEntry=isA||(dp>0);
+  // Update Effective and vs-planned cells
+  const cat=CATS.find(x=>x.id===c);const item=cat?.items[i];const planned=item?.p||0;
+  const effCell=document.getElementById('eff-'+c+'-'+i);
+  if(effCell)effCell.innerHTML=isA?fmt(actualVal):'<span style="color:var(--muted)">—</span>';
+  const vspCell=document.getElementById('vsp-'+c+'-'+i);
+  if(vspCell)vspCell.innerHTML=isA?fmtD(actualVal-planned):'<span style="color:var(--muted)">—</span>';
   let html;
   if(!hasEntry)html='<span style="color:var(--muted)">—</span>';
   else if(unp===0)html='<span style="color:var(--green)">Fully paid</span>';
@@ -856,9 +862,10 @@ function toggleCat(id){
 }
 
 function rowHtml(cat,item,i){
-  const s=getS(cat.id,i),e=effV(s,item.p),d=e-item.p,dp=Number(s.dp)||0;
-  const isA=s.actual!==''&&!isNaN(parseFloat(s.actual));
+  const s=getS(cat.id,i),dp=Number(s.dp)||0;
+  const isA=s.actual!==''&&parseFloat(s.actual)>0;
   const actualVal=isA?parseFloat(s.actual):0;
+  const d=actualVal-(item.p||0);
   const unp=actualVal-dp;
   // Show balance only when actual has been entered OR a downpayment has been made
   const hasEntry=isA||(dp>0);
@@ -872,8 +879,8 @@ function rowHtml(cat,item,i){
     <td><input class="ni" type="text" value="${nm}" oninput="updN('${cat.id}',${i},this.value)"></td>
     <td><input class="ii" type="number" placeholder="0" value="${item.p||''}" oninput="updP('${cat.id}',${i},this.value)"></td>
     <td><input class="ii" type="number" placeholder="0" value="${s.actual}" oninput="setS('${cat.id}',${i},'actual',this.value)"></td>
-    <td>${isA?fmt(actualVal):'<span style="color:var(--muted)">—</span>'}</td>
-    <td>${isA?fmtD(d):'<span style="color:var(--muted)">—</span>'}</td>
+    <td id="eff-${cat.id}-${i}">${isA?fmt(actualVal):'<span style="color:var(--muted)">—</span>'}</td>
+    <td id="vsp-${cat.id}-${i}">${isA?fmtD(d):'<span style="color:var(--muted)">—</span>'}</td>
     <td><input class="ii" type="number" placeholder="0" value="${s.dp||''}" oninput="setS('${cat.id}',${i},'dp',+this.value)"></td>
     <td id="bal-${cat.id}-${i}">${balHtml}</td>
     <td><input class="nti" type="text" placeholder="notes" value="${s.notes||''}" oninput="setS('${cat.id}',${i},'notes',this.value)"></td>
@@ -944,7 +951,7 @@ function buildCats(){
           <tbody>${cat.items.map((item,i)=>rowHtml(cat,item,i)).join('')}</tbody>
           <tfoot><tr id="foot-${cat.id}"></tr></tfoot>
         </table>
-        <div class="note-dim">* no actual entered — using planned price</div>
+        <div class="note-dim">Enter 0 in Actual paid to mark as not purchased</div>
         <button class="add-row" onclick="addRow('${cat.id}')">＋ Add item</button>
       </div>`;
     con.appendChild(div);refreshCat(cat.id);
