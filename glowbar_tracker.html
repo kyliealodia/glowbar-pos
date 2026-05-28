@@ -131,6 +131,65 @@ function calcTrackerCost(svc, st){
   return Math.round(elec + water + consCost);
 }
 
+// ── PUSH PACKAGES → gb/packages (POS sync) ───────────────────────
+window.pushPackagesToPOS = async function(){
+  try {
+    const PACKAGES = [
+      // Diode Hair Removal
+      {name:'Underarms Diode Package',price:6000,sessions:6,validity:365,services:['Underarms Diode'],desc:'5+1 free diode hair removal — underarms',active:true},
+      {name:'Upper Lip Diode Package',price:4000,sessions:6,validity:365,services:['Upper Lip Diode'],desc:'5+1 free diode hair removal — upper lip',active:true},
+      {name:'Lower Lip Diode Package',price:4000,sessions:6,validity:365,services:['Lower Lip Diode'],desc:'5+1 free diode hair removal — lower lip',active:true},
+      {name:'Cheeks Diode Package',price:5000,sessions:6,validity:365,services:['Cheeks Diode'],desc:'5+1 free diode hair removal — cheeks',active:true},
+      {name:'Arms Full Diode Package',price:11000,sessions:6,validity:365,services:['Arms Full Diode'],desc:'5+1 free diode hair removal — full arms',active:true},
+      {name:'Arms Half Diode Package',price:7500,sessions:6,validity:365,services:['Arms Half Diode'],desc:'5+1 free diode hair removal — half arms',active:true},
+      {name:'Legs Full Diode Package',price:17500,sessions:6,validity:365,services:['Legs Full Diode'],desc:'5+1 free diode hair removal — full legs',active:true},
+      {name:'Legs Half Diode Package',price:12500,sessions:6,validity:365,services:['Legs Half Diode'],desc:'5+1 free diode hair removal — half legs',active:true},
+      // Skin Rejuvenation / Whitening
+      {name:'Underarms Rejuvenation Package',price:6000,sessions:6,validity:365,services:['Underarms Rejuvenation'],desc:'5+1 free skin rejuvenation — underarms',active:true},
+      {name:'Elbows Rejuvenation Package',price:5000,sessions:6,validity:365,services:['Elbows Rejuvenation'],desc:'5+1 free skin rejuvenation — elbows',active:true},
+      {name:'Inner Thighs Rejuvenation Package',price:6500,sessions:6,validity:365,services:['Inner Thighs Rejuvenation'],desc:'5+1 free skin rejuvenation — inner thighs',active:true},
+      {name:'Remove & Rejuve Combo Package',price:11000,sessions:6,validity:365,services:['Remove & Rejuve Combo Underarms'],desc:'5+1 free remove & rejuvenate combo — underarms',active:true},
+      // Exilis
+      {name:'Full Face with Neck Exilis Package',price:16000,sessions:6,validity:365,services:['Full Face with Neck'],desc:'5+1 free Exilis — full face with neck',active:true},
+      {name:'Full Face Exilis Package',price:14000,sessions:6,validity:365,services:['Full Face'],desc:'5+1 free Exilis — full face',active:true},
+      {name:'Double Chin with Neck Exilis Package',price:10000,sessions:6,validity:365,services:['Double Chin with Neck'],desc:'5+1 free Exilis — double chin with neck',active:true},
+      {name:'Face Per Area Exilis Package',price:7500,sessions:6,validity:365,services:['Face Per Area'],desc:'5+1 free Exilis — face per area',active:true},
+      {name:'Arms Exilis Package',price:9000,sessions:6,validity:365,services:['Arms Exilis'],desc:'5+1 free Exilis — arms',active:true},
+      {name:'Abdomen Exilis Package',price:12500,sessions:6,validity:365,services:['Abdomen Exilis'],desc:'5+1 free Exilis — abdomen',active:true},
+      {name:'Inner Thigh Exilis Package',price:12000,sessions:6,validity:365,services:['Inner Thigh Exilis'],desc:'5+1 free Exilis — inner thigh',active:true},
+      {name:'Love Handle Exilis Package',price:11000,sessions:6,validity:365,services:['Love Handle Exilis'],desc:'5+1 free Exilis — love handle',active:true},
+      {name:'Buttocks Exilis Package',price:12000,sessions:6,validity:365,services:['Buttocks Exilis'],desc:'5+1 free Exilis — buttocks',active:true},
+      {name:'Lower Leg Exilis Package',price:8000,sessions:6,validity:365,services:['Lower Leg Exilis'],desc:'5+1 free Exilis — lower leg',active:true},
+      // Pico Laser
+      {name:'Black Doll Carbon Laser Package',price:7500,sessions:6,validity:365,services:['Black Doll Carbon Laser'],desc:'5+1 free pico laser — black doll carbon',active:true},
+      {name:'Melasma/Freckles Face Package',price:8000,sessions:6,validity:365,services:['Melasma/Freckles Face'],desc:'5+1 free pico laser — melasma/freckles face',active:true},
+      {name:'Melasma/Freckles Shoulders Package',price:9500,sessions:6,validity:365,services:['Melasma/Freckles Shoulders'],desc:'5+1 free pico laser — melasma/freckles shoulders',active:true},
+      {name:'Melasma/Freckles Back Package',price:12500,sessions:6,validity:365,services:['Melasma/Freckles Back'],desc:'5+1 free pico laser — melasma/freckles back',active:true},
+      {name:'Scar Lightening Face Package',price:7500,sessions:6,validity:365,services:['Scar Lightening Face'],desc:'5+1 free pico laser — scar lightening face',active:true},
+      {name:'Scar Lightening Arms Package',price:5000,sessions:6,validity:365,services:['Scar Lightening Arms'],desc:'5+1 free pico laser — scar lightening arms',active:true},
+      {name:'Scar Lightening Legs Package',price:7500,sessions:6,validity:365,services:['Scar Lightening Legs'],desc:'5+1 free pico laser — scar lightening legs',active:true},
+      {name:'Scar Lightening Knees Package',price:6500,sessions:6,validity:365,services:['Scar Lightening Knees'],desc:'5+1 free pico laser — scar lightening knees',active:true},
+    ];
+    const pkgRef = ref(db, 'gb/packages');
+    const snap = await get(pkgRef);
+    const existing = snap.exists() ? (Array.isArray(snap.val()) ? snap.val() : Object.values(snap.val()).filter(Boolean)) : [];
+    const updated = [...existing];
+    PACKAGES.forEach(pkg => {
+      const ex = existing.find(p => p && p.name === pkg.name);
+      if(!ex){
+        updated.push({id: Date.now() + Math.floor(Math.random()*10000), ...pkg});
+      } else {
+        const idx = updated.indexOf(ex);
+        updated[idx] = {...ex, price: pkg.price, sessions: pkg.sessions, services: pkg.services, desc: pkg.desc};
+      }
+    });
+    await set(pkgRef, updated);
+    console.log('GlowBar Tracker: pushed', PACKAGES.length, 'packages to POS gb/packages');
+  } catch(e) {
+    console.error('pushPackagesToPOS error:', e);
+  }
+};
+
 // ── PUSH MONTHLY EXPENSES → gb/capital (POS sync) ─────────────────
 window.pushMonthlyToPOS = async function(){
   try {
@@ -709,6 +768,18 @@ let SVC_CATS = [
     {id:'s23',name:'Bikini',price:900,durationMins:40,staffRole:'',consumables:[]},
     {id:'s24',name:'Full Body',price:2500,durationMins:90,staffRole:'',consumables:[]},
   ]},
+  // ── HAIR WAXING ───────────────────────────────────────────────────
+  {id:'waxing_hair', name:'Hair Waxing', group:'Hair Waxing', type:'standard', canAddServices:true, services:[
+    {id:'hw1',name:'Underarm Wax',price:500,durationMins:30,staffRole:'',consumables:[]},
+    {id:'hw2',name:'Upper Lip Wax',price:400,durationMins:20,staffRole:'',consumables:[]},
+    {id:'hw3',name:'Lower Lip Wax',price:400,durationMins:20,staffRole:'',consumables:[]},
+    {id:'hw4',name:'Half Arms Wax',price:600,durationMins:30,staffRole:'',consumables:[]},
+    {id:'hw5',name:'Full Arms Wax',price:850,durationMins:40,staffRole:'',consumables:[]},
+    {id:'hw6',name:'Half Legs Wax',price:700,durationMins:30,staffRole:'',consumables:[]},
+    {id:'hw7',name:'Full Legs Wax',price:1000,durationMins:40,staffRole:'',consumables:[]},
+    {id:'hw8',name:'Brazilian Wax',price:800,durationMins:30,staffRole:'',consumables:[]},
+    {id:'hw9',name:'Bikini Wax',price:600,durationMins:20,staffRole:'',consumables:[]},
+  ]},
   // ── GLOW FACIALS ──────────────────────────────────────────────
   {id:'facial', name:'Glow Facials — Facials', group:'Glow Facials', type:'standard', canAddServices:true, services:[
     {id:'s34',name:'Regular Facial',price:699,durationMins:60,staffRole:'',consumables:[]},
@@ -726,20 +797,41 @@ let SVC_CATS = [
   {id:'skin_rej', name:'Glow Skin — Skin Rejuvenation', group:'Glow Skin', type:'laser', canAddServices:true, services:[
     {id:'s29',name:'Skin Rejuvenation — Single',price:1000,durationMins:45,staffRole:'',consumables:[]},
     {id:'s30',name:'Skin Rejuvenation Package',price:5000,durationMins:45,staffRole:'',consumables:[],sessions:5,freeSessions:1},
+    {id:'sr1',name:'Underarms Rejuvenation',price:1200,durationMins:20,staffRole:'',consumables:[]},
+    {id:'sr2',name:'Elbows Rejuvenation',price:1000,durationMins:40,staffRole:'',consumables:[]},
+    {id:'sr3',name:'Inner Thighs Rejuvenation',price:1300,durationMins:40,staffRole:'',consumables:[]},
+    {id:'sr4',name:'Remove & Rejuve Combo Underarms',price:2200,durationMins:60,staffRole:'',consumables:[]},
   ]},
   {id:'diode', name:'Glow Skin — Diode Laser', group:'Glow Skin', type:'laser', canAddServices:true, services:[
     {id:'s25',name:'Diode Single',price:1200,durationMins:30,staffRole:'',consumables:[]},
     {id:'s27',name:'Diode Package',price:6000,durationMins:30,staffRole:'',consumables:[],sessions:5,freeSessions:1},
+    {id:'d1',name:'Underarms Diode',price:1200,durationMins:20,staffRole:'',consumables:[]},
+    {id:'d2',name:'Upper Lip Diode',price:800,durationMins:20,staffRole:'',consumables:[]},
+    {id:'d3',name:'Lower Lip Diode',price:800,durationMins:20,staffRole:'',consumables:[]},
+    {id:'d4',name:'Cheeks Diode',price:1000,durationMins:30,staffRole:'',consumables:[]},
+    {id:'d5',name:'Arms Full Diode',price:2200,durationMins:60,staffRole:'',consumables:[]},
+    {id:'d6',name:'Arms Half Diode',price:1500,durationMins:40,staffRole:'',consumables:[]},
+    {id:'d7',name:'Legs Full Diode',price:3500,durationMins:60,staffRole:'',consumables:[]},
+    {id:'d8',name:'Legs Half Diode',price:2500,durationMins:60,staffRole:'',consumables:[]},
   ]},
   {id:'pico', name:'Glow Skin — Pico Laser', group:'Glow Skin', type:'laser', canAddServices:true, services:[
     {id:'s51',name:'Single Session',price:2500,durationMins:45,staffRole:'',consumables:[]},
     {id:'s52',name:'Package',price:12500,durationMins:45,staffRole:'',consumables:[],sessions:5,freeSessions:1},
+    {id:'p1',name:'Black Doll Carbon Laser',price:1500,durationMins:60,staffRole:'',consumables:[]},
+    {id:'p2',name:'Melasma/Freckles Face',price:1600,durationMins:30,staffRole:'',consumables:[]},
+    {id:'p3',name:'Melasma/Freckles Shoulders',price:1900,durationMins:40,staffRole:'',consumables:[]},
+    {id:'p4',name:'Melasma/Freckles Back',price:2500,durationMins:60,staffRole:'',consumables:[]},
+    {id:'p5',name:'Scar Lightening Face',price:1500,durationMins:30,staffRole:'',consumables:[]},
+    {id:'p6',name:'Scar Lightening Arms',price:1000,durationMins:30,staffRole:'',consumables:[]},
+    {id:'p7',name:'Scar Lightening Legs',price:1500,durationMins:40,staffRole:'',consumables:[]},
+    {id:'p8',name:'Scar Lightening Knees',price:1300,durationMins:40,staffRole:'',consumables:[]},
   ]},
   // ── GLOW INK ──────────────────────────────────────────────────
   {id:'tattoo', name:'Glow Ink', group:'Glow Ink', type:'standard', canAddServices:true, services:[
     {id:'s31',name:'Tattoo Removal — Small',price:500,durationMins:20,staffRole:'',consumables:[]},
     {id:'s32',name:'Tattoo Removal — Medium',price:1000,durationMins:30,staffRole:'',consumables:[]},
     {id:'s33',name:'Tattoo Removal — Large',price:2000,durationMins:45,staffRole:'',consumables:[]},
+    {id:'t1',name:'Tattoo Laser Removal',price:1500,durationMins:60,staffRole:'',consumables:[]},
   ]},
   // ── GLOW CLEAR ────────────────────────────────────────────────
   {id:'wart', name:'Glow Clear', group:'Glow Clear', type:'standard', canAddServices:true, services:[
@@ -753,6 +845,16 @@ let SVC_CATS = [
     {id:'s46',name:'Lifting',price:1800,durationMins:45,staffRole:'',consumables:[]},
     {id:'s49',name:'Fat Reduction — Package (4+1 free)',price:11500,durationMins:60,staffRole:'',consumables:[],sessions:4,freeSessions:1},
     {id:'s50',name:'Lifting — Package (4+1 free)',price:7500,durationMins:45,staffRole:'',consumables:[],sessions:4,freeSessions:1},
+    {id:'e1',name:'Full Face with Neck',price:3200,durationMins:60,staffRole:'',consumables:[]},
+    {id:'e2',name:'Full Face',price:2800,durationMins:40,staffRole:'',consumables:[]},
+    {id:'e3',name:'Double Chin with Neck',price:2000,durationMins:40,staffRole:'',consumables:[]},
+    {id:'e4',name:'Face Per Area',price:1500,durationMins:20,staffRole:'',consumables:[]},
+    {id:'e5',name:'Arms Exilis',price:1800,durationMins:40,staffRole:'',consumables:[]},
+    {id:'e6',name:'Abdomen Exilis',price:2500,durationMins:60,staffRole:'',consumables:[]},
+    {id:'e7',name:'Inner Thigh Exilis',price:2400,durationMins:40,staffRole:'',consumables:[]},
+    {id:'e8',name:'Love Handle Exilis',price:2200,durationMins:40,staffRole:'',consumables:[]},
+    {id:'e9',name:'Buttocks Exilis',price:2400,durationMins:40,staffRole:'',consumables:[]},
+    {id:'e10',name:'Lower Leg Exilis',price:1600,durationMins:40,staffRole:'',consumables:[]},
   ]},
   // ── GLOW PACKAGES ─────────────────────────────────────────────
   {id:'glow_pkg', name:'Glow Packages', group:'Glow Packages', type:'package', canAddServices:true, services:[
@@ -1009,7 +1111,10 @@ function saveSvcState(){
   localStorage.setItem('glowbar_svc2',JSON.stringify({state:svcCatState,cats:SVC_CATS}));
   // Sync to POS — debounced so it doesn't fire on every keystroke
   clearTimeout(window._posSvcTimer);
-  window._posSvcTimer = setTimeout(()=>{ if(window.pushServicesToPOS) window.pushServicesToPOS(); }, 2000);
+  window._posSvcTimer = setTimeout(()=>{
+    if(window.pushServicesToPOS) window.pushServicesToPOS();
+    if(window.pushPackagesToPOS) window.pushPackagesToPOS();
+  }, 2000);
 }
 
 function getSvcState(svcId){ if(!svcCatState[svcId])svcCatState[svcId]={}; return svcCatState[svcId]; }
