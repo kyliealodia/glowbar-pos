@@ -174,10 +174,11 @@ window.pushPackagesToPOS = async function(){
     const snap = await get(pkgRef);
     const existing = snap.exists() ? (Array.isArray(snap.val()) ? snap.val() : Object.values(snap.val()).filter(Boolean)) : [];
     const updated = [...existing];
-    PACKAGES.forEach(pkg => {
+    const baseId = Date.now();
+    PACKAGES.forEach((pkg, i) => {
       const ex = existing.find(p => p && p.name === pkg.name);
       if(!ex){
-        updated.push({id: Date.now() + Math.floor(Math.random()*10000), ...pkg});
+        updated.push({id: baseId + i, ...pkg});
       } else {
         const idx = updated.indexOf(ex);
         updated[idx] = {...ex, price: pkg.price, sessions: pkg.sessions, services: pkg.services, desc: pkg.desc};
@@ -1106,7 +1107,26 @@ function getHourlyRate(roleId){ const r=staffRoles.find(x=>x.id===roleId); retur
 
 // ── SERVICE STATE ─────────────────────────────────────────────────
 let svcCatState = {}; // stores per-service edits keyed by service id
-function loadSvcState(){ try{ const d=JSON.parse(localStorage.getItem('glowbar_svc2')||'{}'); svcCatState=d.state||{}; if(d.cats&&d.cats.length) SVC_CATS=d.cats; }catch(e){ svcCatState={}; } }
+function loadSvcState(){
+  try{
+    const d=JSON.parse(localStorage.getItem('glowbar_svc2')||'{}');
+    svcCatState=d.state||{};
+    if(d.cats&&d.cats.length){
+      // Merge saved cats with code: keep user edits, add new categories/services from code
+      const savedCats=d.cats;
+      const savedCatIds=new Set(savedCats.map(c=>c.id));
+      const mergedCats=savedCats.map(savedCat=>{
+        const codeCat=SVC_CATS.find(c=>c.id===savedCat.id);
+        if(!codeCat)return savedCat;
+        const savedIds=new Set((savedCat.services||[]).map(s=>s.id));
+        const newSvcs=(codeCat.services||[]).filter(s=>!savedIds.has(s.id));
+        return newSvcs.length?{...savedCat,services:[...(savedCat.services||[]),...newSvcs]}:savedCat;
+      });
+      SVC_CATS.forEach(codeCat=>{ if(!savedCatIds.has(codeCat.id)) mergedCats.push(codeCat); });
+      SVC_CATS=mergedCats;
+    }
+  }catch(e){ svcCatState={}; }
+}
 function saveSvcState(){
   localStorage.setItem('glowbar_svc2',JSON.stringify({state:svcCatState,cats:SVC_CATS}));
   // Sync to POS — debounced so it doesn't fire on every keystroke
