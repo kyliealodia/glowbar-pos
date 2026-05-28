@@ -1395,7 +1395,8 @@ function countDaysPresent(period){
   const [yr,mo]=period.split('-').map(Number);
   const logs=S.loginLogs.filter(l=>{
     const d=new Date(l.time||l.date);
-    return l.user===currentUser.name&&d.getFullYear()===yr&&d.getMonth()===mo-1&&l.action==='in';
+    const matchUser=l.userId===currentUser.id||l.user===currentUser.name||l.name===currentUser.name;
+    return matchUser&&d.getFullYear()===yr&&d.getMonth()===mo-1&&(l.action==='in'||l.action==='clockin');
   });
   return new Set(logs.map(l=>new Date(l.time||l.date).toDateString())).size;
 }
@@ -1427,7 +1428,8 @@ function renderAttendance(){
 
   const logs=S.loginLogs.filter(l=>{
     const d=new Date(l.time||l.date);
-    return l.user===currentUser.name&&d.getFullYear()===yr&&d.getMonth()===mo-1;
+    const matchUser=l.userId===currentUser.id||l.user===currentUser.name||l.name===currentUser.name;
+    return matchUser&&d.getFullYear()===yr&&d.getMonth()===mo-1;
   });
 
   // Group by date
@@ -1436,8 +1438,8 @@ function renderAttendance(){
     const d=new Date(l.time||l.date);
     const key=d.toDateString();
     if(!byDate[key]) byDate[key]={date:d,in:null,out:null};
-    if(l.action==='in'&&!byDate[key].in) byDate[key].in=d;
-    if(l.action==='out') byDate[key].out=d;
+    if((l.action==='in'||l.action==='clockin')&&!byDate[key].in) byDate[key].in=d;
+    if(l.action==='out'||l.action==='clockout') byDate[key].out=d;
   });
 
   const days=Object.values(byDate).sort((a,b)=>b.date-a.date);
