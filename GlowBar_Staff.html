@@ -1425,6 +1425,9 @@ function printPayslip(){
 function renderAttendance(){
   const period=document.getElementById('attMonth')?.value||td().slice(0,7);
   const [yr,mo]=period.split('-').map(Number);
+  const userRecord=S.users.find(u=>u.id===currentUser.id)||currentUser;
+  const shiftStart=userRecord.shiftStart||'09:00';
+  const [shiftHr,shiftMin]=shiftStart.split(':').map(Number);
 
   const logs=S.loginLogs.filter(l=>{
     const d=new Date(l.time||l.date);
@@ -1464,7 +1467,7 @@ function renderAttendance(){
     const outStr=d.out?d.out.toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'}):'—';
     const hrs=d.in&&d.out?((d.out-d.in)/3600000).toFixed(1):'—';
     const dateStr=d.date.toLocaleDateString('en-PH',{weekday:'short',month:'short',day:'numeric'});
-    const late=d.in&&d.in.getHours()>=9;
+    const late=d.in&&(d.in.getHours()>shiftHr||(d.in.getHours()===shiftHr&&d.in.getMinutes()>shiftMin));
     return `<tr>
       <td style="font-size:12px;">${dateStr}</td>
       <td>${inStr}</td>
@@ -1812,22 +1815,25 @@ function renderAdmin(){
   const staffRows=S.users.filter(u=>u.role!=='owner'||S.users.length===1).map(u=>{
     const logs=S.loginLogs.filter(l=>{
       const d=new Date(l.time||l.date);
-      return l.user===u.name&&d.getFullYear()===yr&&d.getMonth()===mo-1;
+      const matchU=l.userId===u.id||l.user===u.name||l.name===u.name;
+      return matchU&&d.getFullYear()===yr&&d.getMonth()===mo-1;
     });
+    const uShift=u.shiftStart||'09:00';
+    const [uHr,uMin]=uShift.split(':').map(Number);
     const byDate={};
     logs.forEach(l=>{
       const d=new Date(l.time||l.date);
       const key=d.toDateString();
       if(!byDate[key]) byDate[key]={in:null,out:null,date:d};
-      if(l.action==='in'&&!byDate[key].in) byDate[key].in=d;
-      if(l.action==='out') byDate[key].out=d;
+      if((l.action==='in'||l.action==='clockin')&&!byDate[key].in) byDate[key].in=d;
+      if(l.action==='out'||l.action==='clockout') byDate[key].out=d;
     });
     const days=Object.keys(byDate).length;
     let hrs=0;
     let late=0;
     Object.values(byDate).forEach(d=>{
       if(d.in&&d.out) hrs+=(d.out-d.in)/3600000;
-      if(d.in&&d.in.getHours()>=9) late++;
+      if(d.in&&(d.in.getHours()>uHr||(d.in.getHours()===uHr&&d.in.getMinutes()>uMin))) late++;
     });
     const leaveTaken=S.leaveRequests.filter(l=>l.userId===u.id&&l.status==='approved'&&l.from.startsWith(period)).reduce((s,l)=>s+(l.days||1),0);
     return `<tr>
