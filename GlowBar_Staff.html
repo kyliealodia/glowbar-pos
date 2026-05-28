@@ -287,10 +287,18 @@ nav{flex:1;padding:12px 0;overflow-y:auto;}
       <div id="page-payslip" class="page" style="display:none;">
         <div class="page-hdr">
           <div class="page-title">💰 My Payslip</div>
-          <div style="display:flex;gap:8px;margin-top:10px;">
+          <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center;">
             <select class="form-select" id="payPeriodSel" onchange="renderPayslip()" style="width:180px;font-size:12px;"></select>
             <button class="btn btn-outline btn-sm" onclick="printPayslip()">🖨 Print</button>
           </div>
+        </div>
+        <!-- Cut-off Pay -->
+        <div style="max-width:680px;margin:0 auto 4px;">
+          <div style="display:flex;gap:6px;margin-bottom:12px;">
+            <button id="co1btn" onclick="selectCutoff(1)" style="flex:1;padding:8px 0;border-radius:8px;border:1.5px solid #C9A84C;background:#C9A84C;color:#fff;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;">1st Cut-off &nbsp;(1–15)</button>
+            <button id="co2btn" onclick="selectCutoff(2)" style="flex:1;padding:8px 0;border-radius:8px;border:1.5px solid #C9A84C;background:#fff;color:#C9A84C;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;">2nd Cut-off &nbsp;(16–end)</button>
+          </div>
+          <div id="cutoffContent"></div>
         </div>
         <div id="payslipContent"></div>
       </div>
@@ -1108,6 +1116,162 @@ function renderHome(){
   }
 }
 
+// ══ CUT-OFF PAY ══
+let selectedCutoff=1;
+
+function selectCutoff(n){
+  selectedCutoff=n;
+  const a=document.getElementById('co1btn'),b=document.getElementById('co2btn');
+  if(a&&b){
+    a.style.background=n===1?'#C9A84C':'#fff';a.style.color=n===1?'#fff':'#C9A84C';
+    b.style.background=n===2?'#C9A84C':'#fff';b.style.color=n===2?'#fff':'#C9A84C';
+  }
+  renderCutoff();
+}
+
+function coRow(label,value){
+  return `<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid rgba(0,0,0,0.04);">
+    <span style="color:#5C4F3D;">${label}</span><span style="font-weight:500;">${value}</span></div>`;
+}
+
+function renderCutoff(){
+  const el=document.getElementById('cutoffContent');if(!el)return;
+  const period=document.getElementById('payPeriodSel')?.value||td().slice(0,7);
+  const [yr,mo]=period.split('-').map(Number);
+  const n=selectedCutoff;
+  const userRecord=S.users.find(u=>u.id===currentUser.id)||currentUser;
+  const basicPay=userRecord.salary||userRecord.basicPay||0;
+  const commRate=userRecord.commission||0;
+  const allowances=userRecord.allowances||0;
+  const otherDeductions=userRecord.otherDeductions||0;
+  const f=fmtPrice;
+
+  // Cut-off date range
+  const daysInMonth=new Date(yr,mo,0).getDate();
+  const coStart=n===1?1:16;
+  const coEnd=n===1?15:daysInMonth;
+  const pad=x=>String(x).padStart(2,'0');
+  const coStartStr=`${yr}-${pad(mo)}-${pad(coStart)}`;
+  const coEndStr=`${yr}-${pad(mo)}-${pad(coEnd)}`;
+
+  // Pay date label
+  const payDate=n===1
+    ?new Date(yr,mo-1,15).toLocaleDateString('en-PH',{month:'long',day:'numeric',year:'numeric'})
+    :new Date(yr,mo,1).toLocaleDateString('en-PH',{month:'long',day:'numeric',year:'numeric'});
+  const periodLabel=`${new Date(yr,mo-1,coStart).toLocaleDateString('en-PH',{month:'short',day:'numeric'})} – ${new Date(yr,mo-1,coEnd).toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'numeric'})}`;
+
+  // Working days in cut-off (respecting staff start date and today)
+  const today=new Date();today.setHours(23,59,59,0);
+  const staffStart=userRecord.startDate?new Date(userRecord.startDate):new Date('2026-06-02');
+  const dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const shiftDays=userRecord.shiftDays||['Tue','Wed','Thu','Fri','Sat','Sun'];
+  const coStartDate=new Date(yr,mo-1,coStart);
+  const coEndDate=new Date(yr,mo-1,coEnd,23,59,59);
+  const rangeStart=staffStart>coStartDate?staffStart:coStartDate;
+  const rangeEnd=today<coEndDate?today:coEndDate;
+  let workingDaysInCO=0;
+  for(let d=new Date(rangeStart);d<=rangeEnd;d.setDate(d.getDate()+1)){
+    if(shiftDays.includes(dayNames[new Date(d).getDay()])) workingDaysInCO++;
+  }
+
+  // Daily rate from full month working days
+  const totalWD=getWorkingDaysSP(yr,mo,staffStart,today,userRecord.shiftDays)||1;
+  const dailyRate=basicPay>0?Math.round(basicPay/totalWD*100)/100:0;
+
+  // Days present in cut-off
+  const inLogs=(S.loginLogs||[]).filter(l=>{
+    const matchUser=l.userId===currentUser.id||l.user===currentUser.name||l.name===currentUser.name;
+    if(!matchUser)return false;
+    if(!(l.action==='clockin'||l.action==='in'))return false;
+    const d=(l.time||'').slice(0,10);
+    return d>=coStartStr&&d<=coEndStr;
+  });
+  const daysPresent=new Set(inLogs.map(l=>l.time.slice(0,10))).size;
+  const baseEarned=Math.round(dailyRate*daysPresent);
+  const coAllowances=Math.round(allowances/2);
+
+  // Commission from transactions in cut-off
+  const txns=(S.transactions||[]).filter(t=>{
+    const d=(t.time||'').slice(0,10);
+    return t.staff===currentUser.name&&d>=coStartStr&&d<=coEndStr;
+  });
+  const commEarned=Math.round(txns.reduce((s,t)=>s+t.total,0)*(commRate/100));
+
+  // Approved OT in cut-off
+  const otPay=(S.overtimeRequests||[]).filter(o=>
+    o.userId===currentUser.id&&o.status==='approved'&&o.date>=coStartStr&&o.date<=coEndStr
+  ).reduce((s,o)=>s+(o.amount||0),0);
+
+  const grossPay=baseEarned+commEarned+coAllowances+otPay;
+
+  // Deductions: half of monthly statutory (PH standard — split across two cut-offs)
+  const estMonthlyGross=grossPay*2;
+  const sss=Math.round(computeSSS(estMonthlyGross)/2);
+  const philhealth=Math.round(computePhilHealth(estMonthlyGross)/2);
+  const pagibig=Math.round(computePagibig()/2);
+  const govTotal=sss+philhealth+pagibig;
+  const taxable=Math.max(0,estMonthlyGross-computeSSS(estMonthlyGross)-computePhilHealth(estMonthlyGross)-computePagibig());
+  const taxForCO=Math.round(computeWithholdingTax(taxable)/2);
+  const otherDed=Math.round(otherDeductions/2);
+  const totalDed=govTotal+taxForCO+otherDed;
+  const netPay=grossPay-totalDed;
+
+  el.innerHTML=`
+    <div style="background:#fff;border:1px solid #E8DFD0;border-radius:14px;overflow:hidden;margin-bottom:16px;">
+      <div style="background:linear-gradient(135deg,#2C2318,#5C4F3D);color:#fff;padding:14px 20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+        <div>
+          <div style="font-size:10px;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:1px;">Cut-off Pay</div>
+          <div style="font-size:15px;font-weight:700;color:#B8935A;margin-top:2px;">${periodLabel}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:10px;color:rgba(255,255,255,0.5);">Pay Date</div>
+          <div style="font-size:13px;font-weight:600;color:#C9A84C;">${payDate}</div>
+        </div>
+      </div>
+      <div style="padding:14px 18px;">
+        <div style="display:flex;gap:10px;margin-bottom:14px;">
+          <div style="flex:1;background:#F5EFE3;border-radius:10px;padding:10px;text-align:center;">
+            <div style="font-size:9px;color:#8C7B65;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Working Days</div>
+            <div style="font-size:20px;font-weight:700;color:#2C2318;">${workingDaysInCO}</div>
+          </div>
+          <div style="flex:1;background:#F5EFE3;border-radius:10px;padding:10px;text-align:center;">
+            <div style="font-size:9px;color:#8C7B65;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Days Present</div>
+            <div style="font-size:20px;font-weight:700;color:#2C2318;">${daysPresent}</div>
+          </div>
+          <div style="flex:1;background:#F5EFE3;border-radius:10px;padding:10px;text-align:center;">
+            <div style="font-size:9px;color:#8C7B65;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Daily Rate</div>
+            <div style="font-size:13px;font-weight:700;color:#2C2318;">${f(dailyRate)}</div>
+          </div>
+        </div>
+        <div style="font-size:10px;font-weight:700;color:#C9A84C;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">Earnings</div>
+        <div style="background:#FAFAF8;border-radius:8px;padding:10px 12px;margin-bottom:10px;">
+          ${coRow('Basic Pay',f(baseEarned))}
+          ${commEarned>0?coRow(`Commission (${commRate}%)`,'+'+f(commEarned)):''}
+          ${coAllowances>0?coRow('Allowances','+'+f(coAllowances)):''}
+          ${otPay>0?coRow('Overtime Pay','+'+f(otPay)):''}
+          <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;padding-top:8px;margin-top:4px;border-top:1px solid #E8DFD0;color:#2C2318;">
+            <span>Gross Pay</span><span>${f(grossPay)}</span>
+          </div>
+        </div>
+        <div style="font-size:10px;font-weight:700;color:#C9A84C;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">Deductions <span style="font-weight:400;color:#8C7B65;font-size:9px;text-transform:none;">(½ of monthly)</span></div>
+        <div style="background:#FAFAF8;border-radius:8px;padding:10px 12px;margin-bottom:10px;">
+          ${coRow('SSS','−'+f(sss))}
+          ${coRow('PhilHealth','−'+f(philhealth))}
+          ${coRow('Pag-IBIG','−'+f(pagibig))}
+          ${taxForCO>0?coRow('Withholding Tax','−'+f(taxForCO)):''}
+          ${otherDed>0?coRow('Other Deductions','−'+f(otherDed)):''}
+          <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;padding-top:8px;margin-top:4px;border-top:1px solid #E8DFD0;color:#c0392b;">
+            <span>Total Deductions</span><span>−${f(totalDed)}</span>
+          </div>
+        </div>
+        <div style="background:linear-gradient(135deg,#2C2318,#5C4F3D);border-radius:10px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;">
+          <span style="color:rgba(255,255,255,0.75);font-size:13px;font-weight:500;">Net Take-Home</span>
+          <span style="font-size:22px;font-weight:700;color:#C9A84C;">${f(netPay)}</span>
+        </div>
+      </div>
+    </div>`;
+}
+
 // ══ PAYSLIP ══
 function populateMonthSelects(){
   const now=new Date();
@@ -1168,6 +1332,7 @@ function getWorkingDaysSP(yr, mo, from, to, shiftDays){
 }
 
 function renderPayslip(){
+  renderCutoff();
   const period=document.getElementById('payPeriodSel')?.value||td().slice(0,7);
   const [yr,mo]=period.split('-').map(Number);
   const periodLabel=new Date(yr,mo-1,1).toLocaleDateString('en-PH',{month:'long',year:'numeric'});
