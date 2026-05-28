@@ -1491,7 +1491,7 @@ function previewOT(){
   const prev=document.getElementById('otPreview');
   if(!prev||!hrs||!basicPay){if(prev)prev.style.display='none';return;}
   const dailyR=Math.round(basicPay/26*100)/100;
-  const hrlyR=Math.round(dailyR/8*100)/100;
+  const hrlyR=dailyR/8;
   const otRate=Math.round(hrlyR*1.25*100)/100;
   const amount=Math.round(otRate*hrs);
   prev.style.display='block';

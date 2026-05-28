@@ -331,7 +331,7 @@ body{font-family:system-ui,sans-serif;background:var(--cream);color:var(--text);
 .brand{text-align:center;margin-bottom:1.4rem;padding-bottom:1rem;border-bottom:1px solid var(--border-l)}
 .brand h1{font-size:24px;font-weight:500;color:var(--gold-d);letter-spacing:0.04em}
 .brand p{font-size:11px;letter-spacing:0.15em;color:var(--muted);margin-top:3px}
-.tabs{display:flex;border-bottom:1px solid var(--border-l);margin-bottom:1.2rem}
+.tabs{display:flex;border-bottom:1px solid var(--border-l);margin-bottom:1.2rem;overflow-x:auto;}
 .tab{padding:8px 22px;font-size:13px;cursor:pointer;border:none;background:none;color:var(--muted);border-bottom:2px solid transparent;font-family:inherit}
 .tab.active{color:var(--gold-d);border-bottom:2px solid var(--gold);font-weight:600}
 .section{display:none}.section.active{display:block}
@@ -1971,7 +1971,7 @@ function previewTrackerOT(){
   const prev = document.getElementById('ot-modal-preview');
   if(!prev||!hrs||!basicPay){ if(prev) prev.style.display='none'; return; }
   const dailyR = Math.round(basicPay/26*100)/100;
-  const hrlyR = Math.round(dailyR/8*100)/100;
+  const hrlyR = dailyR/8;
   const otRate = Math.round(hrlyR*1.25*100)/100;
   const amount = Math.round(otRate*hrs);
   prev.style.display='block';
