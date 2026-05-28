@@ -225,6 +225,7 @@ function bootApp(){
     loadState(); loadConsState(); loadStaff(); loadSvcState(); loadMonthlyLog();
     buildCats(); refreshSummary(); buildServices(); buildConsumables();
     updateMonthFilter(); renderMonthly();
+    setTimeout(()=>{if(window.pushCapitalToPOS)window.pushCapitalToPOS();},1000);
   }
 }
 
