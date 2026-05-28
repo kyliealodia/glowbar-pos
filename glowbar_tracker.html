@@ -444,7 +444,7 @@ body{font-family:system-ui,sans-serif;background:var(--cream);color:var(--text);
   <div class="summary" id="summary-grid"></div>
   <div class="bar-wrap">
     <div class="bar-bg"><div class="bar-fill" id="budget-bar" style="width:0%"></div></div>
-    <div class="bar-lbl"><span>₱0</span><span id="bar-mid"></span><span>₱300,000 cash on hand</span></div>
+    <div class="bar-lbl"><span>₱0</span><span id="bar-mid"></span><span>₱400,000 cash on hand</span></div>
   </div>
   <div id="cats-container"></div>
   <div class="add-cat-wrap">
@@ -641,7 +641,7 @@ function debounce(key, fn, delay){
   _debouncers[key] = setTimeout(fn, delay||400);
 }
 
-const BUDGET=300000;
+const BUDGET=400000;
 let CATS=[
   {id:'permits',name:'Permits & licenses',items:[
     {name:'DTI Registration',p:530},{name:'Barangay Clearance',p:600},{name:"Mayor's Permit",p:4500},
@@ -837,7 +837,7 @@ function refreshSummary(){
   bar.style.width=pct+'%';bar.style.background=pct>100?'var(--red)':pct>85?'#E4A834':'linear-gradient(90deg,var(--gold-l),var(--gold))';
   document.getElementById('bar-mid').textContent=pct+'% of cash used';
   const al=document.getElementById('alert-el');
-  if(td>BUDGET){al.className='alert show';al.textContent=`⚠ Downpayments (${fmt(td)}) exceed your ₱300,000 cash by ${fmt(td-BUDGET)}.`;}
+  if(td>BUDGET){al.className='alert show';al.textContent=`⚠ Downpayments (${fmt(td)}) exceed your ₱400,000 cash by ${fmt(td-BUDGET)}.`;}
   else if(left<50000&&left>=0){al.className='alert show';al.textContent=`Less than ${fmt(left)} cash remaining — review before next purchase.`;}
   else al.className='alert';
 }
