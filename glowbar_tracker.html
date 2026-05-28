@@ -872,8 +872,8 @@ function rowHtml(cat,item,i){
     <td><input class="ni" type="text" value="${nm}" oninput="updN('${cat.id}',${i},this.value)"></td>
     <td><input class="ii" type="number" placeholder="0" value="${item.p||''}" oninput="updP('${cat.id}',${i},this.value)"></td>
     <td><input class="ii" type="number" placeholder="0" value="${s.actual}" oninput="setS('${cat.id}',${i},'actual',this.value)"></td>
-    <td style="color:${isA?'var(--text)':'var(--muted)'};font-style:${isA?'normal':'italic'}">${fmt(e)}${isA?'':' *'}</td>
-    <td>${fmtD(d)}</td>
+    <td>${isA?fmt(actualVal):'<span style="color:var(--muted)">—</span>'}</td>
+    <td>${isA?fmtD(d):'<span style="color:var(--muted)">—</span>'}</td>
     <td><input class="ii" type="number" placeholder="0" value="${s.dp||''}" oninput="setS('${cat.id}',${i},'dp',+this.value)"></td>
     <td id="bal-${cat.id}-${i}">${balHtml}</td>
     <td><input class="nti" type="text" placeholder="notes" value="${s.notes||''}" oninput="setS('${cat.id}',${i},'notes',this.value)"></td>
