@@ -280,6 +280,42 @@ async function initFirebase(){
 }
 
 window.addEventListener('load', () => setTimeout(initFirebase, 150));
+
+// ── STAFFING DATA (reads from gb/ namespace) ─────────────────────
+window.loadStaffingData = async function(){
+  try {
+    const toArr = v => !v ? [] : Array.isArray(v) ? v : Object.values(v);
+    const [uSnap, lSnap, otSnap] = await Promise.all([
+      get(ref(db, 'gb/users')),
+      get(ref(db, 'gb/loginLogs')),
+      get(ref(db, 'gb/overtimeRequests'))
+    ]);
+    window._trackerStaff    = toArr(uSnap.exists()  ? uSnap.val()  : []);
+    window._trackerLogs     = toArr(lSnap.exists()  ? lSnap.val()  : []);
+    window._trackerOTAll    = toArr(otSnap.exists() ? otSnap.val() : []);
+    if(typeof renderStaffingTab === 'function') renderStaffingTab();
+  } catch(e){ console.error('Staffing load error:', e); }
+};
+
+window.saveTrackerOT = async function(requests){
+  try {
+    const obj = {};
+    requests.forEach((o,i) => { obj[o.id||i] = o; });
+    await set(ref(db, 'gb/overtimeRequests'), obj);
+  } catch(e){ console.error('OT save error:', e); }
+};
+
+// ── POS DATA (reads from gb/transactions) ────────────────────────
+window.loadPOSData = async function(){
+  try {
+    const toArr = v => !v ? [] : Array.isArray(v) ? v : Object.values(v);
+    const [txSnap] = await Promise.all([
+      get(ref(db, 'gb/transactions'))
+    ]);
+    window._trackerTxns = toArr(txSnap.exists() ? txSnap.val() : []);
+    if(typeof renderPOSTab === 'function') renderPOSTab();
+  } catch(e){ console.error('POS load error:', e); }
+};
 </script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -399,6 +435,8 @@ body{font-family:system-ui,sans-serif;background:var(--cream);color:var(--text);
   <button class="tab" onclick="showTab('services')">Service costing</button>
   <button class="tab" onclick="showTab('consumables')">Consumables</button>
   <button class="tab" onclick="showTab('monthly')">Monthly expenses</button>
+  <button class="tab" onclick="showTab('staffing')">Staffing</button>
+  <button class="tab" onclick="showTab('pos')">POS</button>
 </div>
 
 <div id="tab-expenses" class="section active">
@@ -521,6 +559,78 @@ body{font-family:system-ui,sans-serif;background:var(--cream);color:var(--text);
   <div id="svc-cat-tabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:1rem"></div>
   <div id="svc-container"></div>
   <button class="add-cat-btn" style="margin-top:10px" onclick="addSvcCategory()">&#xff0b; Add service category</button>
+</div>
+
+<!-- STAFFING TAB -->
+<div id="tab-staffing" class="section">
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:1rem">
+    <select id="staff-month-sel" class="ii" style="width:170px;font-size:12px;padding:5px 8px" onchange="renderStaffingTab()"></select>
+    <button class="btn-p" style="font-size:12px;padding:5px 14px" onclick="openLogOTModal()">+ Log Overtime</button>
+    <button class="btn-s" style="font-size:12px;padding:5px 14px" onclick="if(window.loadStaffingData)window.loadStaffingData()">⟳ Refresh</button>
+  </div>
+  <div id="staffing-payroll-table"></div>
+  <div style="margin-top:1.5rem">
+    <div style="font-size:12px;font-weight:600;color:var(--gold-d);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em">Pending Overtime Requests</div>
+    <div style="background:#fff;border:0.5px solid var(--border-l);border-radius:12px;overflow:hidden">
+      <table class="tbl">
+        <thead><tr><th style="text-align:left">Staff</th><th style="text-align:left">Date</th><th>Hours</th><th>OT Pay</th><th style="text-align:left">Reason</th><th>Actions</th></tr></thead>
+        <tbody id="tracker-ot-pending"></tbody>
+      </table>
+    </div>
+  </div>
+  <div style="margin-top:1.2rem">
+    <div style="font-size:12px;font-weight:600;color:var(--gold-d);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em">Overtime History</div>
+    <div style="background:#fff;border:0.5px solid var(--border-l);border-radius:12px;overflow:hidden">
+      <table class="tbl">
+        <thead><tr><th style="text-align:left">Staff</th><th style="text-align:left">Date</th><th>Hours</th><th>OT Pay</th><th style="text-align:left">Reason</th><th>Status</th></tr></thead>
+        <tbody id="tracker-ot-history"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- POS TAB -->
+<div id="tab-pos" class="section">
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:1rem">
+    <select id="pos-month-sel" class="ii" style="width:170px;font-size:12px;padding:5px 8px" onchange="renderPOSTab()"></select>
+    <button class="btn-s" style="font-size:12px;padding:5px 14px" onclick="if(window.loadPOSData)window.loadPOSData()">⟳ Refresh</button>
+  </div>
+  <div class="summary" id="pos-summary" style="margin-bottom:1.2rem"></div>
+  <div id="pos-by-staff"></div>
+  <div id="pos-by-service"></div>
+</div>
+
+<!-- OVERTIME LOG MODAL -->
+<div id="ot-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:999;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:14px;padding:24px;width:420px;max-width:95vw;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.25)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <span style="font-size:15px;font-weight:600;color:var(--gold-d)">⏱ Log Overtime</span>
+      <button class="del-row" onclick="closeOTModal()" style="font-size:16px">&#10005;</button>
+    </div>
+    <div style="display:grid;gap:12px">
+      <div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:3px;text-transform:uppercase">Staff Member</div>
+        <select id="ot-staff-sel" class="ii" style="width:100%;font-size:13px;padding:6px 8px" onchange="previewTrackerOT()"></select>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:3px;text-transform:uppercase">Date</div>
+        <input id="ot-date" class="ii" type="date" style="width:100%" oninput="previewTrackerOT()">
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:3px;text-transform:uppercase">Overtime Hours</div>
+        <input id="ot-hours" class="ii" type="number" min="0.5" max="12" step="0.5" placeholder="e.g. 2" style="width:100%" oninput="previewTrackerOT()">
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:3px;text-transform:uppercase">Reason</div>
+        <input id="ot-reason" class="ni" type="text" placeholder="Brief reason for overtime…" style="width:100%">
+      </div>
+      <div id="ot-modal-preview" style="background:var(--cream2);border-radius:8px;padding:10px;font-size:12px;color:var(--gold-d);display:none"></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn-p" onclick="submitTrackerOT()">Submit for Approval</button>
+      <button class="btn-s" onclick="closeOTModal()">Cancel</button>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -1373,6 +1483,8 @@ function showTab(tab){
   document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
   document.querySelector(`.tab[onclick="showTab('${tab}')"]`).classList.add('active');
   document.getElementById('tab-'+tab).classList.add('active');
+  if(tab==='staffing' && window.loadStaffingData) window.loadStaffingData();
+  if(tab==='pos' && window.loadPOSData) window.loadPOSData();
 }
 
 
@@ -1715,7 +1827,265 @@ function buildConsumables(){
   refreshConsSummary();
 }
 
+// ── PH HOLIDAYS ─────────────────────────────────────────────────────
+const TRACKER_HOLIDAYS = {
+  regular:['2026-01-01','2026-04-02','2026-04-03','2026-04-09','2026-05-01',
+           '2026-06-12','2026-08-25','2026-11-30','2026-12-25','2026-12-30'],
+  special:['2026-01-30','2026-02-25','2026-04-04','2026-08-21',
+           '2026-11-01','2026-11-02','2026-12-08','2026-12-24','2026-12-31']
+};
+
+let trackerOTRequests = [];
+
+function fmtTrackerDate(d){ return new Date(d+'T12:00').toLocaleDateString('en-PH',{weekday:'short',month:'short',day:'numeric'}); }
+
+function populateMonthSel(selId){
+  const sel = document.getElementById(selId); if(!sel) return;
+  const now = new Date(); sel.innerHTML = '';
+  for(let i=0;i<12;i++){
+    const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+    const val = d.toISOString().slice(0,7);
+    const lbl = d.toLocaleDateString('en-PH',{month:'long',year:'numeric'});
+    sel.innerHTML += `<option value="${val}">${lbl}</option>`;
+  }
+}
+
+// ── STAFFING TAB ─────────────────────────────────────────────────────
+function renderStaffingTab(){
+  trackerOTRequests = window._trackerOTAll || [];
+  const sel = document.getElementById('staff-month-sel');
+  const period = sel?.value || new Date().toISOString().slice(0,7);
+  const [yr,mo] = period.split('-').map(Number);
+  const staff = (window._trackerStaff||[]).filter(u=>u.role==='staff');
+  const loginLogs = window._trackerLogs || [];
+
+  const container = document.getElementById('staffing-payroll-table');
+
+  if(!staff.length){
+    if(container) container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);font-size:13px;">No staff data — click Refresh to load from the Staff app.</div>';
+  } else {
+    let rows = '';
+    let totalBasic=0, totalHol=0, totalOT=0;
+    staff.forEach(u=>{
+      const basicPay = u.salary||u.basicPay||0;
+      const dailyRate = basicPay>0 ? Math.round(basicPay/26*100)/100 : 0;
+      const myLogs = loginLogs.filter(l=>{
+        const match = l.userId===u.id||l.user===u.name;
+        return match&&(l.action==='clockin'||l.action==='in')&&l.time?.startsWith(period);
+      });
+      const presentDates = [...new Set(myLogs.map(l=>l.time.split('T')[0]))];
+      let regDays=0, spcDays=0;
+      presentDates.forEach(d=>{ if(TRACKER_HOLIDAYS.regular.includes(d)) regDays++; else if(TRACKER_HOLIDAYS.special.includes(d)) spcDays++; });
+      const holidayPay = Math.round(dailyRate*regDays)+Math.round(dailyRate*0.30*spcDays);
+      const approvedOT = trackerOTRequests.filter(o=>o.userId===u.id&&o.status==='approved'&&o.date?.startsWith(period));
+      const otPay = approvedOT.reduce((s,o)=>s+(o.amount||0),0);
+      const otHrs = approvedOT.reduce((s,o)=>s+(o.hours||0),0);
+      const pendingCount = trackerOTRequests.filter(o=>o.userId===u.id&&o.status==='pending').length;
+      const total = basicPay+holidayPay+otPay;
+      totalBasic+=basicPay; totalHol+=holidayPay; totalOT+=otPay;
+      const holNote = [regDays?regDays+' reg':null, spcDays?spcDays+' special':null].filter(Boolean).join(' + ');
+      rows += `<tr>
+        <td style="font-weight:600">${u.name}</td>
+        <td style="font-size:11px;color:var(--muted)">${u.specialty||u.role}</td>
+        <td>₱${basicPay.toLocaleString()}</td>
+        <td style="color:var(--gold-d)">${holidayPay>0?`<strong>₱${holidayPay.toLocaleString()}</strong><br><span style="font-size:10px;color:var(--muted)">${holNote}</span>`:'—'}</td>
+        <td style="color:#2D6B3E">${otPay>0?`<strong>₱${otPay.toLocaleString()}</strong><br><span style="font-size:10px;color:var(--muted)">${otHrs} hrs</span>`:'—'}</td>
+        <td>${pendingCount>0?`<span style="background:#FEF3C7;color:#92400E;font-size:11px;padding:2px 9px;border-radius:20px;font-weight:600">${pendingCount} pending</span>`:'—'}</td>
+        <td style="font-weight:700;color:var(--gold-d)">₱${total.toLocaleString()}</td>
+      </tr>`;
+    });
+    rows += `<tr style="font-weight:700;background:var(--cream2)">
+      <td colspan="2">Totals</td>
+      <td>₱${totalBasic.toLocaleString()}</td>
+      <td style="color:var(--gold-d)">₱${totalHol.toLocaleString()}</td>
+      <td style="color:#2D6B3E">₱${totalOT.toLocaleString()}</td>
+      <td></td>
+      <td style="color:var(--gold-d)">₱${(totalBasic+totalHol+totalOT).toLocaleString()}</td>
+    </tr>`;
+    if(container) container.innerHTML = `
+      <div style="font-size:12px;font-weight:600;color:var(--gold-d);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em">Monthly Payroll Summary</div>
+      <div style="background:#fff;border:0.5px solid var(--border-l);border-radius:12px;overflow:hidden">
+        <table class="tbl">
+          <thead><tr>
+            <th style="text-align:left">Name</th><th style="text-align:left">Role</th>
+            <th>Basic Pay</th><th>Holiday Pay</th><th>Overtime Pay</th><th>Pending OT</th><th>Est. Total</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  }
+
+  // Pending OT
+  const pending = trackerOTRequests.filter(o=>o.status==='pending');
+  const pendTbody = document.getElementById('tracker-ot-pending');
+  if(pendTbody){
+    pendTbody.innerHTML = !pending.length
+      ? '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted)">No pending overtime requests</td></tr>'
+      : pending.map(o=>`<tr>
+          <td style="font-weight:500">${o.userName||'Unknown'}</td>
+          <td style="font-size:12px">${fmtTrackerDate(o.date)}</td>
+          <td>${o.hours} hr${o.hours!==1?'s':''}</td>
+          <td style="font-weight:600;color:var(--gold-d)">₱${(o.amount||0).toLocaleString()}</td>
+          <td style="font-size:12px;color:var(--muted)">${o.reason||'—'}</td>
+          <td><div style="display:flex;gap:6px">
+            <button class="btn-p" style="font-size:11px;padding:4px 10px" onclick="trackerApproveOT(${o.id})">✓ Approve</button>
+            <button class="btn-s" style="font-size:11px;padding:4px 10px;color:#8B2E2E" onclick="trackerRejectOT(${o.id})">✕ Reject</button>
+          </div></td>
+        </tr>`).join('');
+  }
+
+  // OT history
+  const history = trackerOTRequests.filter(o=>o.status!=='pending').sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const histTbody = document.getElementById('tracker-ot-history');
+  if(histTbody){
+    histTbody.innerHTML = !history.length
+      ? '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted)">No overtime history yet</td></tr>'
+      : history.map(o=>`<tr>
+          <td style="font-weight:500">${o.userName||'Unknown'}</td>
+          <td style="font-size:12px">${fmtTrackerDate(o.date)}</td>
+          <td>${o.hours} hr${o.hours!==1?'s':''}</td>
+          <td>₱${(o.amount||0).toLocaleString()}</td>
+          <td style="font-size:12px;color:var(--muted)">${o.reason||'—'}</td>
+          <td><span style="font-size:11px;padding:3px 9px;border-radius:20px;font-weight:600;background:${o.status==='approved'?'#D1FAE5':'#FEE2E2'};color:${o.status==='approved'?'#065F46':'#991B1B'}">${o.status==='approved'?'Approved':'Rejected'}</span></td>
+        </tr>`).join('');
+  }
+}
+
+function openLogOTModal(){
+  const staff = (window._trackerStaff||[]).filter(u=>u.role==='staff');
+  if(!staff.length){ alert('No staff data loaded — click Refresh first.'); return; }
+  const sel = document.getElementById('ot-staff-sel');
+  if(sel) sel.innerHTML = staff.map(u=>`<option value="${u.id}" data-salary="${u.salary||u.basicPay||0}">${u.name}</option>`).join('');
+  document.getElementById('ot-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('ot-hours').value = '';
+  document.getElementById('ot-reason').value = '';
+  const prev = document.getElementById('ot-modal-preview'); if(prev) prev.style.display='none';
+  document.getElementById('ot-modal').style.display='flex';
+}
+function closeOTModal(){ document.getElementById('ot-modal').style.display='none'; }
+
+function previewTrackerOT(){
+  const sel = document.getElementById('ot-staff-sel');
+  const basicPay = parseFloat(sel?.options[sel.selectedIndex]?.dataset?.salary||0)||0;
+  const hrs = parseFloat(document.getElementById('ot-hours')?.value)||0;
+  const prev = document.getElementById('ot-modal-preview');
+  if(!prev||!hrs||!basicPay){ if(prev) prev.style.display='none'; return; }
+  const dailyR = Math.round(basicPay/26*100)/100;
+  const hrlyR = Math.round(dailyR/8*100)/100;
+  const otRate = Math.round(hrlyR*1.25*100)/100;
+  const amount = Math.round(otRate*hrs);
+  prev.style.display='block';
+  prev.innerHTML = `Estimated OT pay: <strong>₱${amount.toLocaleString()}</strong> (₱${hrlyR.toFixed(2)}/hr × 125% = ₱${otRate.toFixed(2)}/hr × ${hrs} hrs)`;
+}
+
+function submitTrackerOT(){
+  const sel = document.getElementById('ot-staff-sel');
+  const userId = parseInt(sel?.value)||0;
+  const userName = sel?.options[sel.selectedIndex]?.text||'';
+  const basicPay = parseFloat(sel?.options[sel.selectedIndex]?.dataset?.salary||0)||0;
+  const date = document.getElementById('ot-date')?.value;
+  const hrs = parseFloat(document.getElementById('ot-hours')?.value)||0;
+  const reason = document.getElementById('ot-reason')?.value||'';
+  if(!userId){ alert('Please select a staff member'); return; }
+  if(!date){ alert('Please select a date'); return; }
+  if(hrs<=0){ alert('Please enter overtime hours'); return; }
+  const dailyR = Math.round(basicPay/26*100)/100;
+  const otRate = Math.round(dailyR/8*1.25*100)/100;
+  const amount = Math.round(otRate*hrs);
+  const req = {id:Date.now(),userId,userName,date,hours:hrs,rate:otRate,amount,reason,status:'pending',createdAt:new Date().toISOString()};
+  trackerOTRequests.push(req);
+  window._trackerOTAll = trackerOTRequests;
+  if(window.saveTrackerOT) window.saveTrackerOT(trackerOTRequests);
+  closeOTModal();
+  renderStaffingTab();
+}
+
+function trackerApproveOT(id){
+  const req = trackerOTRequests.find(o=>o.id===id); if(!req) return;
+  req.status='approved';
+  window._trackerOTAll = trackerOTRequests;
+  if(window.saveTrackerOT) window.saveTrackerOT(trackerOTRequests);
+  renderStaffingTab();
+}
+function trackerRejectOT(id){
+  const req = trackerOTRequests.find(o=>o.id===id); if(!req) return;
+  req.status='rejected';
+  window._trackerOTAll = trackerOTRequests;
+  if(window.saveTrackerOT) window.saveTrackerOT(trackerOTRequests);
+  renderStaffingTab();
+}
+
+// ── POS TAB ──────────────────────────────────────────────────────────
+function renderPOSTab(){
+  const sel = document.getElementById('pos-month-sel');
+  const period = sel?.value || new Date().toISOString().slice(0,7);
+  const [yr,mo] = period.split('-').map(Number);
+  const txns = (window._trackerTxns||[]).filter(t=>{
+    const d = new Date(t.time||t.createdAt||t.date);
+    return d.getFullYear()===yr && d.getMonth()===mo-1;
+  });
+
+  const sumEl = document.getElementById('pos-summary');
+  const staffEl = document.getElementById('pos-by-staff');
+  const svcEl = document.getElementById('pos-by-service');
+
+  if(!txns.length){
+    if(sumEl) sumEl.innerHTML = '<div class="metric"><div class="metric-label">Revenue</div><div class="metric-value" style="color:var(--muted)">—</div></div>';
+    if(staffEl) staffEl.innerHTML = '<div style="text-align:center;padding:32px;color:var(--muted);font-size:13px;">No POS transactions this month. Click Refresh to load.</div>';
+    if(svcEl) svcEl.innerHTML = '';
+    return;
+  }
+
+  const totalRev = txns.reduce((s,t)=>s+(t.total||0),0);
+  const cashRev = txns.filter(t=>!t.paymentMethod||t.paymentMethod==='cash').reduce((s,t)=>s+(t.total||0),0);
+  const cardRev = txns.filter(t=>t.paymentMethod==='card').reduce((s,t)=>s+(t.total||0),0);
+
+  if(sumEl) sumEl.innerHTML = `
+    <div class="metric"><div class="metric-label">Total Revenue</div><div class="metric-value gd">₱${Math.round(totalRev).toLocaleString()}</div></div>
+    <div class="metric"><div class="metric-label">Transactions</div><div class="metric-value">${txns.length}</div></div>
+    <div class="metric"><div class="metric-label">Cash</div><div class="metric-value">₱${Math.round(cashRev).toLocaleString()}</div></div>
+    <div class="metric"><div class="metric-label">Card</div><div class="metric-value">₱${Math.round(cardRev).toLocaleString()}</div></div>
+    <div class="metric"><div class="metric-label">Avg / Transaction</div><div class="metric-value">₱${Math.round(totalRev/txns.length).toLocaleString()}</div></div>`;
+
+  // By staff
+  const byStaff = {};
+  txns.forEach(t=>{ const n=t.staff||'Unassigned'; if(!byStaff[n])byStaff[n]={rev:0,count:0}; byStaff[n].rev+=t.total||0; byStaff[n].count++; });
+  const staffRows = Object.entries(byStaff).sort((a,b)=>b[1].rev-a[1].rev).map(([n,d])=>`<tr>
+    <td style="font-weight:500">${n}</td><td>${d.count}</td>
+    <td style="font-weight:600;color:var(--gold-d)">₱${Math.round(d.rev).toLocaleString()}</td>
+    <td style="color:var(--muted);font-size:12px">₱${Math.round(d.rev/d.count).toLocaleString()}</td>
+  </tr>`).join('');
+  if(staffEl) staffEl.innerHTML = `
+    <div style="font-size:12px;font-weight:600;color:var(--gold-d);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em">Revenue by Staff</div>
+    <div style="background:#fff;border:0.5px solid var(--border-l);border-radius:12px;overflow:hidden">
+      <table class="tbl"><thead><tr><th style="text-align:left">Staff</th><th>Transactions</th><th>Revenue</th><th>Avg</th></tr></thead>
+      <tbody>${staffRows||'<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--muted)">No data</td></tr>'}</tbody></table>
+    </div>`;
+
+  // By service
+  const bySvc = {};
+  txns.forEach(t=>{
+    const items = t.items?.length ? t.items : [{name:t.service||t.item||'Service',qty:1,price:t.total||0}];
+    items.forEach(item=>{ const n=item.name||'Service'; if(!bySvc[n])bySvc[n]={rev:0,count:0}; bySvc[n].rev+=(item.price||0)*(item.qty||1); bySvc[n].count+=item.qty||1; });
+  });
+  const svcRows = Object.entries(bySvc).sort((a,b)=>b[1].rev-a[1].rev).slice(0,15).map(([n,d])=>`<tr>
+    <td style="font-weight:500">${n}</td><td>${d.count}</td>
+    <td style="font-weight:600;color:var(--gold-d)">₱${Math.round(d.rev).toLocaleString()}</td>
+  </tr>`).join('');
+  if(svcEl) svcEl.innerHTML = `
+    <div style="font-size:12px;font-weight:600;color:var(--gold-d);margin-top:1.2rem;margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em">Top Services</div>
+    <div style="background:#fff;border:0.5px solid var(--border-l);border-radius:12px;overflow:hidden">
+      <table class="tbl"><thead><tr><th style="text-align:left">Service</th><th>Qty Sold</th><th>Revenue</th></tr></thead>
+      <tbody>${svcRows||'<tr><td colspan="3" style="text-align:center;padding:20px;color:var(--muted)">No service data</td></tr>'}</tbody></table>
+    </div>`;
+}
+
 // App init handled by Firebase module above — see <script type='module'> in <head>
+// Populate month selectors on load
+document.addEventListener('DOMContentLoaded', ()=>{
+  populateMonthSel('staff-month-sel');
+  populateMonthSel('pos-month-sel');
+});
 </script>
 </body>
 </html>
