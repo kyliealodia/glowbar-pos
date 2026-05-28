@@ -1182,8 +1182,9 @@ function renderCutoff(){
     if(shiftDays.includes(dayNames[new Date(d).getDay()])) workingDaysInCO++;
   }
 
-  // Daily rate uses fixed 26 working days per PH standard
-  const dailyRate=basicPay>0?Math.round(basicPay/26*100)/100:0;
+  // Daily rate based on actual working days in the month
+  const totalWD=getWorkingDaysSP(yr,mo,staffStart,today,userRecord.shiftDays)||1;
+  const dailyRate=basicPay>0?Math.round(basicPay/totalWD*100)/100:0;
 
   // Days present in cut-off
   const inLogs=(S.loginLogs||[]).filter(l=>{
@@ -1364,11 +1365,11 @@ function renderPayslip(){
   const pagibigNo=userRecord.pagibigNo||'—';
   const tinNo=userRecord.tinNo||'—';
 
-  // Daily rate uses fixed 26 working days per PH standard
+  // Daily rate based on actual working days in the month
 const today=new Date(); today.setHours(23,59,59,0);
 const staffStart=userRecord.startDate?new Date(userRecord.startDate):new Date('2026-06-02');
-const workingDays=getWorkingDaysSP(yr,mo,staffStart,today,userRecord.shiftDays);
-const dailyRate=basicPay>0?Math.round(basicPay/26*100)/100:0;
+const workingDays=getWorkingDaysSP(yr,mo,staffStart,today,userRecord.shiftDays)||1;
+const dailyRate=basicPay>0?Math.round(basicPay/workingDays*100)/100:0;
 
   // Days present from clock-in logs
   const inLogs=(S.loginLogs||[]).filter(l=>{
@@ -1501,7 +1502,7 @@ const paidDays=daysPresent+leaveDays;
           <!-- EARNINGS -->
           <div style="padding:16px 24px;border-right:1px solid #E8DFD0;">
             <div style="font-size:10px;font-weight:700;color:#8C7B65;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid #2C2318;">Earnings</div>
-            ${row('Daily Rate (salary ÷ 26)','<span style="color:#8C7B65;font-size:11px;">'+fmtPrice(dailyRate)+'</span>')}
+            ${row('Daily Rate (salary ÷ '+workingDays+' working days)','<span style="color:#8C7B65;font-size:11px;">'+fmtPrice(dailyRate)+'</span>')}
             ${row('Basic Pay ('+paidDays+' day'+(paidDays!==1?'s':'')+' × '+fmtPrice(dailyRate)+')',fmtPrice(earnedBasic))}
             ${leaveDays>0?row('Approved Leave ('+leaveDays+' day'+(leaveDays!==1?'s':'')+', paid)',`<span style="color:#4A7CB8;">included</span>`):''}
             ${daysAbsent>0?row('Unpaid Absence ('+daysAbsent+' day'+(daysAbsent!==1?'s':'')+')',`<span style="color:#C44A4A;">not counted</span>`):''}
