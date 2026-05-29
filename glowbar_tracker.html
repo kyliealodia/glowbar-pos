@@ -618,7 +618,6 @@ body{font-family:system-ui,sans-serif;background:var(--cream);color:var(--text);
     <div style="display:flex;align-items:center;gap:6px;font-size:13px"><span style="color:var(--muted)">Electricity/service: &#8369;</span><input id="elec-rate" class="ii" type="number" style="width:65px" value="15" oninput="rebuildAllServices()"></div>
     <div style="display:flex;align-items:center;gap:6px;font-size:13px"><span style="color:var(--muted)">Water/service: &#8369;</span><input id="water-rate" class="ii" type="number" style="width:65px" value="9" oninput="rebuildAllServices()"></div>
     <div style="display:flex;align-items:center;gap:6px;font-size:13px"><span style="color:var(--muted)">Commission:</span><input id="comm-pct" class="ii" type="number" style="width:55px" value="10" oninput="rebuildAllServices()"><span style="color:var(--muted)">%</span></div>
-    <div style="font-size:11px;color:var(--gold-d);background:var(--cream);padding:4px 10px;border-radius:6px;border:0.5px solid var(--border-l)">3% card fee always applied</div>
     <button class="btn-p" style="font-size:12px;padding:5px 12px;margin-left:auto" onclick="showStaffModal()">&#9881; Manage staff</button>
   </div>
   <div id="staff-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:999;align-items:center;justify-content:center">
@@ -1224,7 +1223,6 @@ function calcSvcCost(svc){
   const water=st.noWater?0:waterRate;
   const commPct=parseFloat(document.getElementById('comm-pct')?.value||10)/100;
   const commission=price*commPct;
-  const cardFee=price*0.03;
 
   // consumables
   let consCost=0;
@@ -1240,9 +1238,9 @@ function calcSvcCost(svc){
 
   // package discount
   const discount=parseFloat(st.discount||svc.discount||0);
-  const profit=price-totalCost-commission-cardFee-discount;
+  const profit=price-totalCost-commission-discount;
   const margin=price>0?Math.round(profit/price*100):0;
-  return {laborCost,elec,water,consCost,totalCost,price,commission,cardFee,discount,profit,margin,durationMins,roleId};
+  return {laborCost,elec,water,consCost,totalCost,price,commission,discount,profit,margin,durationMins,roleId};
 }
 
 // ── CONSUMABLE HELPERS ────────────────────────────────────────────
@@ -1358,7 +1356,7 @@ function addSvcCons(svcId){ const st=getSvcState(svcId); const cons=st.consumabl
 
 function buildSvcCardInner(svc, catId){
   const st=getSvcState(svc.id);
-  const {laborCost,elec,water,consCost,totalCost,price,commission,cardFee,discount,profit,margin,durationMins,roleId}=calcSvcCost(svc);
+  const {laborCost,elec,water,consCost,totalCost,price,commission,discount,profit,margin,durationMins,roleId}=calcSvcCost(svc);
   const pColor=profit>=0?'var(--green)':'var(--red)';
   const cons=st.consumables||svc.consumables||[];
   const consRows=cons.map((c,ci)=>svcConsRowHtml(svc.id,c,ci)).join('');
@@ -1408,10 +1406,6 @@ function buildSvcCardInner(svc, catId){
       <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:0.5px solid var(--border-l)">
         <span style="color:var(--muted)">Commission (${document.getElementById('comm-pct')?.value||10}%)</span>
         <span style="color:var(--warn)">&#8722;&#8369;${commission.toFixed(2)}</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:0.5px solid var(--border-l)">
-        <span style="color:var(--muted)">Card fee (3%)</span>
-        <span style="color:var(--warn)">&#8722;&#8369;${cardFee.toFixed(2)}</span>
       </div>
       <div style="display:flex;justify-content:space-between;padding:4px 0;font-weight:600;border-top:0.5px solid var(--gold-l);margin-top:2px">
         <span>Net profit (package)</span>
@@ -1473,7 +1467,6 @@ function buildSvcCardInner(svc, catId){
   </div>
   <div style="font-size:11px;border-top:0.5px solid var(--border-l);padding-top:6px">
     <div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:var(--muted)">Commission (${document.getElementById('comm-pct')?.value||10}%)</span><span style="color:var(--warn)">&#8722;&#8369;${commission.toFixed(2)}</span></div>
-    <div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:var(--muted)">Card fee (3%)</span><span style="color:var(--warn)">&#8722;&#8369;${cardFee.toFixed(2)}</span></div>
     ${isPkg&&discount>0?`<div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:var(--muted)">Discount</span><span style="color:var(--warn)">&#8722;&#8369;${discount.toFixed(2)}</span></div>`:''}
     <div style="display:flex;justify-content:space-between;padding:4px 0;font-weight:600;font-size:12px;border-top:0.5px solid var(--border-l);margin-top:2px">
       <span>Net profit</span><span style="color:${pColor}">&#8369;${profit.toFixed(2)} <span style="font-weight:400;font-size:10px">(${margin}%)</span></span>

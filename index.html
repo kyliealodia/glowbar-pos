@@ -891,6 +891,10 @@ html{height:-webkit-fill-available;}
             <div class="card"><div class="card-hdr"><h3>Top Services</h3></div><div class="card-body" id="rptTopSvcs"></div></div>
             <div class="card"><div class="card-hdr"><h3>Payment Methods</h3></div><div class="card-body" id="rptPayMethods"></div></div>
           </div>
+          <div class="card" style="margin-bottom:14px;">
+            <div class="card-hdr"><h3>Fee Summary</h3></div>
+            <div class="card-body" id="rptFeeSummary"></div>
+          </div>
           <div class="card">
             <div class="card-hdr"><h3>Transaction History</h3></div>
             <div id="rptTxnList" style="overflow-x:auto;"></div>
@@ -1578,13 +1582,47 @@ html{height:-webkit-fill-available;}
     <div class="modal-hdr"><div class="modal-title">Complete Payment</div><div class="modal-x" onclick="closeM('payModal');stopRefCam()">✕</div></div>
     <div id="payReceiptPrev" style="margin-bottom:14px;"></div>
     <div style="font-size:10px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Payment Method</div>
-    <div class="pay-grid">
+    <div class="pay-grid" style="grid-template-columns:repeat(4,1fr);">
       <div class="pay-m sel" data-m="cash" onclick="selPay(this)"><span class="pay-ico">💵</span>Cash</div>
-      <div class="pay-m" data-m="gcash" onclick="selPay(this)"><span class="pay-ico">📱</span>GCash</div>
-      <div class="pay-m" data-m="maya" onclick="selPay(this)"><span class="pay-ico">💳</span>Maya</div>
       <div class="pay-m" data-m="card" onclick="selPay(this)"><span class="pay-ico">🏦</span>Card</div>
-      <div class="pay-m" data-m="transfer" onclick="selPay(this)"><span class="pay-ico">🔄</span>Transfer</div>
+      <div class="pay-m" data-m="gcash" onclick="selPay(this)"><span class="pay-ico">📱</span>GCash</div>
+      <div class="pay-m" data-m="qrph" onclick="selPay(this)"><span class="pay-ico">📷</span>QR Ph</div>
       <div class="pay-m" data-m="package" onclick="selPay(this)"><span class="pay-ico">📋</span>Package</div>
+      <div class="pay-m" data-m="internal-installment" onclick="selPay(this)"><span class="pay-ico">🏠</span><span style="font-size:10px;">Internal<br>Install.</span></div>
+      <div class="pay-m" data-m="bank-installment" onclick="selPay(this)"><span class="pay-ico">🏛</span><span style="font-size:10px;">Bank<br>Install.</span></div>
+      <div class="pay-m" data-m="veritaspay" onclick="selPay(this)"><span class="pay-ico">💼</span><span style="font-size:10px;">VeritasPay</span></div>
+    </div>
+
+    <!-- Fee breakdown — Card / Bank Installment / VeritasPay -->
+    <div id="feeBreakdownWrap" style="display:none;margin-top:14px;padding:12px 14px;background:#FFF8F0;border-radius:12px;border:1.5px solid var(--gold);">
+      <div style="font-size:10px;font-weight:700;color:var(--gold-dk);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">💳 Payment Fee</div>
+      <div id="feeTermRow" style="display:none;margin-bottom:10px;">
+        <label style="font-size:11px;color:var(--ink3);display:block;margin-bottom:5px;">Installment term:</label>
+        <select class="form-select" id="feeTermSel" onchange="updateFeeBreakdown()" style="font-size:13px;">
+          <option value="3">3 months</option>
+          <option value="6">6 months</option>
+          <option value="9">9 months</option>
+          <option value="12">12 months</option>
+        </select>
+      </div>
+      <div id="feeBreakdownLines"></div>
+    </div>
+
+    <!-- Internal Installment Setup -->
+    <div id="internalInstWrap" style="display:none;margin-top:14px;padding:12px 14px;background:var(--cream2);border-radius:12px;border:1.5px solid var(--gold);">
+      <div style="font-size:10px;font-weight:700;color:var(--gold-dk);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">🏠 Internal Installment</div>
+      <div style="font-size:11px;color:var(--ink3);margin-bottom:10px;">Min. ₱3,000 total to qualify.</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+        <div>
+          <label style="font-size:10px;color:var(--ink3);display:block;margin-bottom:3px;">Deposit today (₱)</label>
+          <input class="form-input" type="number" id="intInstDeposit" min="0" step="50" placeholder="0" oninput="updateInternalInst()" style="font-size:14px;font-weight:600;">
+        </div>
+        <div>
+          <label style="font-size:10px;color:var(--ink3);display:block;margin-bottom:3px;">Months to pay</label>
+          <input class="form-input" type="number" id="intInstMonths" min="1" max="24" value="3" oninput="updateInternalInst()" style="font-size:14px;font-weight:600;">
+        </div>
+      </div>
+      <div id="internalInstSummary"></div>
     </div>
 
     <!-- Link to appointment — shown if client has appointments today -->
@@ -3986,6 +4024,17 @@ function _openPaymentCore(){
   _pendingInstallmentPlan=null;
   const ipSummary=document.getElementById('instPlanSummary');
   if(ipSummary)ipSummary.style.display='none';
+  // Reset fee & installment sections
+  const feeWrap=document.getElementById('feeBreakdownWrap');
+  if(feeWrap)feeWrap.style.display='none';
+  const intWrap=document.getElementById('internalInstWrap');
+  if(intWrap)intWrap.style.display='none';
+  // Reset to cash default
+  document.querySelectorAll('.pay-m').forEach(m=>m.classList.remove('sel'));
+  const cashBtn=document.querySelector('.pay-m[data-m="cash"]');
+  if(cashBtn)cashBtn.classList.add('sel');
+  const cashWrapEl=document.getElementById('cashWrap');
+  if(cashWrapEl)cashWrapEl.style.display='block';
   checkInstallmentEligibility();
   openM('payModal');
 }
@@ -3993,7 +4042,7 @@ function selPay(el){
   document.querySelectorAll('.pay-m').forEach(m=>m.classList.remove('sel'));
   el.classList.add('sel');
   const method=el.dataset.m;
-  // Show cash section for cash only
+  // Cash section
   const cashWrap=document.getElementById('cashWrap');
   if(cashWrap){
     cashWrap.style.display=method==='cash'?'block':'none';
@@ -4004,12 +4053,27 @@ function selPay(el){
       document.querySelectorAll('.cash-preset').forEach(b=>b.classList.remove('active'));
     }
   }
-  // Show photo section for digital payments
-  const needsPhoto=['gcash','maya','transfer','card'];
-  const wrap=document.getElementById('refCaptureWrap');
-  if(wrap){
-    wrap.style.display=needsPhoto.includes(method)?'block':'none';
+  // Photo proof for GCash, QR Ph, Card
+  const needsPhoto=['gcash','qrph','card'];
+  const refWrap=document.getElementById('refCaptureWrap');
+  if(refWrap){
+    refWrap.style.display=needsPhoto.includes(method)?'block':'none';
     if(!needsPhoto.includes(method)){stopRefCam();_refPhotoData=null;resetRefPhotoUI();}
+  }
+  // Fee breakdown for Card, Bank Installment, VeritasPay
+  const feeWrap=document.getElementById('feeBreakdownWrap');
+  if(feeWrap){
+    const hasFee=['card','bank-installment','veritaspay'].includes(method);
+    feeWrap.style.display=hasFee?'block':'none';
+    const termRow=document.getElementById('feeTermRow');
+    if(termRow) termRow.style.display=['bank-installment','veritaspay'].includes(method)?'block':'none';
+    if(hasFee) updateFeeBreakdown();
+  }
+  // Internal installment setup
+  const intWrap=document.getElementById('internalInstWrap');
+  if(intWrap){
+    intWrap.style.display=method==='internal-installment'?'block':'none';
+    if(method==='internal-installment') updateInternalInst();
   }
 }
 
@@ -4044,6 +4108,89 @@ function calcChange(){
   }
 }
 
+
+const _FEE_RATES={
+  card:{flat:0.03},
+  'bank-installment':{3:0.035,6:0.063,9:0.096,12:0.118},
+  veritaspay:{3:0.04,6:0.068,9:0.101,12:0.125}
+};
+
+function getCartBaseTotal(){
+  const sub=cart.reduce((s,i)=>s+i.price*i.qty,0);
+  const dv=parseFloat(document.getElementById('discInp')?.value)||0;
+  const disc=discType==='pct'?sub*(dv/100):Math.min(dv,sub);
+  const afterDisc=sub-disc;
+  const tipAmt=tipMode==='custom'?parseFloat(document.getElementById('tipCustomInp')?.value)||0:tipAmount;
+  const vatOn=document.getElementById('vatToggle')?.checked;
+  const vat=vatOn?afterDisc*0.12:0;
+  const dep=window._linkedDepositAmt||0;
+  return Math.max(0,afterDisc+tipAmt+vat-dep);
+}
+
+function updateFeeBreakdown(){
+  const method=document.querySelector('.pay-m.sel')?.dataset.m||'cash';
+  const original=getCartBaseTotal();
+  let feePct=0,feeLabel='';
+  if(method==='card'){
+    feePct=_FEE_RATES.card.flat;
+    feeLabel='Card 3%';
+  } else if(method==='bank-installment'||method==='veritaspay'){
+    const term=parseInt(document.getElementById('feeTermSel')?.value||3);
+    feePct=(_FEE_RATES[method]||{})[term]||0;
+    const pctDisplay=Math.round(feePct*1000)/10;
+    feeLabel=(method==='bank-installment'?'Bank ':' VeritasPay ')+pctDisplay+'% ('+term+'mo)';
+  }
+  const feeAmt=Math.round(original*feePct*100)/100;
+  const total=original+feeAmt;
+  const el=document.getElementById('feeBreakdownLines');
+  if(!el)return;
+  el.innerHTML=`
+    <div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-bottom:1px solid var(--border);">
+      <span style="color:var(--ink3);">Original amount</span>
+      <span style="font-weight:500;">${fmtPrice(original)}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-bottom:1px solid var(--border);">
+      <span style="color:var(--ink3);">Fee (${feeLabel})</span>
+      <span style="color:var(--warn);font-weight:600;">+${fmtPrice(feeAmt)}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0;font-weight:700;">
+      <span>Total to charge</span>
+      <span style="color:var(--gold-dk);">${fmtPrice(total)}</span>
+    </div>`;
+}
+
+function updateInternalInst(){
+  const original=getCartBaseTotal();
+  const deposit=parseFloat(document.getElementById('intInstDeposit')?.value)||0;
+  const months=Math.max(1,parseInt(document.getElementById('intInstMonths')?.value)||1);
+  const remaining=Math.max(0,original-deposit);
+  const monthly=Math.ceil(remaining/months);
+  const el=document.getElementById('internalInstSummary');
+  if(!el)return;
+  if(original<3000){
+    el.innerHTML=`<div style="font-size:11px;color:var(--danger);padding:4px 0;">Total must be at least ₱3,000 for internal installment.</div>`;
+    return;
+  }
+  el.innerHTML=`
+    <div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid var(--border);">
+      <span style="color:var(--ink3);">Total amount</span><span style="font-weight:500;">${fmtPrice(original)}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid var(--border);">
+      <span style="color:var(--ink3);">Deposit paid today</span><span style="color:var(--success);font-weight:600;">${fmtPrice(deposit)}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid var(--border);">
+      <span style="color:var(--ink3);">Remaining balance</span><span style="font-weight:500;">${fmtPrice(remaining)}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid var(--border);">
+      <span style="color:var(--ink3);">Monthly payment (${months} mo.)</span><span style="font-weight:500;">${fmtPrice(monthly)}/mo</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0;font-weight:700;border-top:1.5px solid var(--gold);margin-top:4px;">
+      <span>Charged today</span><span style="color:var(--gold-dk);">${fmtPrice(deposit)}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;">
+      <span style="color:var(--ink3);">Balance after today</span><span style="color:var(--danger);font-weight:600;">${fmtPrice(remaining)}</span>
+    </div>`;
+}
 
 function resetRefPhotoUI(){
   const prompt=document.getElementById('refCamPrompt');
@@ -4143,8 +4290,38 @@ function confirmPay(){
   const total=afterDisc+tip+vat;
   const dep=window._linkedDepositAmt||0;
   let finalTotal=Math.max(0,total-dep);
-  // Installment: only charge first payment today
+  // Package installment: only charge first payment today
   if(_pendingInstallmentPlan) finalTotal=_pendingInstallmentPlan.schedule[0].amount;
+  // Payment fee + internal installment handling
+  const originalAmount=finalTotal;
+  let payFeeAmt=0,payFeePct=0,payFeeTerm=null,internalInstInfo=null;
+  if(method==='card'){
+    payFeePct=_FEE_RATES.card.flat;
+    payFeeAmt=Math.round(originalAmount*payFeePct*100)/100;
+    finalTotal=originalAmount+payFeeAmt;
+  } else if(method==='bank-installment'){
+    payFeeTerm=parseInt(document.getElementById('feeTermSel')?.value||3);
+    payFeePct=(_FEE_RATES['bank-installment']||{})[payFeeTerm]||0;
+    payFeeAmt=Math.round(originalAmount*payFeePct*100)/100;
+    finalTotal=originalAmount+payFeeAmt;
+  } else if(method==='veritaspay'){
+    payFeeTerm=parseInt(document.getElementById('feeTermSel')?.value||3);
+    payFeePct=(_FEE_RATES['veritaspay']||{})[payFeeTerm]||0;
+    payFeeAmt=Math.round(originalAmount*payFeePct*100)/100;
+    finalTotal=originalAmount+payFeeAmt;
+  } else if(method==='internal-installment'){
+    const depositToday=parseFloat(document.getElementById('intInstDeposit')?.value)||0;
+    const instMonths=Math.max(1,parseInt(document.getElementById('intInstMonths')?.value)||1);
+    const remaining=Math.max(0,originalAmount-depositToday);
+    const monthly=Math.ceil(remaining/instMonths);
+    const sched=[{month:0,dueDate:td(),amount:depositToday,paid:true,paidDate:new Date().toISOString()}];
+    for(let i=1;i<=instMonths;i++){
+      const d=new Date(td()+'T12:00');d.setMonth(d.getMonth()+i);
+      sched.push({month:i,dueDate:d.toISOString().split('T')[0],amount:monthly,paid:false});
+    }
+    internalInstInfo={totalAmount:originalAmount,depositPaid:depositToday,remaining,months:instMonths,monthly,schedule:sched};
+    finalTotal=depositToday;
+  }
   const cn=selClient?selClient.name:'Walk-in Client';
   const txid='TXN'+Date.now().toString().slice(-6);
   const now=new Date();
@@ -4192,12 +4369,20 @@ function confirmPay(){
   const cashGiven=method==='cash'?(parseFloat(document.getElementById('cashGiven').value)||0):0;
   const cashChange=method==='cash'?Math.max(0,cashGiven-finalTotal):0;
   const instMeta=_pendingInstallmentPlan?{visit:1,totalVisits:_pendingInstallmentPlan.schedule.length,totalPrice:_pendingInstallmentPlan.totalPrice,packageName:_pendingInstallmentPlan.pkg.name}:null;
-  S.transactions.push({id:txid,client:cn,clientId:selClient?.id||null,items:JSON.parse(JSON.stringify(cart)),sub,disc,discType,tip,vat,vatOn,total:finalTotal,depositApplied:dep||null,method,cashGiven:cashGiven||null,cashChange:cashChange||null,refPhoto:_refPhotoData||null,time:now.toISOString(),staff:currentUser.name,installmentInfo:instMeta||null});
+  S.transactions.push({id:txid,client:cn,clientId:selClient?.id||null,items:JSON.parse(JSON.stringify(cart)),sub,disc,discType,tip,vat,vatOn,total:finalTotal,originalAmount:payFeeAmt>0?originalAmount:null,payFee:payFeeAmt||null,feePct:payFeePct||null,feeTerm:payFeeTerm||null,depositApplied:dep||null,method,cashGiven:cashGiven||null,cashChange:cashChange||null,refPhoto:_refPhotoData||null,time:now.toISOString(),staff:currentUser.name,installmentInfo:instMeta||null,internalInstallment:internalInstInfo||null});
   window.lastTx=S.transactions[S.transactions.length-1];
   window._lastPaidClientId = selClient?.id||null;
   window._lastTxId = txid;
   sync('transactions'); sync('products'); if(selClient)sync('clients');
   if(_pendingInstallmentPlan&&selClient){_createInstallmentRecord(selClient.id,_pendingInstallmentPlan,txid);_pendingInstallmentPlan=null;}
+  if(internalInstInfo&&selClient){
+    const cl=S.clients.find(c=>c.id===selClient.id);
+    if(cl){
+      if(!cl.internalInstallments)cl.internalInstallments=[];
+      cl.internalInstallments.push({id:'IINST'+txid,txId:txid,active:true,service:cart.map(i=>i.name).join(', '),...internalInstInfo});
+      sync('clients');
+    }
+  }
   // Award loyalty points
   if(selClient) awardLoyaltyPoints(selClient.id, total);
   // Mark linked appointment as completed
@@ -6645,11 +6830,13 @@ function renderReports(){
   const margin=rev>0?Math.round(profit/rev*100):0;
   const avg=txns.length?rev/txns.length:0;
 
+  const totalFeesPeriod=txns.reduce((s,t)=>s+(t.payFee||0),0);
+  const netRev=rev-totalFeesPeriod;
   // Summary metrics
   document.getElementById('rptMetrics').innerHTML=`
-    <div class="metric"><div class="metric-lbl">Total Revenue</div><div class="metric-val">${fmtPrice(rev)}</div><div class="metric-sub">${txns.length} transactions</div></div>
-    <div class="metric"><div class="metric-lbl">Total Cost</div><div class="metric-val" style="color:var(--danger)">${fmtPrice(totalCost)}</div><div class="metric-sub">consumables used</div></div>
-    <div class="metric"><div class="metric-lbl">Gross Profit</div><div class="metric-val" style="color:var(--success)">${fmtPrice(profit)}</div><div class="metric-sub">${margin}% margin</div></div>
+    <div class="metric"><div class="metric-lbl">Total Charged</div><div class="metric-val">${fmtPrice(rev)}</div><div class="metric-sub">${txns.length} transactions</div></div>
+    <div class="metric"><div class="metric-lbl">Payment Fees</div><div class="metric-val" style="color:var(--warn);">${fmtPrice(totalFeesPeriod)}</div><div class="metric-sub">to processors</div></div>
+    <div class="metric"><div class="metric-lbl">Net Revenue</div><div class="metric-val" style="color:var(--success)">${fmtPrice(netRev)}</div><div class="metric-sub">after fees</div></div>
     <div class="metric"><div class="metric-lbl">Avg Transaction</div><div class="metric-val">${fmtPrice(avg)}</div><div class="metric-sub">${tips>0?'tips: '+fmtPrice(tips):''}</div></div>`;
 
   if(rptTab==='sales') renderRptSales(txns);
@@ -6684,35 +6871,76 @@ function renderRptSales(txns){
 
   // Payment methods
   const pmData={};
-  txns.forEach(t=>{pmData[t.method]=(pmData[t.method]||0)+t.total;});
-  const totalPM=Object.values(pmData).reduce((s,v)=>s+v,0)||1;
-  document.getElementById('rptPayMethods').innerHTML=Object.entries(pmData).sort((a,b)=>b[1]-a[1]).map(([m,amt])=>`
+  txns.forEach(t=>{
+    const m=t.method||'cash';
+    if(!pmData[m])pmData[m]={total:0,count:0,fees:0,net:0};
+    pmData[m].total+=t.total;
+    pmData[m].count++;
+    const fee=t.payFee||0;
+    pmData[m].fees+=fee;
+    pmData[m].net+=t.total-fee;
+  });
+  const totalPM=Object.values(pmData).reduce((s,v)=>s+v.total,0)||1;
+  document.getElementById('rptPayMethods').innerHTML=Object.entries(pmData).sort((a,b)=>b[1].total-a[1].total).map(([m,d])=>`
     <div style="padding:8px 0;border-bottom:1px solid var(--border);">
-      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
-        <span style="text-transform:capitalize;font-weight:500;">${m}</span>
-        <span style="font-weight:600;">${fmtPrice(amt)} <span style="color:var(--ink3);font-weight:400;">(${Math.round(amt/totalPM*100)}%)</span></span>
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px;">
+        <span style="text-transform:capitalize;font-weight:500;">${m.replace('-',' ')}</span>
+        <span style="font-weight:600;">${fmtPrice(d.total)} <span style="color:var(--ink3);font-weight:400;">(${Math.round(d.total/totalPM*100)}%)</span></span>
       </div>
+      ${d.fees>0?`<div style="font-size:10px;color:var(--warn);margin-bottom:3px;">Fees: +${fmtPrice(d.fees)} &nbsp; Net: ${fmtPrice(d.net)}</div>`:''}
       <div style="height:4px;background:var(--cream2);border-radius:2px;overflow:hidden;">
-        <div style="width:${Math.round(amt/totalPM*100)}%;height:100%;background:var(--gold-dk);border-radius:2px;"></div>
+        <div style="width:${Math.round(d.total/totalPM*100)}%;height:100%;background:var(--gold-dk);border-radius:2px;"></div>
       </div>
     </div>`).join('')||'<div style="color:var(--ink3);font-size:12px;padding:10px 0;">No data</div>';
+
+  // Fee summary card
+  const totalFees=txns.reduce((s,t)=>s+(t.payFee||0),0);
+  const totalNet=txns.reduce((s,t)=>s+(t.total-(t.payFee||0)),0);
+  const feeByMethod=Object.entries(pmData).filter(([,d])=>d.fees>0);
+  document.getElementById('rptFeeSummary').innerHTML=totalFees>0?`
+    <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px;">
+      <div style="flex:1;min-width:120px;text-align:center;padding:10px;background:var(--cream2);border-radius:10px;">
+        <div style="font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px;">Total Charged</div>
+        <div style="font-size:16px;font-weight:700;">${fmtPrice(txns.reduce((s,t)=>s+t.total,0))}</div>
+      </div>
+      <div style="flex:1;min-width:120px;text-align:center;padding:10px;background:#fff8f0;border-radius:10px;border:1px solid var(--gold-lt);">
+        <div style="font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px;">Total Fees</div>
+        <div style="font-size:16px;font-weight:700;color:var(--warn);">+${fmtPrice(totalFees)}</div>
+      </div>
+      <div style="flex:1;min-width:120px;text-align:center;padding:10px;background:#f0fff4;border-radius:10px;border:1px solid var(--success);">
+        <div style="font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px;">Net Revenue</div>
+        <div style="font-size:16px;font-weight:700;color:var(--success);">${fmtPrice(totalNet)}</div>
+      </div>
+    </div>
+    ${feeByMethod.map(([m,d])=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:5px 0;border-bottom:1px solid var(--border);">
+      <span style="text-transform:capitalize;font-weight:500;">${m.replace('-',' ')}</span>
+      <span style="color:var(--ink3);">${d.count} tx</span>
+      <span style="color:var(--warn);">+${fmtPrice(d.fees)} fees</span>
+      <span style="font-weight:600;">Net ${fmtPrice(d.net)}</span>
+    </div>`).join('')}`
+  :`<div style="color:var(--ink3);font-size:12px;padding:10px 0;">No payment fees this period — all transactions used Cash, GCash, QR Ph, or Internal Installment.</div>`;
 
   // Transaction list
   const sorted=[...txns].sort((a,b)=>new Date(b.time)-new Date(a.time));
   const isAdmin=currentUser&&(currentUser.role==='owner'||currentUser.role==='admin');
   document.getElementById('rptTxnList').innerHTML=sorted.length?`
     <table class="inv-table" style="width:100%;">
-      <thead><tr><th>Date & Time</th><th>Client</th><th>Services</th><th>Method</th><th>Staff</th><th>Discount</th><th>Total</th>${isAdmin?'<th></th>':''}</tr></thead>
+      <thead><tr><th>Date & Time</th><th>Client</th><th>Services</th><th>Method</th><th>Staff</th><th>Discount</th><th>Original</th><th>Fee</th><th>Total</th>${isAdmin?'<th></th>':''}</tr></thead>
       <tbody>${sorted.map(t=>{
         const isRefund=t.type==='refund';
         const isRefunded=t.refunded;
+        const hasFee=t.payFee>0;
+        const methodLabel=(t.method||'cash').replace('-',' ')+(hasFee&&t.feeTerm?' ('+t.feeTerm+'mo)':'');
         return `<tr style="${isRefund?'opacity:0.6;':''}${isRefunded?'background:#fff8f8;':''}">
         <td style="font-size:11px;">${new Date(t.time).toLocaleDateString('en-PH',{month:'short',day:'numeric'})}<br><span style="color:var(--ink3);">${new Date(t.time).toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'})}</span></td>
         <td style="font-size:12px;font-weight:500;">${t.client}${isRefund?'<br><span style="font-size:10px;color:var(--danger);">↩ REFUND</span>':''}</td>
-        <td style="font-size:11px;color:var(--ink3);max-width:180px;">${isRefund?`<em>Refund: ${t.refundReason||''}</em>${t.originalTxId?`<br><span style="font-size:10px;color:var(--ink4);">Orig: ${t.originalTxId}</span>`:''}`:(t.items||[]).map(i=>i.name).join(', ')}${!isRefund&&t.depositApplied>0?`<br><span style="font-size:10px;color:var(--success);">💰 Dep -${fmtPrice(t.depositApplied)}</span>`:''}</td>
-        <td style="font-size:11px;text-transform:capitalize;">${t.method||'cash'}</td>
+        <td style="font-size:11px;color:var(--ink3);max-width:160px;">${isRefund?`<em>Refund: ${t.refundReason||''}</em>${t.originalTxId?`<br><span style="font-size:10px;color:var(--ink4);">Orig: ${t.originalTxId}</span>`:''}`:(t.items||[]).map(i=>i.name).join(', ')}${!isRefund&&t.depositApplied>0?`<br><span style="font-size:10px;color:var(--success);">💰 Dep -${fmtPrice(t.depositApplied)}</span>`:''}</td>
+        <td style="font-size:11px;text-transform:capitalize;">${methodLabel}</td>
         <td style="font-size:11px;">${t.staff||'—'}</td>
         <td style="font-size:12px;color:var(--danger);">${t.disc>0?'-'+fmtPrice(t.disc):'—'}</td>
+        <td style="font-size:12px;">${hasFee?fmtPrice(t.originalAmount||t.total-t.payFee):'—'}</td>
+        <td style="font-size:12px;color:var(--warn);">${hasFee?'+'+fmtPrice(t.payFee):'—'}</td>
         <td style="font-weight:600;font-size:13px;color:${isRefund?'var(--danger)':''};">${isRefund?'-':''} ${fmtPrice(Math.abs(t.total))}</td>
         ${isAdmin?`<td>${!isRefund&&!isRefunded?`<button class="btn btn-outline btn-sm" onclick="openRefund('${t.id}')" style="font-size:11px;color:var(--danger);border-color:var(--danger);">↩ Refund</button>`:isRefunded?'<span style="font-size:10px;color:var(--danger);">Refunded</span>':''}</td>`:''}
       </tr>`;}).join('')}</tbody>
