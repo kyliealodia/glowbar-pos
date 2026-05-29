@@ -893,17 +893,16 @@ async function sendConfirmationEmail(appt, ref){
   try {
     const d = new Date(appt.date+'T00:00');
     const dateStr = d.toLocaleDateString('en-PH',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+    const total = appt.totalPrice||appt.servicePrice||0;
+    const deposit = appt.depositAmt||0;
     await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
-      to_email:    appt.email,
-      to_name:     appt.client || appt.name,
-      booking_ref: ref,
-      service:     appt.service,
-      date:        dateStr,
-      time:        appt.time,
-      staff:       appt.staff || 'To be assigned',
-      total:       '₱' + (appt.totalPrice||appt.servicePrice||0).toLocaleString(),
-      clinic_name: 'GlowBar Beauty Clinic',
-      clinic_email:'hello@glowbarph.com',
+      email:            appt.email,
+      client_name:      appt.client || appt.name,
+      service_name:     appt.service,
+      appointment_date: dateStr,
+      appointment_time: appt.time,
+      deposit_amount:   deposit > 0 ? '₱' + deposit.toLocaleString() : '—',
+      balance_due:      '₱' + Math.max(0, total - deposit).toLocaleString(),
     });
     console.log('Confirmation email sent to', appt.email);
   } catch(e) {
