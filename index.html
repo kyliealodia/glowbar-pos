@@ -471,6 +471,24 @@ html{height:-webkit-fill-available;}
 .bk-time{font-size:12px;font-weight:600;color:var(--gold-dk);min-width:42px;}
 .bk-client{font-size:13px;font-weight:500;}
 .bk-svc{font-size:11px;color:var(--ink3);}
+/* ── CONSENT FORMS ── */
+.cf-section{margin-bottom:22px;}
+.cf-stitle{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--gold-dk);margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--border2);}
+.cf-field{margin-bottom:12px;}
+.cf-field>label,.cf-field label{font-size:12px;font-weight:600;color:var(--ink2);display:block;margin-bottom:5px;}
+.cf-row2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.cf-checks{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:5px;}
+.cf-check{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--ink2);cursor:pointer;}
+.cf-check input{accent-color:var(--gold);width:14px;height:14px;flex-shrink:0;}
+.cf-inline{display:flex;gap:18px;margin-top:5px;flex-wrap:wrap;}
+.cf-confirm-item{display:flex;align-items:flex-start;gap:8px;font-size:12px;color:var(--ink2);line-height:1.5;margin-bottom:8px;cursor:pointer;}
+.cf-confirm-item input{accent-color:var(--gold);width:14px;height:14px;flex-shrink:0;margin-top:2px;}
+.cf-waiver{background:#FFF8F0;border:1.5px solid #f0d9a8;border-radius:12px;padding:16px;}
+.cf-waiver .cf-stitle{color:var(--ink);}
+.cf-waiver-item{display:flex;align-items:flex-start;gap:8px;font-size:12px;color:var(--ink2);line-height:1.5;margin-bottom:10px;cursor:pointer;}
+.cf-waiver-item input{accent-color:var(--gold);width:15px;height:15px;flex-shrink:0;margin-top:2px;}
+.cf-badge-signed{font-size:10px;font-weight:600;color:#2E7D32;background:#E8F5E9;padding:2px 8px;border-radius:10px;}
+.cf-badge-unsigned{font-size:10px;font-weight:600;color:#C84B00;background:#FFF3E0;padding:2px 8px;border-radius:10px;}
 </style>
 </head>
 <body>
@@ -2536,6 +2554,12 @@ html{height:-webkit-fill-available;}
         <div id="cpPhotosEmpty" style="font-size:12px;color:var(--ink4);padding:10px 0;text-align:center;background:var(--cream2);border-radius:10px;">No photos yet — tap + Add Photo to upload before/after images.</div>
       </div>
 
+      <!-- Consent Forms -->
+      <div id="cpConsentsWrap" style="margin-bottom:18px;">
+        <div style="font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">📋 Consent Forms</div>
+        <div id="cpConsentsGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;"></div>
+      </div>
+
       <!-- Referral Records -->
       <div id="cpReferralWrap">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
@@ -3894,6 +3918,16 @@ function recalc(){
 
 function openPayment(){
   if(!cart.length)return;
+  if(selClient){
+    const unsigned=[...getRequiredConsentKeys(cart)].filter(k=>!isConsentSigned(selClient,k));
+    if(unsigned.length){
+      _showConsentPrompt(unsigned,selClient,_openPaymentCore);
+      return;
+    }
+  }
+  _openPaymentCore();
+}
+function _openPaymentCore(){
   const sub=cart.reduce((s,i)=>s+i.price*i.qty,0);
   const dv=parseFloat(document.getElementById('discInp').value)||0;
   const disc=discType==='pct'?sub*(dv/100):Math.min(dv,sub);
@@ -5235,6 +5269,15 @@ function saveAppt(){
   const date=document.getElementById('apDate').value;
   const time=document.getElementById('apTime').value;
   if(!client||!service||!date||!time){showToast('Fill required fields','err');return;}
+  // Check general consent for matched client
+  const apptClient=S.clients.find(c=>c.name.toLowerCase()===client.toLowerCase());
+  if(apptClient&&!isConsentSigned(apptClient,'general')){
+    _showConsentPrompt(['general'],apptClient,()=>{
+      // Re-run saveAppt after consent is signed — fields are still populated
+      saveAppt();
+    });
+    return;
+  }
   // Check clinic is open that day
   if(!isClinicOpen(date)){
     showToast('Clinic is closed on that day — check Clinic Settings','err');return;
@@ -7851,6 +7894,7 @@ function viewClientProfile(id){
   // Photos
   window._cpClientId=id;
   renderClientPhotos(c);
+  renderClientConsents(id);
 
   // Referral records
   const refCredit=c.referralCredit||0;
@@ -9313,6 +9357,387 @@ function updateReferralRow(){
   }
   row.style.display='none';
 }
+
+// ════════════════════════════════════════════════
+// CONSENT FORM SYSTEM
+// ════════════════════════════════════════════════
+
+const CONSENT_KEYS={
+  general:'General Consent',
+  hairWaxing:'Hair Waxing Consent',
+  diodeLaser:'Diode Hair Removal Consent',
+  skinRejuvenation:'Skin Rejuvenation / Whitening Consent',
+  tattooRemoval:'Tattoo Laser Removal Consent',
+  exilis:'Exilis Body Contouring Consent',
+  picoLaser:'Pico Laser Consent',
+  nailServices:'Nail Services Consent',
+};
+
+function getConsentKeyForProduct(p){
+  const cat=(p.cat||'').toLowerCase(), sub=(p.subcat||'').toLowerCase();
+  if(cat.includes('glow nails')) return 'nailServices';
+  if(cat.includes('hair waxing')||cat.includes('glow wax')) return 'hairWaxing';
+  if(cat.includes('glow skin')){
+    if(sub.includes('diode')) return 'diodeLaser';
+    if(sub.includes('pico')) return 'picoLaser';
+    return 'skinRejuvenation';
+  }
+  if(cat.includes('glow ink')||cat.includes('glow clear')) return 'tattooRemoval';
+  if(cat.includes('exilis')) return 'exilis';
+  return null;
+}
+
+function getRequiredConsentKeys(cartItems){
+  const keys=new Set(['general']);
+  cartItems.forEach(ci=>{
+    const p=S.products.find(x=>x.id===ci.id);
+    if(p){const k=getConsentKeyForProduct(p);if(k)keys.add(k);}
+  });
+  return [...keys];
+}
+
+function isConsentSigned(client,key){
+  return !!(client?.consents?.[key]?.signed);
+}
+
+// ── Consent queue ──
+let _cfQueue=[], _cfQueueClient=null, _cfQueueCallback=null;
+
+function _showConsentPrompt(unsigned, client, callback){
+  document.getElementById('consentRequiredList').innerHTML=unsigned.map(k=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--cream2);border-radius:8px;border:1px solid var(--border2);">
+      <span style="font-size:14px;">📋</span>
+      <span style="font-size:12px;font-weight:500;color:var(--ink2);">${CONSENT_KEYS[k]}</span>
+    </div>`).join('');
+  _cfQueue=[...unsigned];
+  _cfQueueClient=client;
+  _cfQueueCallback=callback;
+  openM('consentRequiredModal');
+}
+
+function startConsentQueue(){closeM('consentRequiredModal');processConsentQueue();}
+function skipConsentQueue(){closeM('consentRequiredModal');_cfQueue=[];_cfQueueClient=null;_cfQueueCallback=null;}
+
+function processConsentQueue(){
+  if(!_cfQueue.length){
+    if(_cfQueueCallback){const cb=_cfQueueCallback;_cfQueueCallback=null;cb();}
+    return;
+  }
+  const key=_cfQueue.shift();
+  openConsentForm(_cfQueueClient.id, key, processConsentQueue);
+}
+
+// ── Open/close consent form ──
+let _cfClientId=null, _cfFormKey=null, _cfOnSigned=null;
+
+function openConsentForm(clientId, formKey, onSigned){
+  const client=S.clients.find(c=>c.id===clientId);
+  if(!client)return;
+  _cfClientId=clientId;_cfFormKey=formKey;_cfOnSigned=onSigned||null;
+  document.getElementById('cfModalTitle').textContent=CONSENT_KEYS[formKey];
+  document.getElementById('cfModalSubtitle').textContent='Client: '+client.name;
+  document.getElementById('consentFormBody').innerHTML=_buildConsentForm(client,formKey);
+  openM('consentFormModal');
+  _initSigPad();
+}
+
+function cancelConsentForm(){
+  closeM('consentFormModal');
+  _cfClientId=null;_cfFormKey=null;_cfOnSigned=null;
+}
+
+function saveConsentForm(){
+  const client=S.clients.find(c=>c.id===_cfClientId);
+  if(!client)return;
+  const waivers=document.querySelectorAll('#consentFormBody .cf-waiver-item input[type=checkbox]');
+  if(![...waivers].every(cb=>cb.checked)){showToast('Please check all liability waiver items','err');return;}
+  const canvas=document.getElementById('cfSigCanvas');
+  const typed=(document.getElementById('cfTypedSig')?.value||'').trim();
+  let sig=typed||(canvas&&!_isSigEmpty(canvas)?canvas.toDataURL('image/png'):'');
+  if(!sig){showToast('Please sign or type your name before saving','err');return;}
+  const data=_collectConsentData(_cfFormKey);
+  if(!client.consents)client.consents={};
+  client.consents[_cfFormKey]={signed:true,date:new Date().toISOString().split('T')[0],signedAt:new Date().toISOString(),signature:sig,data};
+  sync('clients');
+  closeM('consentFormModal');
+  showToast('✅ '+CONSENT_KEYS[_cfFormKey]+' signed','ok');
+  renderClientConsents(_cfClientId);
+  const cb=_cfOnSigned;_cfClientId=null;_cfFormKey=null;_cfOnSigned=null;
+  if(cb)cb();
+}
+
+// ── View signed consent ──
+function viewSignedConsent(clientId,formKey){
+  const client=S.clients.find(c=>c.id===clientId);
+  const consent=client?.consents?.[formKey];
+  if(!consent?.signed){showToast('This form has not been signed yet','err');return;}
+  document.getElementById('vcModalTitle').textContent=CONSENT_KEYS[formKey];
+  document.getElementById('vcSignedInfo').textContent='Signed: '+fmtDate(consent.date)+' · '+client.name;
+  document.getElementById('viewConsentBody').innerHTML=_buildSignedView(client,formKey,consent);
+  openM('viewConsentModal');
+}
+
+// ── Render consent status in client profile ──
+function renderClientConsents(clientId){
+  const client=S.clients.find(c=>c.id===clientId);
+  const grid=document.getElementById('cpConsentsGrid');
+  if(!grid||!client)return;
+  grid.innerHTML=Object.entries(CONSENT_KEYS).map(([key,label])=>{
+    const c=client.consents?.[key];
+    const signed=c?.signed;
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:${signed?'#F1F8E9':'var(--cream2)'};border:1px solid ${signed?'#C8E6C9':'var(--border2)'};border-radius:10px;gap:8px;">
+      <div style="min-width:0;">
+        <div style="font-size:11px;font-weight:600;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${label}</div>
+        ${signed?`<div style="font-size:10px;color:#388E3C;margin-top:1px;">✓ ${fmtDate(c.date)}</div>`:`<div style="font-size:10px;color:var(--ink4);margin-top:1px;">Not yet signed</div>`}
+      </div>
+      ${signed
+        ?`<button style="font-size:10px;padding:3px 10px;border:1px solid var(--border2);border-radius:6px;background:#fff;cursor:pointer;white-space:nowrap;" onclick="viewSignedConsent(${clientId},'${key}')">View</button>`
+        :`<button style="font-size:10px;padding:3px 10px;border:1px solid var(--gold);border-radius:6px;background:var(--cream);color:var(--gold-dk);cursor:pointer;white-space:nowrap;" onclick="openConsentForm(${clientId},'${key}')">Sign</button>`
+      }
+    </div>`;
+  }).join('');
+}
+
+// ── Signature pad ──
+let _sigDrawing=false, _sigLX=0, _sigLY=0;
+function _initSigPad(){
+  const canvas=document.getElementById('cfSigCanvas');
+  if(!canvas)return;
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.strokeStyle='#222';ctx.lineWidth=2;ctx.lineCap='round';ctx.lineJoin='round';
+  function pos(e){const r=canvas.getBoundingClientRect(),sx=canvas.width/r.width,sy=canvas.height/r.height;if(e.touches)return{x:(e.touches[0].clientX-r.left)*sx,y:(e.touches[0].clientY-r.top)*sy};return{x:(e.clientX-r.left)*sx,y:(e.clientY-r.top)*sy};}
+  canvas.onmousedown=e=>{_sigDrawing=true;const p=pos(e);_sigLX=p.x;_sigLY=p.y;};
+  canvas.onmousemove=e=>{if(!_sigDrawing)return;const p=pos(e);ctx.beginPath();ctx.moveTo(_sigLX,_sigLY);ctx.lineTo(p.x,p.y);ctx.stroke();_sigLX=p.x;_sigLY=p.y;};
+  canvas.onmouseup=canvas.onmouseleave=()=>{_sigDrawing=false;};
+  canvas.ontouchstart=e=>{e.preventDefault();_sigDrawing=true;const p=pos(e);_sigLX=p.x;_sigLY=p.y;};
+  canvas.ontouchmove=e=>{e.preventDefault();if(!_sigDrawing)return;const p=pos(e);ctx.beginPath();ctx.moveTo(_sigLX,_sigLY);ctx.lineTo(p.x,p.y);ctx.stroke();_sigLX=p.x;_sigLY=p.y;};
+  canvas.ontouchend=()=>{_sigDrawing=false;};
+}
+function clearSigPad(){const c=document.getElementById('cfSigCanvas');if(c)c.getContext('2d').clearRect(0,0,c.width,c.height);}
+function _isSigEmpty(canvas){return !canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data.some(v=>v!==0);}
+
+// ── Shared HTML helpers ──
+function _cfClientBanner(client){
+  return `<div style="background:var(--cream2);border:1px solid var(--border2);border-radius:10px;padding:12px 16px;margin-bottom:20px;display:flex;gap:20px;font-size:12px;color:var(--ink2);">
+    <div><strong>Client:</strong> ${client.name}</div><div><strong>Phone:</strong> ${client.phone||'—'}</div>
+  </div>`;
+}
+function _cfChecks(items,name){
+  return `<div class="cf-checks">${items.map(it=>`<label class="cf-check"><input type="checkbox" name="${name}" value="${it.replace(/\s+/g,'-').toLowerCase()}"> ${it}</label>`).join('')}</div>`;
+}
+function _cfConfirms(items){
+  return items.map(text=>`<label class="cf-confirm-item"><input type="checkbox" required> <span>${text}</span></label>`).join('');
+}
+function _cfAllergyHistory(allergyCtx){
+  return `<div class="cf-section">
+    <div class="cf-stitle">Allergy & Medical History</div>
+    <div class="cf-row2">
+      <div class="cf-field"><label>Known allergies${allergyCtx?` (especially ${allergyCtx})`:''}:</label><input id="cf-allergies" class="form-input" placeholder="List allergies, or write None"></div>
+      <div class="cf-field"><label>Current medications:</label><input id="cf-medications" class="form-input" placeholder="List medications, or write None"></div>
+    </div>
+    <div class="cf-field"><label>Skin conditions (check all that apply):</label>${_cfChecks(['Eczema','Psoriasis','Rosacea','Dermatitis','Sensitive skin','Acne','Other'],'cf-skin')}</div>
+    <div class="cf-field"><label>Medical conditions (check all that apply):</label>${_cfChecks(['Diabetes','Autoimmune disorder','Epilepsy','Heart condition','Cancer history','None'],'cf-medical')}</div>
+    <div class="cf-field"><label>Previous allergic reactions to aesthetic treatments?</label>
+      <div class="cf-inline">
+        <label class="cf-check"><input type="radio" name="cf-prev-rx" value="no" checked> No</label>
+        <label class="cf-check"><input type="radio" name="cf-prev-rx" value="yes" onchange="document.getElementById('cf-prev-rx-desc').style.display='block'"> Yes — describe:</label>
+      </div>
+      <input id="cf-prev-rx-desc" class="form-input" placeholder="Describe previous reaction" style="display:none;margin-top:6px">
+    </div>
+  </div>`;
+}
+function _cfPostEffects(effects){
+  return `<div class="cf-section">
+    <div class="cf-stitle">Post-Treatment Effects</div>
+    <p style="font-size:12px;color:var(--ink2);margin-bottom:10px;">I acknowledge that the following temporary effects may occur after treatment:</p>
+    <ul style="margin:0;padding-left:18px;font-size:12px;color:var(--ink2);line-height:2.1;">${effects.map(e=>`<li>${e}</li>`).join('')}</ul>
+  </div>`;
+}
+function _cfLiabilityWaiver(){
+  const items=[
+    'I understand that aesthetic treatments carry inherent risks and that results are not guaranteed.',
+    'I confirm that I have disclosed all relevant medical history, medications, allergies, and conditions truthfully and completely.',
+    'I understand that Glowbar Aesthetic Clinic and its staff are not liable for any adverse reactions, complications, or unsatisfactory results arising from undisclosed medical conditions, allergies, or failure to follow post-treatment care instructions.',
+    'I acknowledge that I have been given the opportunity to ask questions about the treatment and that all my questions have been answered to my satisfaction.',
+    'I voluntarily consent to the treatment and release Glowbar Aesthetic Clinic, its owners, and staff from any claims, damages, or liability related to the services rendered.',
+    'I confirm that I am at least 18 years old, or if a minor, that a parent or guardian has reviewed and signed this form on my behalf.',
+    'By signing below, I confirm that I have read, understood, and agreed to all the terms stated in this consent form.',
+  ];
+  return `<div class="cf-section cf-waiver">
+    <div class="cf-stitle">⚖️ Liability Waiver & Release</div>
+    ${items.map(text=>`<label class="cf-waiver-item"><input type="checkbox" class="cf-waiver-cb"> <span>${text}</span></label>`).join('')}
+  </div>`;
+}
+function _cfSignaturePad(){
+  const today=new Date().toISOString().split('T')[0];
+  return `<div class="cf-section">
+    <div class="cf-stitle">Signature</div>
+    <p style="font-size:12px;color:var(--ink3);margin-bottom:10px;">Draw your signature in the box below, or type your full name as an alternative.</p>
+    <canvas id="cfSigCanvas" width="680" height="150" style="display:block;width:100%;border:1.5px solid var(--border2);border-radius:8px;cursor:crosshair;background:#fff;touch-action:none;margin-bottom:8px;"></canvas>
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;">
+      <button type="button" onclick="clearSigPad()" style="font-size:11px;padding:5px 14px;border:1px solid var(--border2);border-radius:7px;background:var(--cream2);cursor:pointer;color:var(--ink2);">Clear</button>
+      <span style="font-size:11px;color:var(--ink4);">— or type full name —</span>
+    </div>
+    <div class="cf-row2">
+      <div class="cf-field"><label>Typed name (alternative signature):</label><input id="cfTypedSig" class="form-input" placeholder="Full legal name"></div>
+      <div class="cf-field"><label>Date signed:</label><input id="cfSignDate" type="date" class="form-input" value="${today}"></div>
+    </div>
+  </div>`;
+}
+
+// ── Form builders ──
+function _buildConsentForm(client, formKey){
+  if(formKey==='general') return _buildGeneralForm(client);
+  return _buildServiceForm(client, formKey);
+}
+
+function _buildGeneralForm(client){
+  return `${_cfClientBanner(client)}
+  <div class="cf-section">
+    <div class="cf-stitle">Personal Information</div>
+    <div class="cf-row2">
+      <div class="cf-field"><label>Full name *</label><input id="cf-fullname" class="form-input" value="${(client.name||'').replace(/"/g,'&quot;')}"></div>
+      <div class="cf-field"><label>Date of birth *</label><input id="cf-dob" type="date" class="form-input" value="${client.bday||''}"></div>
+      <div class="cf-field"><label>Contact number *</label><input id="cf-contact" class="form-input" value="${(client.phone||'').replace(/"/g,'&quot;')}"></div>
+      <div class="cf-field"><label>Emergency contact (name & number)</label><input id="cf-emergency" class="form-input" placeholder="e.g. Maria Santos — 09171234567"></div>
+    </div>
+    <div class="cf-field"><label>How did you hear about GlowBar?</label>
+      <div class="cf-inline">
+        <label class="cf-check"><input type="radio" name="cf-heard" value="referral"> Referral</label>
+        <label class="cf-check"><input type="radio" name="cf-heard" value="social-media"> Social Media</label>
+        <label class="cf-check"><input type="radio" name="cf-heard" value="walk-in"> Walk-in</label>
+        <label class="cf-check"><input type="radio" name="cf-heard" value="other"> Other</label>
+      </div>
+    </div>
+  </div>
+  <div class="cf-section">
+    <div class="cf-stitle">Health Screening</div>
+    <div class="cf-field"><label>Currently pregnant or breastfeeding?</label>
+      <div class="cf-inline"><label class="cf-check"><input type="radio" name="cf-pregnant" value="no" checked> No</label><label class="cf-check"><input type="radio" name="cf-pregnant" value="yes"> Yes</label></div>
+    </div>
+    <div class="cf-field"><label>Currently taking any medications?</label>
+      <div class="cf-inline">
+        <label class="cf-check"><input type="radio" name="cf-meds" value="no" checked onchange="document.getElementById('cf-meds-list').style.display='none'"> No</label>
+        <label class="cf-check"><input type="radio" name="cf-meds" value="yes" onchange="document.getElementById('cf-meds-list').style.display='block'"> Yes — list:</label>
+      </div>
+      <input id="cf-meds-list" class="form-input" placeholder="List medications" style="display:none;margin-top:6px">
+    </div>
+    <div class="cf-field"><label>Known allergies to products, chemicals, or materials?</label>
+      <div class="cf-inline">
+        <label class="cf-check"><input type="radio" name="cf-allergy" value="no" checked onchange="document.getElementById('cf-allergy-desc').style.display='none'"> No</label>
+        <label class="cf-check"><input type="radio" name="cf-allergy" value="yes" onchange="document.getElementById('cf-allergy-desc').style.display='block'"> Yes — describe:</label>
+      </div>
+      <input id="cf-allergy-desc" class="form-input" placeholder="Describe allergies" style="display:none;margin-top:6px">
+    </div>
+    <div class="cf-field"><label>Any serious medical conditions?</label>
+      <div class="cf-inline">
+        <label class="cf-check"><input type="radio" name="cf-medcond" value="no" checked onchange="document.getElementById('cf-medcond-desc').style.display='none'"> No</label>
+        <label class="cf-check"><input type="radio" name="cf-medcond" value="yes" onchange="document.getElementById('cf-medcond-desc').style.display='block'"> Yes — describe:</label>
+      </div>
+      <input id="cf-medcond-desc" class="form-input" placeholder="Describe conditions" style="display:none;margin-top:6px">
+    </div>
+    <div class="cf-field"><label>Previous adverse reactions to aesthetic treatments?</label>
+      <div class="cf-inline">
+        <label class="cf-check"><input type="radio" name="cf-adverse" value="no" checked onchange="document.getElementById('cf-adverse-desc').style.display='none'"> No</label>
+        <label class="cf-check"><input type="radio" name="cf-adverse" value="yes" onchange="document.getElementById('cf-adverse-desc').style.display='block'"> Yes — describe:</label>
+      </div>
+      <input id="cf-adverse-desc" class="form-input" placeholder="Describe reactions" style="display:none;margin-top:6px">
+    </div>
+  </div>
+  <div class="cf-section">
+    <div class="cf-stitle">Acknowledgements</div>
+    <div style="display:flex;flex-direction:column;">
+      ${_cfConfirms([
+        'All information I provided is truthful and accurate.',
+        'I will inform GlowBar staff of any changes to my health status on future visits.',
+        'I understand that aesthetic results vary per individual and are not guaranteed.',
+        'I understand that GlowBar follows strict sanitation and safety protocols.',
+      ])}
+      <label class="cf-confirm-item"><input type="checkbox" id="cf-photo-opt"> <span>(Optional) I consent to photos being taken for treatment documentation purposes only.</span></label>
+      <label class="cf-confirm-item"><input type="checkbox" required> <span>I consent to the collection and use of my personal information in accordance with the Philippine Data Privacy Act. My information is kept confidential and will not be shared without my consent.</span></label>
+    </div>
+  </div>
+  ${_cfLiabilityWaiver()}${_cfSignaturePad()}`;
+}
+
+function _buildServiceForm(client, formKey){
+  const cfg={
+    hairWaxing:{ctx:'latex, wax, numbing creams',confirms:['There are no active skin infections, open wounds, sunburn, or rashes on the treatment area.','I am not currently on blood thinners or Accutane.','I am not pregnant (required for Brazilian/Bikini wax).'],effects:['Redness, irritation, and temporary bumps after waxing','Skin sensitivity lasting up to 24 hours','Possible ingrown hairs in the days following treatment'],acks:['Results vary per skin and hair type.']},
+    diodeLaser:{ctx:'topical anesthetics, laser gels',confirms:['There are no active skin infections or open wounds on the treatment area.','I am not pregnant.','I have no history of keloid scarring.','I am not on photosensitizing medications.','I have had no sun exposure or tanning in the last 2 weeks.','There are no tattoos or permanent makeup on the treatment area.'],effects:['Redness and swelling immediately after treatment','Mild burning sensation on the treated area','Temporary darkening or lightening of skin','Skin sensitivity lasting 24–72 hours'],acks:['Multiple sessions are required for full results.','Permanent hair removal is not guaranteed.']},
+    skinRejuvenation:{ctx:'brightening agents, vitamin C, kojic acid',confirms:['There are no active skin infections or open wounds.','I am not pregnant or breastfeeding.','I have no history of hyperpigmentation reactions.','I am not on photosensitizing medications.','I have had no sun exposure in the last 2 weeks.'],effects:['Mild redness and peeling after treatment','Dryness and tightness','Temporary darkening of skin before lightening begins','Increased sensitivity to sunlight'],acks:['Results require multiple sessions and vary per skin type.','I must use sunscreen after treatment to protect results.']},
+    tattooRemoval:{ctx:'topical anesthetics, laser gels',confirms:['There is no active skin infection on the treatment area.','I am not pregnant.','I have no history of keloid scarring.','I am not on blood thinners or Accutane.','I have had no sun exposure or tanning in the last 4 weeks.'],effects:['Blistering, scabbing, and swelling after treatment','Redness and temporary pigment changes','Healing takes 1–2 weeks per session'],acks:['Multiple sessions are required; number varies by tattoo size, color, and age.','Complete removal cannot be guaranteed.','There is a risk of temporary or permanent pigment change.']},
+    exilis:{ctx:'conductive gels',confirms:['I have no metal implants, pacemaker, or electronic implants in the treatment area.','I am not pregnant.','There are no active skin infections or open wounds on the treatment area.','I have no history of skin cancer in the treatment area.','I have no blood clotting disorders.'],effects:['Warmth and redness in the treated area during and after treatment','Mild swelling and temporary tenderness lasting 24–48 hours','Gradual fat reduction and skin tightening visible over 2–3 months'],acks:['This treatment uses radiofrequency and ultrasound energy.','Results develop gradually over several weeks.','Multiple sessions are recommended for optimal results.','Results are not equivalent to surgical fat removal.']},
+    picoLaser:{ctx:'topical anesthetics, laser gels',confirms:['There are no active skin infections or open wounds.','I am not pregnant or breastfeeding.','I have no history of photosensitivity disorders.','I am not on photosensitizing medications or Accutane.','I have had no sun exposure or tanning in the last 2 weeks.','I have no history of keloid scarring.'],effects:['Redness and mild swelling after treatment','Temporary darkening of pigment spots before they fade','Mild skin sensitivity and possible peeling','Must avoid sun exposure for at least 2 weeks post-treatment'],acks:['Multiple sessions may be needed for full results.','There is a risk of temporary hyperpigmentation, especially on darker skin tones.']},
+    nailServices:{ctx:'acrylic, gel, nail products, UV/LED light',confirms:['There are no active fungal infections, open wounds, or nail disorders on my hands or feet.','I do not have diabetes or circulatory conditions affecting the feet (for foot spa services).'],effects:['Mild sensitivity around the cuticles after treatment','Possible skin irritation from gel or nail products','Mild UV/LED lamp exposure during gel services may cause temporary skin sensitivity'],acks:['Foot spa tools are sanitized between clients, but the risk of cross-contamination cannot be 100% eliminated.','Results and durability vary per nail condition and aftercare.']},
+  };
+  const c=cfg[formKey];
+  if(!c)return '<p>Form not found.</p>';
+  return `${_cfClientBanner(client)}
+  ${_cfAllergyHistory(c.ctx)}
+  <div class="cf-section">
+    <div class="cf-stitle">Confirmations</div>
+    <div style="display:flex;flex-direction:column;">${_cfConfirms(c.confirms)}</div>
+  </div>
+  ${_cfPostEffects(c.effects)}
+  <div class="cf-section">
+    <div class="cf-stitle">Additional Acknowledgements</div>
+    <div style="display:flex;flex-direction:column;">${_cfConfirms(c.acks)}</div>
+  </div>
+  ${_cfLiabilityWaiver()}${_cfSignaturePad()}`;
+}
+
+// ── Collect form data on save ──
+function _collectConsentData(formKey){
+  const d={};
+  if(formKey==='general'){
+    d.fullName=document.getElementById('cf-fullname')?.value||'';
+    d.dob=document.getElementById('cf-dob')?.value||'';
+    d.contact=document.getElementById('cf-contact')?.value||'';
+    d.emergency=document.getElementById('cf-emergency')?.value||'';
+    d.heardAbout=document.querySelector('[name="cf-heard"]:checked')?.value||'';
+    d.pregnant=document.querySelector('[name="cf-pregnant"]:checked')?.value||'no';
+    d.medications=document.querySelector('[name="cf-meds"]:checked')?.value==='yes'?document.getElementById('cf-meds-list')?.value:'none';
+    d.allergies=document.querySelector('[name="cf-allergy"]:checked')?.value==='yes'?document.getElementById('cf-allergy-desc')?.value:'none';
+    d.medConditions=document.querySelector('[name="cf-medcond"]:checked')?.value==='yes'?document.getElementById('cf-medcond-desc')?.value:'none';
+    d.adverseReactions=document.querySelector('[name="cf-adverse"]:checked')?.value==='yes'?document.getElementById('cf-adverse-desc')?.value:'none';
+    d.photoConsent=!!(document.getElementById('cf-photo-opt')?.checked);
+  } else {
+    d.allergies=document.getElementById('cf-allergies')?.value||'';
+    d.medications=document.getElementById('cf-medications')?.value||'';
+    d.skinConditions=[...document.querySelectorAll('[name="cf-skin"]:checked')].map(cb=>cb.value);
+    d.medConditions=[...document.querySelectorAll('[name="cf-medical"]:checked')].map(cb=>cb.value);
+    d.prevReaction=document.querySelector('[name="cf-prev-rx"]:checked')?.value||'no';
+    d.prevReactionDesc=document.getElementById('cf-prev-rx-desc')?.value||'';
+  }
+  d.signDate=document.getElementById('cfSignDate')?.value||new Date().toISOString().split('T')[0];
+  return d;
+}
+
+// ── Build read-only view of signed form ──
+function _buildSignedView(client, formKey, consent){
+  const d=consent.data||{};
+  const sig=consent.signature||'';
+  const sigHtml=sig.startsWith('data:image')
+    ?`<img src="${sig}" style="max-width:320px;border:1px solid var(--border2);border-radius:8px;display:block;">`
+    :`<div style="font-family:Georgia,serif;font-size:22px;color:var(--ink);padding:10px 0;border-bottom:2px solid var(--ink);display:inline-block;min-width:200px;">${sig}</div>`;
+  const rows=Object.entries(d).filter(([k])=>k!=='signDate').map(([k,v])=>{
+    const label={fullName:'Full Name',dob:'Date of Birth',contact:'Contact',emergency:'Emergency Contact',heardAbout:'How heard about us',pregnant:'Pregnant/Breastfeeding',medications:'Medications',allergies:'Allergies',medConditions:'Medical Conditions',adverseReactions:'Previous Reactions',photoConsent:'Photo Consent',skinConditions:'Skin Conditions',prevReaction:'Previous Reaction',prevReactionDesc:'Details'}[k]||k.replace(/([A-Z])/g,' $1').replace(/^./,s=>s.toUpperCase());
+    const val=Array.isArray(v)?(v.length?v.join(', '):'None'):(v===true?'Yes':v===false?'No':v||'—');
+    return `<tr><td style="font-size:11px;font-weight:600;color:var(--ink3);padding:5px 12px 5px 0;vertical-align:top;white-space:nowrap;">${label}</td><td style="font-size:12px;color:var(--ink2);padding:5px 0;">${val}</td></tr>`;
+  }).join('');
+  return `<div style="background:var(--cream2);border-radius:10px;padding:12px 16px;margin-bottom:18px;font-size:12px;color:var(--ink2);">
+    <strong>${CONSENT_KEYS[formKey]}</strong><br>
+    Client: ${client.name} &nbsp;·&nbsp; Signed: ${fmtDate(consent.date)}
+  </div>
+  ${rows?`<table style="width:100%;border-collapse:collapse;margin-bottom:20px;">${rows}</table>`:''}
+  <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border2);">
+    <div style="font-size:11px;font-weight:600;color:var(--ink3);margin-bottom:8px;">Signature:</div>
+    ${sigHtml}
+    <div style="font-size:11px;color:var(--ink4);margin-top:8px;">Signed on: ${fmtDate(consent.date)}</div>
+  </div>`;
+}
+
 </script>
 
 <!-- Clear Data Modal -->
@@ -9377,6 +9802,61 @@ function updateReferralRow(){
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeM('logReferralModal')">Cancel</button>
       <button class="btn btn-gold" onclick="saveReferral()">✓ Save Referral</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CONSENT FORM MODAL (signing) ══ -->
+<div class="overlay hidden" id="consentFormModal">
+  <div class="modal modal-lg" style="max-width:760px;max-height:92vh;display:flex;flex-direction:column;">
+    <div class="modal-hdr" style="flex-shrink:0;">
+      <div>
+        <div class="modal-title" id="cfModalTitle">Consent Form</div>
+        <div style="font-size:11px;color:var(--ink4);margin-top:2px;" id="cfModalSubtitle"></div>
+      </div>
+      <div class="modal-x" onclick="cancelConsentForm()">✕</div>
+    </div>
+    <div id="consentFormBody" style="flex:1;overflow-y:auto;padding:20px 24px;"></div>
+    <div style="padding:14px 24px;border-top:1px solid var(--border2);display:flex;justify-content:flex-end;gap:10px;flex-shrink:0;background:#fff;border-radius:0 0 16px 16px;">
+      <button class="btn btn-outline" onclick="cancelConsentForm()">Cancel</button>
+      <button class="btn btn-gold" onclick="saveConsentForm()">✓ Save & Sign</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ VIEW SIGNED CONSENT MODAL ══ -->
+<div class="overlay hidden" id="viewConsentModal">
+  <div class="modal modal-lg" style="max-width:760px;max-height:92vh;display:flex;flex-direction:column;">
+    <div class="modal-hdr" style="flex-shrink:0;">
+      <div class="modal-title" id="vcModalTitle">Signed Consent Form</div>
+      <div class="modal-x" onclick="closeM('viewConsentModal')">✕</div>
+    </div>
+    <div id="viewConsentBody" style="flex:1;overflow-y:auto;padding:20px 24px;"></div>
+    <div style="padding:14px 24px;border-top:1px solid var(--border2);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;background:#fff;border-radius:0 0 16px 16px;">
+      <span style="font-size:12px;color:var(--ink4);" id="vcSignedInfo"></span>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-outline" onclick="closeM('viewConsentModal')">Close</button>
+        <button class="btn btn-gold" onclick="window.print()">🖨 Print</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CONSENT REQUIRED PROMPT ══ -->
+<div class="overlay hidden" id="consentRequiredModal">
+  <div class="modal" style="max-width:460px;">
+    <div class="modal-hdr">
+      <div class="modal-title">📋 Consent Forms Required</div>
+      <div class="modal-x" onclick="skipConsentQueue()">✕</div>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--ink2);margin-bottom:14px;">The following consent forms must be signed before proceeding:</p>
+      <div id="consentRequiredList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;"></div>
+      <p style="font-size:11px;color:var(--ink4);">These forms protect both the client and the clinic. Tap "Sign Now" to complete them in sequence.</p>
+    </div>
+    <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:10px;padding:14px 20px;border-top:1px solid var(--border2);">
+      <button class="btn btn-outline" onclick="skipConsentQueue()">Skip for now</button>
+      <button class="btn btn-gold" onclick="startConsentQueue()">Sign Now →</button>
     </div>
   </div>
 </div>
