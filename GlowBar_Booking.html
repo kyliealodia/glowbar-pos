@@ -440,7 +440,7 @@ function showStep1(){
           <span style="color:var(--ink);">${s.name}</span>
           <div style="display:flex;align-items:center;gap:10px;">
             <span style="font-weight:600;color:var(--gold-dk);">${fmtPrice(s.price)}</span>
-            <button onclick="removeService(${s.id})" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;padding:0 4px;">✕</button>
+            <button onclick="removeService('${s.id}')" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;padding:0 4px;">✕</button>
           </div>
         </div>`).join('')}
       </div>
@@ -457,7 +457,7 @@ function showStep1(){
         <div class="svc-grid">`;
       items.forEach(p=>{
         const sel=booking.services.some(s=>s.id===p.id)?'sel':'';
-        html += `<button class="svc-btn ${sel}" onclick="selectService(${p.id},'${p.name.replace(/'/g,"\\'")}',${p.price},${p.durationMins||60})">
+        html += `<button class="svc-btn ${sel}" onclick="selectService('${p.id}','${p.name.replace(/'/g,"\\'")}',${p.price},${p.durationMins||60})">
           ${sel?'<span style="float:right;color:var(--gold-dk);font-size:14px;">✓</span>':''}
           <span class="svc-name">${p.name}</span>
           <span class="svc-price">${fmtPrice(p.price)}</span>
