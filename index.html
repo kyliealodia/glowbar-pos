@@ -2054,7 +2054,7 @@ html{height:-webkit-fill-available;}
         <div class="form-group"><label class="form-label">Duration (mins)</label><input class="form-input" type="number" id="apDuration" value="60" min="15" step="15"></div>
         <div class="form-group"><label class="form-label">Group Size <span style="color:var(--ink4);font-size:10px;">(clients together)</span></label><input class="form-input" type="number" id="apGroupSize" value="1" min="1" max="10"></div>
       </div>
-      <div class="form-group"><label class="form-label">Deposit Amount <span style="color:var(--ink4);font-size:10px;">(optional — partial payment)</span></label><input class="form-input" type="number" id="apDeposit" value="0" min="0" step="50" placeholder="0"><div id="apDepositBalance" style="font-size:11px;color:var(--ink3);margin-top:4px;display:none;"></div></div>
+      <div class="form-group"><label class="form-label">Deposit Amount <span style="color:var(--ink4);font-size:10px;">(optional — partial payment)</span></label><input class="form-input" type="number" id="apDeposit" value="0" min="0" step="50" placeholder="0" oninput="updateDepBalanceHint()"><div id="apDepositBalance" style="font-size:11px;color:var(--success);margin-top:5px;padding:6px 10px;background:#f0fff4;border-radius:7px;display:none;"></div></div>
       <div class="form-group"><label class="form-label">Notes / Concerns</label><textarea class="form-textarea" id="apNotes" placeholder="Client concerns, contraindications…"></textarea></div>
       <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--cream2);border-radius:9px;border:1px solid var(--border);">
         <input type="checkbox" id="apSendReminder" checked style="width:16px;height:16px;accent-color:var(--gold);">
@@ -4789,7 +4789,7 @@ function showDayAppts(ds){
       <div class="appt-client">${b.client}${b.groupSize>1?' <span style="font-size:10px;color:var(--gold);">👥 ×'+b.groupSize+'</span>':''}</div>
       <div class="appt-svc">${b.service}${alertDot}</div>
       <div class="appt-staff">👤 ${b.staff||'Unassigned'}</div>
-      ${b.depositAmt>0?`<div style="font-size:11px;color:var(--success);">💰 Deposit: ${fmtPrice(b.depositAmt)}</div>`:''}
+      ${(()=>{if(!b.depositAmt)return'';const p=S.products.find(x=>x.name===b.service);const bal=p?.price?Math.max(0,p.price-b.depositAmt):null;return`<div style="font-size:11px;color:var(--success);">💰 Dep: ${fmtPrice(b.depositAmt)}${bal!==null?` · Bal: ${fmtPrice(bal)}`:''}</div>`;})()}
     </div>`;
   }).join(''):'<div style="color:var(--ink3);font-size:12px;text-align:center;padding:12px;">No appointments</div>';
   if(document.getElementById('qbDate'))document.getElementById('qbDate').value=ds;
@@ -4808,6 +4808,7 @@ function openApptDetail(id){
   if(document.getElementById('apGroupSize'))document.getElementById('apGroupSize').value=b.groupSize||1;
   if(document.getElementById('apDeposit'))document.getElementById('apDeposit').value=b.depositAmt||0;
   document.getElementById('apNotes').value=b.notes||'';
+  setTimeout(updateDepBalanceHint,0);
   openM('apptModal');
 }
 function quickBook(){
@@ -5164,6 +5165,7 @@ function autoFillDuration(){
   const prod=S.products.find(p=>p.name===svcName);
   const durEl=document.getElementById('apDuration');
   if(prod&&prod.durationMins&&durEl) durEl.value=prod.durationMins;
+  updateDepBalanceHint();
 }
 
 function getAvailableSlots(dateStr,svcName='',svcDur=60){
@@ -5236,6 +5238,7 @@ function renderBookings(){
         <div class="bk-client">${b.client}</div>
         <div class="bk-svc">${b.service} · ${b.staff||'Unassigned'}</div>
         ${b.notes?`<div style="font-size:10px;color:var(--ink3);">${b.notes}</div>`:''}
+        ${(()=>{if(!b.depositAmt)return'';const p=S.products.find(x=>x.name===b.service);const bal=p?.price?Math.max(0,p.price-b.depositAmt):null;return`<div style="font-size:10px;color:var(--success);margin-top:2px;">💰 Deposit: ${fmtPrice(b.depositAmt)}${bal!==null?` · Balance due: ${fmtPrice(bal)}`:''}</div>`;})()}
       </div>
       <span class="pill pill-${b.status==='confirmed'?'green':b.status==='pending'?'amber':b.status==='completed'?'gray':'red'}">${cap(b.status)}</span>
       <div style="display:flex;gap:5px;margin-left:8px;flex-wrap:wrap;">
@@ -6586,7 +6589,7 @@ function renderRptSales(txns){
         return `<tr style="${isRefund?'opacity:0.6;':''}${isRefunded?'background:#fff8f8;':''}">
         <td style="font-size:11px;">${new Date(t.time).toLocaleDateString('en-PH',{month:'short',day:'numeric'})}<br><span style="color:var(--ink3);">${new Date(t.time).toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'})}</span></td>
         <td style="font-size:12px;font-weight:500;">${t.client}${isRefund?'<br><span style="font-size:10px;color:var(--danger);">↩ REFUND</span>':''}</td>
-        <td style="font-size:11px;color:var(--ink3);max-width:180px;">${isRefund?`<em>Refund: ${t.refundReason||''}</em>`:(t.items||[]).map(i=>i.name).join(', ')}</td>
+        <td style="font-size:11px;color:var(--ink3);max-width:180px;">${isRefund?`<em>Refund: ${t.refundReason||''}</em>${t.originalTxId?`<br><span style="font-size:10px;color:var(--ink4);">Orig: ${t.originalTxId}</span>`:''}`:(t.items||[]).map(i=>i.name).join(', ')}${!isRefund&&t.depositApplied>0?`<br><span style="font-size:10px;color:var(--success);">💰 Dep -${fmtPrice(t.depositApplied)}</span>`:''}</td>
         <td style="font-size:11px;text-transform:capitalize;">${t.method||'cash'}</td>
         <td style="font-size:11px;">${t.staff||'—'}</td>
         <td style="font-size:12px;color:var(--danger);">${t.disc>0?'-'+fmtPrice(t.disc):'—'}</td>
@@ -7833,24 +7836,26 @@ function viewClientProfile(id){
       const d=new Date(t.time);
       const dateStr=d.toLocaleDateString('en-PH',{weekday:'short',month:'short',day:'numeric',year:'numeric'});
       const timeStr=d.toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'});
+      const isRefund=t.type==='refund';
       const services=(t.items||[]).map(i=>`${i.name}${i.qty>1?' ×'+i.qty:''}`).join(', ');
       const methodColor={cash:'var(--success)',gcash:'#007AFF',maya:'#6C4EBF',card:'var(--ink)',package:'var(--gold-dk)'}[t.method]||'var(--ink2)';
-      return `<div style="background:#fff;border:1.5px solid var(--border2);border-radius:12px;padding:14px 16px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+      return `<div style="background:${isRefund?'#fff8f8':'#fff'};border:1.5px solid ${isRefund?'rgba(220,53,69,0.2)':'var(--border2)'};border-radius:12px;padding:14px 16px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
         <div style="flex:1;">
-          <div style="font-size:13px;font-weight:500;margin-bottom:3px;">${services||'—'}</div>
+          ${isRefund?`<div style="font-size:13px;font-weight:500;color:var(--danger);margin-bottom:3px;">↩ Refund${t.refundReason?`: ${t.refundReason}`:''}</div>${t.originalTxId?`<div style="font-size:10px;color:var(--ink4);margin-bottom:3px;">Original: ${t.originalTxId}</div>`:''}`:`<div style="font-size:13px;font-weight:500;margin-bottom:3px;">${services||'—'}</div>`}
           <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px;">
             <span style="font-size:11px;color:var(--ink3);">📅 ${dateStr} · ${timeStr}</span>
             ${t.staff?`<span style="font-size:11px;color:var(--ink3);">👤 ${t.staff}</span>`:''}
-            <span style="font-size:11px;font-weight:500;color:${methodColor};">${(t.method||'cash').toUpperCase()}</span>
+            ${!isRefund?`<span style="font-size:11px;font-weight:500;color:${methodColor};">${(t.method||'cash').toUpperCase()}</span>`:''}
             ${t.disc>0?`<span style="font-size:11px;color:var(--danger);">Disc -${fmtPrice(t.disc)}</span>`:''}
+            ${t.depositApplied>0?`<span style="font-size:11px;color:var(--success);">💰 Dep -${fmtPrice(t.depositApplied)}</span>`:''}
           </div>
-          ${t.refunded?`<span style="font-size:11px;color:var(--danger);">↩ Refunded -${fmtPrice(t.refundAmt||0)}</span>`:''}
-          ${currentUser&&(currentUser.role==='owner'||currentUser.role==='admin')&&!t.refunded&&!t.type?`<button class="btn btn-outline btn-sm" onclick="openRefund('${t.id}')" style="font-size:11px;color:var(--danger);border-color:var(--danger);margin-top:6px;">↩ Refund</button>`:''}
+          ${t.refunded?`<div style="font-size:11px;color:var(--danger);margin-top:4px;">↩ Refunded -${fmtPrice(t.refundAmt||0)}</div>`:''}
+          ${currentUser&&(currentUser.role==='owner'||currentUser.role==='admin')&&!t.refunded&&!isRefund?`<button class="btn btn-outline btn-sm" onclick="openRefund('${t.id}')" style="font-size:11px;color:var(--danger);border-color:var(--danger);margin-top:6px;">↩ Refund</button>`:''}
           ${(t.items||[]).some(i=>i.addons&&i.addons.length)?`<div style="font-size:11px;color:var(--ink4);margin-top:4px;">Add-ons: ${(t.items||[]).flatMap(i=>i.addons||[]).map(a=>a.name).join(', ')}</div>`:''}
           ${t.refPhoto?`<div style="margin-top:6px;"><img src="${t.refPhoto}" style="height:48px;border-radius:6px;border:1px solid var(--border2);cursor:pointer;" onclick="viewSelfie('${t.refPhoto}','Payment proof — ${t.id}')" title="Tap to view payment screenshot"></div>`:''}
         </div>
         <div style="text-align:right;flex-shrink:0;">
-          <div style="font-size:15px;font-weight:700;color:var(--gold-dk);">${fmtPrice(t.total)}</div>
+          <div style="font-size:15px;font-weight:700;color:${isRefund?'var(--danger)':'var(--gold-dk)'};">${isRefund?'-':''}${fmtPrice(Math.abs(t.total))}</div>
           ${t.tip>0?`<div style="font-size:10px;color:var(--ink4);">incl. ₱${t.tip} tip</div>`:''}
         </div>
       </div>`;
@@ -9301,6 +9306,22 @@ function updateDepositDisplay(){
     const depAmt=document.getElementById('depositRowAmt');
     if(depAmt) depAmt.textContent=fmtPrice(dep);
   }
+}
+
+function updateDepBalanceHint(){
+  const dep=parseFloat(document.getElementById('apDeposit')?.value)||0;
+  const svc=document.getElementById('apService')?.value;
+  const balEl=document.getElementById('apDepositBalance');
+  if(!balEl)return;
+  if(dep<=0){balEl.style.display='none';return;}
+  const prod=S.products.find(p=>p.name===svc);
+  if(prod?.price){
+    const bal=Math.max(0,prod.price-dep);
+    balEl.textContent=`💰 Deposit: ${fmtPrice(dep)} · Balance due on arrival: ${fmtPrice(bal)}`;
+  } else {
+    balEl.textContent=`💰 Deposit: ${fmtPrice(dep)} recorded`;
+  }
+  balEl.style.display='block';
 }
 
 // ══ REFERRALS ══
