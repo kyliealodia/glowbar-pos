@@ -4819,13 +4819,28 @@ function showDayAppts(ds){
     const bMeta=getSvcMeta(b.service||'');
     const alertDot=nailAlert&&bMeta.type==='nail'?'<span style="color:#e97316;font-size:11px;margin-left:4px;">⚠</span>':'';
     const instFlag=b.status!=='completed'&&b.status!=='cancelled'?getApptInstFlag(b.client,b.date):null;
+    const bClient=S.clients.find(c=>c.name===b.client);
+    const svcMeta2=getSvcMeta(b.service||'');
+    let consentHtml='';
+    if(bClient){
+      // Check general + service-specific consent
+      const prod2=S.products.find(p=>p.name===b.service);
+      const ck=prod2?getConsentKeyForProduct(prod2):null;
+      const needsKeys=['general',...(ck?[ck]:[])];
+      const unsignedKeys=needsKeys.filter(k=>!isConsentSigned(bClient,k));
+      if(unsignedKeys.length) consentHtml=`<div style="font-size:10px;color:var(--danger);margin-top:2px;">📋 Consent unsigned</div>`;
+      else consentHtml=`<div style="font-size:10px;color:var(--success);margin-top:2px;">✓ Consent on file</div>`;
+    } else if(b.source==='online'){
+      consentHtml=`<div style="font-size:10px;color:var(--warn);margin-top:2px;">📋 New client — consent needed</div>`;
+    }
     return `<div class="appt-card" onclick="openApptDetail(${b.id})" style="${instFlag?'border-color:'+(instFlag.overdue?'var(--danger)':'var(--warn)')+'!important;':''}" >
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
         <span class="appt-time">${b.time}${b.duration?' ('+b.duration+'m)':''}</span><span class="pill pill-${b.status==='confirmed'?'green':b.status==='pending'?'amber':b.status==='completed'?'gray':'red'}">${cap(b.status)}</span>
       </div>
       <div class="appt-client">${b.client}${b.groupSize>1?' <span style="font-size:10px;color:var(--gold);">👥 ×'+b.groupSize+'</span>':''}</div>
       <div class="appt-svc">${b.service}${alertDot}</div>
-      <div class="appt-staff">👤 ${b.staff||'Unassigned'}</div>
+      <div class="appt-staff">👤 ${b.staff||'Unassigned'}${b.source==='online'?' · <span style="font-size:10px;color:var(--gold-dk);">Online</span>':''}</div>
+      ${consentHtml}
       ${instFlag?`<div style="font-size:10px;font-weight:600;color:${instFlag.overdue?'var(--danger)':'var(--warn)'};margin-top:3px;">💳 ${instFlag.overdue?'Overdue':'Due'}: ${fmtPrice(instFlag.total)}</div>`:''}
       ${(()=>{if(!b.depositAmt)return'';const p=S.products.find(x=>x.name===b.service);const bal=p?.price?Math.max(0,p.price-b.depositAmt):null;return`<div style="font-size:11px;color:var(--success);">💰 Dep: ${fmtPrice(b.depositAmt)}${bal!==null?` · Bal: ${fmtPrice(bal)}`:''}</div>`;})()}
     </div>`;
@@ -5123,7 +5138,8 @@ function getSvcMeta(svcName,svcCat){
   if(c.includes('body contouring')||c.includes('exilis')||c.includes('pico')||c.includes('diode')||
      c.includes('laser')||c.includes('glow skin')||c.includes('glow ink')||c.includes('glow clear')||
      n.includes('exilis')||n.includes('diode')||n.includes('laser')||n.includes('carbon')||
-     n.includes('tattoo')||n.includes('wart')||n.includes('pico')||n.includes('melasma')||n.includes('scar'))
+     n.includes('tattoo')||n.includes('wart')||n.includes('pico')||n.includes('melasma')||n.includes('scar')||
+     n.includes('rejuvenation')||n.includes('rejuve'))
     return{type:'laser',buffer:15};
   if(c.includes('facial')||n.includes('facial')||n.includes('hydra'))
     return{type:'facial',buffer:15};
@@ -5135,7 +5151,7 @@ function getSvcMeta(svcName,svcCat){
   return{type:'standard',buffer:10};
 }
 
-function getTypeCap(type,dateStr){
+function getTypeCap(type,dateStr,timeStr){
   const cfg=S.settings||{};
   const maxStaff=cfg.maxStaff||2;
   if(type==='laser'||type==='facial') return 1;
@@ -5143,7 +5159,13 @@ function getTypeCap(type,dateStr){
     const pt=cfg.partTimer||{};
     if(!pt.name) return maxStaff;
     const day=new Date((dateStr||td())+'T12:00').getDay();
-    return (pt.workDays||[]).includes(day)? maxStaff+1 : maxStaff;
+    if(!(pt.workDays||[]).includes(day)) return maxStaff;
+    if(timeStr){
+      const ptStart=pt.startTime||'09:00';
+      const ptEnd=pt.endTime||'17:00';
+      if(timeStr<ptStart||timeStr>=ptEnd) return maxStaff;
+    }
+    return maxStaff+1;
   }
   return maxStaff;
 }
@@ -5151,15 +5173,14 @@ function getTypeCap(type,dateStr){
 function getNailCapAlert(dateStr){
   const cfg=S.settings||{};
   const pt=cfg.partTimer||{};
-  if(!pt.name) return false;
   const day=new Date(dateStr+'T12:00').getDay();
-  if((pt.workDays||[]).includes(day)) return false;
-  const cap=cfg.maxStaff||2;
+  if(pt.name&&(pt.workDays||[]).includes(day)) return null;
   const nailBks=S.bookings.filter(b=>
     b.date===dateStr&&b.status!=='cancelled'&&b.status!=='no-show'&&
     getSvcMeta(b.service||'').type==='nail'
   );
-  return nailBks.length>=cap;
+  if(nailBks.length>=4) return {count:nailBks.length,date:dateStr};
+  return null;
 }
 
 function isSlotAvailable(dateStr,timeStr,svcName='',svcDur=60,excludeId=null,newGroupSize=1){
@@ -5170,7 +5191,7 @@ function isSlotAvailable(dateStr,timeStr,svcName='',svcDur=60,excludeId=null,new
   const meta=getSvcMeta(svcName);
   const newStart=toMins(timeStr);
   const newEnd=newStart+svcDur+meta.buffer;
-  const cap=getTypeCap(meta.type,dateStr);
+  const cap=getTypeCap(meta.type,dateStr,timeStr);
   const active=S.bookings.reduce((sum,b)=>{
     if(b.date!==dateStr) return sum;
     if(b.status==='cancelled'||b.status==='no-show') return sum;
@@ -6539,6 +6560,26 @@ function renderDashAlerts(){
       title:`${noShows.length} no-show${noShows.length!==1?'s':''} from yesterday`,
       body:noShows.map(b=>`${b.client} — ${b.service}`).join(' · '),
       action:'setBkRange(\'all\')||goPage(\'bookings\')', actionLabel:'View'
+    });
+  }
+
+  // 7. Nail booking threshold — upcoming 7 days need on-call tech
+  const nailDayAlerts=[];
+  const next7=[...Array(7)].map((_,i)=>{const d=new Date();d.setDate(d.getDate()+i);return d.toISOString().split('T')[0];});
+  next7.forEach(ds=>{
+    const a=getNailCapAlert(ds);
+    if(a) nailDayAlerts.push({...a,date:ds});
+  });
+  if(nailDayAlerts.length){
+    const pt=(S.settings?.partTimer?.name)||'the on-call nail tech';
+    alerts.push({
+      type:'nail', color:'#e97316', icon:'💅',
+      title:`${nailDayAlerts.length} day${nailDayAlerts.length!==1?'s have':' has'} 4+ nail bookings — consider calling ${pt}`,
+      body:nailDayAlerts.map(a=>{
+        const d=new Date(a.date+'T12:00').toLocaleDateString('en-PH',{weekday:'short',month:'short',day:'numeric'});
+        return `${d}: ${a.count} nail booking${a.count!==1?'s':''}`;
+      }).join(' · ')+' — Contact the on-call nail tech to confirm availability.',
+      action:`calSelectDate('${nailDayAlerts[0].date}');goPage('calendar')`, actionLabel:'View Calendar'
     });
   }
 
