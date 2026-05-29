@@ -620,10 +620,12 @@ function renderSlots(date){
   var isSingleResource=meta.type==='laser'||meta.type==='facial';
   var firstFullIdx=-1;
 
+  var grpSize=booking.groupSize||1;
+
   var html='';
   slots.forEach(function(t,idx){
     var active=countOverlap(t);
-    var isFull=active>=cap;
+    var isFull=active+grpSize>cap;
     var isSel=booking.time===t;
     var spotsLeft=cap-active;
     var cls='slot-btn'+(isFull?' taken':'')+(isSel?' sel':'');
@@ -634,12 +636,12 @@ function renderSlots(date){
     html+='<button class="'+cls+'" onclick="'+onclick+'">'+t+subHtml+'</button>';
   });
 
-  // For machine/facial bed: show "next available" banner if any slot is full
+  // For machine/facial bed: show "next available" banner if any slot is full for this group
   var nextNote='';
   if(isSingleResource&&firstFullIdx>=0){
     var nextAvail=null;
     for(var i=0;i<slots.length;i++){
-      if(countOverlap(slots[i])<cap){nextAvail=slots[i];break;}
+      if(countOverlap(slots[i])+grpSize<=cap){nextAvail=slots[i];break;}
     }
     if(nextAvail) nextNote='<div style="font-size:11px;color:#b45309;background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;margin-bottom:8px;">⚡ Machine/bed in use for some slots — next open slot: <strong>'+nextAvail+'</strong></div>';
   }

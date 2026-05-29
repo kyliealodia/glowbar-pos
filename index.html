@@ -4662,10 +4662,10 @@ function quickBook(){
   if(!isClinicOpen(date)){showToast('Clinic is closed on that day','err');return;}
   const prod=S.products.find(p=>p.name===service);
   const dur=prod?.durationMins||60;
-  if(!isSlotAvailable(date,time,service,dur)){
+  if(!isSlotAvailable(date,time,service,dur,null,1)){
     const meta=getSvcMeta(service);
     const cap=getTypeCap(meta.type,date);
-    const next=getNextAvailableSlot(date,toMins(time),service,dur);
+    const next=getNextAvailableSlot(date,toMins(time),service,dur,1);
     showToast(`Slot fully booked (cap ${cap})${next?' — next: '+next:''}`.trim(),'err');return;
   }
   const newBk={id:Date.now(),client,service,staff:document.getElementById('qbStaff').value||'',date,time,duration:dur,status:'pending',notes:'',reminder:false,groupSize:1};
@@ -4966,7 +4966,7 @@ function getNailCapAlert(dateStr){
   return nailBks.length>=cap;
 }
 
-function isSlotAvailable(dateStr,timeStr,svcName='',svcDur=60,excludeId=null){
+function isSlotAvailable(dateStr,timeStr,svcName='',svcDur=60,excludeId=null,newGroupSize=1){
   const cfg=S.settings||{openTime:'09:00',closeTime:'19:00',maxStaff:2,breakStart:'',breakEnd:''};
   if(!isClinicOpen(dateStr)) return false;
   if(timeStr<cfg.openTime||timeStr>=cfg.closeTime) return false;
@@ -4986,17 +4986,17 @@ function isSlotAvailable(dateStr,timeStr,svcName='',svcDur=60,excludeId=null){
     if(newStart<bEnd&&newEnd>bStart) return sum+(b.groupSize||1);
     return sum;
   },0);
-  return active<cap;
+  return active+newGroupSize<=cap;
 }
 
-function getNextAvailableSlot(dateStr,afterMins,svcName,svcDur){
+function getNextAvailableSlot(dateStr,afterMins,svcName,svcDur,groupSize=1){
   const cfg=S.settings||{closeTime:'19:00'};
   const closeTotal=toMins(cfg.closeTime||'19:00');
   let t=afterMins+30;
   while(t<closeTotal){
     const h=Math.floor(t/60),m=t%60;
     const tStr=String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');
-    if(isSlotAvailable(dateStr,tStr,svcName,svcDur)) return tStr;
+    if(isSlotAvailable(dateStr,tStr,svcName,svcDur,null,groupSize)) return tStr;
     t+=30;
   }
   return null;
@@ -5117,10 +5117,10 @@ function saveAppt(){
   const duration=parseInt(document.getElementById('apDuration').value)||60;
   const groupSize=parseInt(document.getElementById('apGroupSize')?.value)||1;
   // Check slot availability (exclude current booking if editing)
-  if(!isSlotAvailable(date,time,service,duration,editApptId)){
+  if(!isSlotAvailable(date,time,service,duration,editApptId,groupSize)){
     const meta=getSvcMeta(service);
     const cap=getTypeCap(meta.type,date);
-    const next=getNextAvailableSlot(date,toMins(time),service,duration);
+    const next=getNextAvailableSlot(date,toMins(time),service,duration,groupSize);
     showToast(`Slot fully booked (cap ${cap})${next?' — next available: '+next:''}`.trim(),'err');return;
   }
   const appt={client,service,staff:document.getElementById('apStaff').value||'',date,time,duration,groupSize,status:'pending',notes:document.getElementById('apNotes').value.trim(),reminder:document.getElementById('apSendReminder').checked};
