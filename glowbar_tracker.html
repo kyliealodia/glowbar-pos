@@ -512,6 +512,7 @@ body{font-family:system-ui,sans-serif;background:var(--cream);color:var(--text);
   <button class="tab" onclick="showTab('monthly')">Monthly expenses</button>
   <button class="tab" onclick="showTab('staffing')">Staffing</button>
   <button class="tab" onclick="showTab('pos')">POS</button>
+  <button class="tab" onclick="showTab('personal')">Personal</button>
 </div>
 
 <div id="tab-expenses" class="section active">
@@ -673,6 +674,24 @@ body{font-family:system-ui,sans-serif;background:var(--cream);color:var(--text);
   <div class="summary" id="pos-summary" style="margin-bottom:1.2rem"></div>
   <div id="pos-by-staff"></div>
   <div id="pos-by-service"></div>
+</div>
+
+<!-- PERSONAL EXPENSE TAB -->
+<div id="tab-personal" class="section">
+  <div class="summary" id="personal-summary" style="margin-bottom:1.2rem"></div>
+  <div id="personal-cats-container"></div>
+  <div class="add-cat-wrap">
+    <button class="add-cat-btn" onclick="togglePersonalNCF()">＋ Add new category</button>
+    <div class="ncf" id="personal-ncf">
+      <input type="text" id="personal-ncf-name" placeholder="e.g. Food & Dining, Travel…">
+      <div class="form-btns">
+        <button class="btn-p" onclick="addPersonalCat()">Add category</button>
+        <button class="btn-s" onclick="togglePersonalNCF()">Cancel</button>
+      </div>
+    </div>
+  </div>
+  <button class="save-btn" onclick="savePersonal()">Save</button>
+  <p style="margin-top:12px;font-size:11px;color:var(--muted)">Personal expenses are stored locally on this device only — not synced to the clinic or Firebase.</p>
 </div>
 
 <!-- OVERTIME LOG MODAL -->
@@ -2266,7 +2285,140 @@ function renderPOSTab(){
 document.addEventListener('DOMContentLoaded', ()=>{
   populateMonthSel('staff-month-sel');
   populateMonthSel('pos-month-sel');
+  loadPersonal();
 });
+
+// ── PERSONAL EXPENSE TAB ─────────────────────────────────────────
+let personalCats = [];
+
+const PERSONAL_DEFAULT_CATS = [
+  {id:'p_food',   name:'Food & Dining',   items:[]},
+  {id:'p_trans',  name:'Transport',       items:[]},
+  {id:'p_bills',  name:'Bills & Utilities',items:[]},
+  {id:'p_shop',   name:'Shopping',        items:[]},
+  {id:'p_health', name:'Health & Wellness',items:[]},
+  {id:'p_ent',    name:'Entertainment',   items:[]},
+  {id:'p_save',   name:'Savings',         items:[]},
+  {id:'p_other',  name:'Other',           items:[]},
+];
+
+function loadPersonal(){
+  try{
+    const d = JSON.parse(localStorage.getItem('glowbar_personal')||'{}');
+    personalCats = d.cats && d.cats.length ? d.cats : JSON.parse(JSON.stringify(PERSONAL_DEFAULT_CATS));
+  }catch(e){
+    personalCats = JSON.parse(JSON.stringify(PERSONAL_DEFAULT_CATS));
+  }
+  renderPersonal();
+}
+
+function savePersonal(){
+  localStorage.setItem('glowbar_personal', JSON.stringify({cats: personalCats}));
+  const btn = document.querySelector('#tab-personal .save-btn');
+  if(btn){btn.textContent='✦ Saved!'; setTimeout(()=>btn.textContent='Save',1500);}
+}
+
+function renderPersonal(){
+  const container = document.getElementById('personal-cats-container');
+  if(!container) return;
+
+  let grandTotal = 0;
+  personalCats.forEach(cat => cat.items.forEach(it => grandTotal += parseFloat(it.amt)||0));
+
+  // Summary
+  const sumEl = document.getElementById('personal-summary');
+  if(sumEl) sumEl.innerHTML = `
+    <div class="metric"><div class="metric-label">Total spent</div><div class="metric-value gd">₱${Math.round(grandTotal).toLocaleString()}</div></div>
+    <div class="metric"><div class="metric-label">Categories</div><div class="metric-value">${personalCats.length}</div></div>
+    <div class="metric"><div class="metric-label">Entries</div><div class="metric-value">${personalCats.reduce((s,c)=>s+c.items.length,0)}</div></div>
+  `;
+
+  container.innerHTML = personalCats.map((cat, ci) => {
+    const catTotal = cat.items.reduce((s,it)=>s+(parseFloat(it.amt)||0),0);
+    const rows = cat.items.map((it, ii) => `
+      <tr>
+        <td><input class="ni" value="${escHtml(it.name)}" placeholder="Description" oninput="personalCats[${ci}].items[${ii}].name=this.value" style="width:100%"></td>
+        <td><input class="ni" type="date" value="${it.date||''}" oninput="personalCats[${ci}].items[${ii}].date=this.value" style="width:130px"></td>
+        <td><input class="ni" type="number" value="${it.amt||''}" placeholder="0" oninput="personalCats[${ci}].items[${ii}].amt=parseFloat(this.value)||0;refreshPersonalTotals(${ci})" style="width:110px;text-align:right"></td>
+        <td><button class="del-row" onclick="deletePersonalItem(${ci},${ii})">✕</button></td>
+      </tr>`).join('');
+
+    return `
+    <div class="cat-block" id="pcat-${ci}" style="margin-bottom:1.2rem;background:#fff;border:0.5px solid var(--border-l);border-radius:12px;overflow:hidden">
+      <div class="cat-hdr" style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:var(--cream2);border-bottom:0.5px solid var(--border-l)">
+        <div style="display:flex;align-items:center;gap:10px">
+          <input class="ni" value="${escHtml(cat.name)}" style="font-size:13px;font-weight:600;color:var(--gold-d);width:200px;background:transparent" oninput="personalCats[${ci}].name=this.value">
+          <span style="font-size:12px;font-weight:600;color:var(--ink)" id="pcat-total-${ci}">₱${Math.round(catTotal).toLocaleString()}</span>
+        </div>
+        <button class="del-row" onclick="deletePersonalCat(${ci})" title="Delete category">✕</button>
+      </div>
+      <table class="tbl">
+        <thead><tr>
+          <th style="text-align:left">Description</th>
+          <th style="text-align:left">Date</th>
+          <th style="text-align:right">Amount (₱)</th>
+          <th></th>
+        </tr></thead>
+        <tbody id="pcat-rows-${ci}">${rows}</tbody>
+      </table>
+      <div style="padding:8px 16px">
+        <button class="add-row" onclick="addPersonalItem(${ci})">＋ Add item</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function refreshPersonalTotals(ci){
+  const cat = personalCats[ci];
+  if(!cat) return;
+  const total = cat.items.reduce((s,it)=>s+(parseFloat(it.amt)||0),0);
+  const el = document.getElementById('pcat-total-'+ci);
+  if(el) el.textContent = '₱'+Math.round(total).toLocaleString();
+  let grandTotal = 0;
+  personalCats.forEach(c=>c.items.forEach(it=>grandTotal+=parseFloat(it.amt)||0));
+  const sumEl = document.getElementById('personal-summary');
+  if(sumEl){
+    const metrics = sumEl.querySelectorAll('.metric-value');
+    if(metrics[0]) metrics[0].textContent = '₱'+Math.round(grandTotal).toLocaleString();
+  }
+}
+
+function addPersonalItem(ci){
+  personalCats[ci].items.push({id:'pi_'+Date.now(), name:'', amt:0, date:new Date().toISOString().split('T')[0]});
+  renderPersonal();
+  // focus the new row's description input
+  const rows = document.querySelectorAll(`#pcat-rows-${ci} tr`);
+  if(rows.length) rows[rows.length-1].querySelector('input')?.focus();
+}
+
+function deletePersonalItem(ci, ii){
+  personalCats[ci].items.splice(ii,1);
+  renderPersonal();
+}
+
+function deletePersonalCat(ci){
+  if(!confirm('Delete this category and all its items?')) return;
+  personalCats.splice(ci,1);
+  renderPersonal();
+}
+
+function togglePersonalNCF(){
+  const ncf = document.getElementById('personal-ncf');
+  const showing = ncf.style.display==='flex';
+  ncf.style.display = showing ? 'none' : 'flex';
+  if(!showing) document.getElementById('personal-ncf-name').focus();
+}
+
+function addPersonalCat(){
+  const name = document.getElementById('personal-ncf-name').value.trim();
+  if(!name) return;
+  personalCats.push({id:'pc_'+Date.now(), name, items:[]});
+  document.getElementById('personal-ncf-name').value='';
+  togglePersonalNCF();
+  renderPersonal();
+}
+
+function escHtml(s){ return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
 </script>
 </body>
 </html>
