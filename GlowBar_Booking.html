@@ -215,60 +215,131 @@ function show(html){ document.getElementById('mainContent').innerHTML=html; }
 // ── LOAD DATA ──
 const DEMO_DATA = {
   products:[
-    // NAIL SERVICES
-    {id:101,name:'Regular Manicure/Pedicure',cat:'Nail Services',subcat:'Nails',price:249,inPOS:true},
-    {id:102,name:'Gel Polish',cat:'Nail Services',subcat:'Nails',price:399,inPOS:true},
-    {id:103,name:'Signature Manicure',cat:'Nail Services',subcat:'Manicure',price:299,inPOS:true},
-    {id:104,name:'Signature Pedicure',cat:'Nail Services',subcat:'Pedicure',price:349,inPOS:true},
-    {id:105,name:'Hand Spa',cat:'Nail Services',subcat:'Spa',price:349,inPOS:true},
-    {id:106,name:'Foot Spa',cat:'Nail Services',subcat:'Spa',price:499,inPOS:true},
-    {id:107,name:'Jelly Add-on',cat:'Nail Services',subcat:'Add-ons',price:150,inPOS:true},
-    {id:108,name:'Paraffin Wax',cat:'Nail Services',subcat:'Add-ons',price:120,inPOS:true},
-    {id:109,name:'Heel Repair Add-on',cat:'Nail Services',subcat:'Add-ons',price:149,inPOS:true},
-    // WAXING
-    {id:201,name:'Underarm Wax',cat:'Waxing',price:300,inPOS:true},
-    {id:202,name:'Upper Lip Wax',cat:'Waxing',price:200,inPOS:true},
-    {id:203,name:'Half Arms Wax',cat:'Waxing',price:350,inPOS:true},
-    {id:204,name:'Full Arms Wax',cat:'Waxing',price:500,inPOS:true},
-    {id:205,name:'Half Legs Wax',cat:'Waxing',price:500,inPOS:true},
-    {id:206,name:'Full Legs Wax',cat:'Waxing',price:800,inPOS:true},
-    {id:207,name:'Bikini Line Wax',cat:'Waxing',price:500,inPOS:true},
-    {id:208,name:'Brazilian Wax',cat:'Waxing',price:900,inPOS:true},
-    // FACIALS
-    {id:301,name:'Regular Facial',cat:'Facial Treatments',subcat:'Signature',price:699,inPOS:true},
-    {id:302,name:'Whitening Facial',cat:'Facial Treatments',subcat:'Brightening',price:699,inPOS:true},
-    {id:303,name:'Anti-Acne Facial',cat:'Facial Treatments',subcat:'Acne Control',price:999,inPOS:true},
-    {id:304,name:'Moisturising Facial',cat:'Facial Treatments',subcat:'Moisturising',price:899,inPOS:true},
-    {id:305,name:'Anti-Ageing Facial',cat:'Facial Treatments',subcat:'Anti-Ageing',price:1099,inPOS:true},
-    {id:306,name:'HydraFacial',cat:'Facial Treatments',subcat:'HydraFacial',price:999,inPOS:true},
-    // LASER HAIR REMOVAL
-    {id:401,name:'Laser Hair Removal — Upper Lip',cat:'Laser Treatments',subcat:'Laser Hair Removal',price:800,inPOS:true},
-    {id:402,name:'Laser Hair Removal — Underarm',cat:'Laser Treatments',subcat:'Laser Hair Removal',price:1200,inPOS:true},
-    {id:403,name:'Laser Hair Removal — Half Arms',cat:'Laser Treatments',subcat:'Laser Hair Removal',price:2000,inPOS:true},
-    {id:404,name:'Laser Hair Removal — Full Arms',cat:'Laser Treatments',subcat:'Laser Hair Removal',price:3000,inPOS:true},
-    {id:405,name:'Laser Hair Removal — Half Legs',cat:'Laser Treatments',subcat:'Laser Hair Removal',price:3000,inPOS:true},
-    {id:406,name:'Laser Hair Removal — Full Legs',cat:'Laser Treatments',subcat:'Laser Hair Removal',price:4800,inPOS:true},
-    {id:407,name:'Laser Hair Removal — Bikini Line',cat:'Laser Treatments',subcat:'Laser Hair Removal',price:3000,inPOS:true},
-    {id:408,name:'Laser Hair Removal — Brazilian',cat:'Laser Treatments',subcat:'Laser Hair Removal',price:3800,inPOS:true},
-    // CARBON LASER
-    {id:501,name:'Carbon Laser — Face',cat:'Laser Treatments',subcat:'Carbon Laser',price:1000,inPOS:true},
-    {id:502,name:'Carbon Laser — Underarm',cat:'Laser Treatments',subcat:'Carbon Laser',price:800,inPOS:true},
-    {id:503,name:'Carbon Laser — Elbows',cat:'Laser Treatments',subcat:'Carbon Laser',price:800,inPOS:true},
-    {id:504,name:'Carbon Laser — Knees',cat:'Laser Treatments',subcat:'Carbon Laser',price:800,inPOS:true},
-    {id:505,name:'Carbon Laser — Butt',cat:'Laser Treatments',subcat:'Carbon Laser',price:1400,inPOS:true},
-    // EXILIS / BODY CONTOURING
-    {id:601,name:'Exilis — Face',cat:'Body Contouring',subcat:'Exilis',price:1800,inPOS:true},
-    {id:602,name:'Exilis — Double Chin',cat:'Body Contouring',subcat:'Exilis',price:1500,inPOS:true},
-    {id:603,name:'Exilis — Arms',cat:'Body Contouring',subcat:'Exilis',price:2000,inPOS:true},
-    {id:604,name:'Exilis — Back',cat:'Body Contouring',subcat:'Exilis',price:2500,inPOS:true},
-    {id:605,name:'Exilis — Tummy',cat:'Body Contouring',subcat:'Exilis',price:2800,inPOS:true},
-    {id:606,name:'Exilis — Thighs',cat:'Body Contouring',subcat:'Exilis',price:3000,inPOS:true},
+    // ── GLOW NAILS — Manicure & Pedicure ──
+    {id:101,name:'Manicure',cat:'Glow Nails',subcat:'Manicure & Pedicure',price:249,durationMins:45,inPOS:true},
+    {id:102,name:'Pedicure',cat:'Glow Nails',subcat:'Manicure & Pedicure',price:299,durationMins:60,inPOS:true},
+    {id:103,name:'Gel Manicure',cat:'Glow Nails',subcat:'Manicure & Pedicure',price:399,durationMins:60,inPOS:true},
+    {id:104,name:'Gel Pedicure',cat:'Glow Nails',subcat:'Manicure & Pedicure',price:449,durationMins:75,inPOS:true},
+    {id:105,name:'Hand Spa',cat:'Glow Nails',subcat:'Manicure & Pedicure',price:349,durationMins:60,inPOS:true},
+    {id:106,name:'Foot Spa',cat:'Glow Nails',subcat:'Manicure & Pedicure',price:499,durationMins:75,inPOS:true},
+    // ── GLOW NAILS — Extensions ──
+    {id:107,name:'Nail Extensions',cat:'Glow Nails',subcat:'Extensions',price:800,durationMins:90,inPOS:true},
+    // ── GLOW NAILS — Nail Art ──
+    {id:108,name:'Nail Art',cat:'Glow Nails',subcat:'Nail Art',price:50,durationMins:5,inPOS:true},
+    {id:109,name:'Glitter / Foil',cat:'Glow Nails',subcat:'Nail Art',price:100,durationMins:10,inPOS:true},
+    {id:110,name:'Chrome Powder',cat:'Glow Nails',subcat:'Nail Art',price:150,durationMins:10,inPOS:true},
+    {id:111,name:'Nail Stickers',cat:'Glow Nails',subcat:'Nail Art',price:80,durationMins:5,inPOS:true},
+    // ── GLOW NAILS — Packages ──
+    {id:112,name:'Mani + Pedi Package',cat:'Glow Nails',subcat:'Packages',price:499,durationMins:90,inPOS:true},
+    {id:113,name:'Gel Mani + Pedi Package',cat:'Glow Nails',subcat:'Packages',price:699,durationMins:120,inPOS:true},
+    // ── GLOW WAX ──
+    {id:201,name:'Face Wax',cat:'Glow Wax',price:200,durationMins:10,inPOS:true},
+    {id:202,name:'Underarm Wax',cat:'Glow Wax',price:300,durationMins:20,inPOS:true},
+    {id:203,name:'Arms & Legs Wax',cat:'Glow Wax',price:650,durationMins:40,inPOS:true},
+    {id:204,name:'Bikini Wax',cat:'Glow Wax',price:900,durationMins:40,inPOS:true},
+    {id:205,name:'Full Body Wax',cat:'Glow Wax',price:2500,durationMins:90,inPOS:true},
+    // ── HAIR WAXING ──
+    {id:211,name:'Underarm Wax',cat:'Hair Waxing',price:500,durationMins:30,inPOS:true},
+    {id:212,name:'Upper Lip Wax',cat:'Hair Waxing',price:400,durationMins:20,inPOS:true},
+    {id:213,name:'Lower Lip Wax',cat:'Hair Waxing',price:400,durationMins:20,inPOS:true},
+    {id:214,name:'Half Arms Wax',cat:'Hair Waxing',price:600,durationMins:30,inPOS:true},
+    {id:215,name:'Full Arms Wax',cat:'Hair Waxing',price:850,durationMins:40,inPOS:true},
+    {id:216,name:'Half Legs Wax',cat:'Hair Waxing',price:700,durationMins:30,inPOS:true},
+    {id:217,name:'Full Legs Wax',cat:'Hair Waxing',price:1000,durationMins:40,inPOS:true},
+    {id:218,name:'Brazilian Wax',cat:'Hair Waxing',price:800,durationMins:30,inPOS:true},
+    {id:219,name:'Bikini Line Wax',cat:'Hair Waxing',price:600,durationMins:20,inPOS:true},
+    // ── GLOW FACIALS ──
+    {id:301,name:'Regular Facial',cat:'Glow Facials',subcat:'Facials',price:699,durationMins:60,inPOS:true},
+    {id:302,name:'Whitening Facial',cat:'Glow Facials',subcat:'Facials',price:999,durationMins:75,inPOS:true},
+    {id:303,name:'Anti-Acne Facial',cat:'Glow Facials',subcat:'Facials',price:999,durationMins:75,inPOS:true},
+    {id:304,name:'Anti-Aging Facial',cat:'Glow Facials',subcat:'Facials',price:1099,durationMins:75,inPOS:true},
+    {id:305,name:'HydraFacial',cat:'Glow Facials',subcat:'Facials',price:2000,durationMins:90,inPOS:true},
+    // ── GLOW FACIALS — Add-ons ──
+    {id:306,name:'LED Therapy',cat:'Glow Facials',subcat:'Add-ons',price:200,durationMins:15,inPOS:true},
+    {id:307,name:'High Frequency',cat:'Glow Facials',subcat:'Add-ons',price:150,durationMins:10,inPOS:true},
+    {id:308,name:'Collagen Mask',cat:'Glow Facials',subcat:'Add-ons',price:250,durationMins:20,inPOS:true},
+    // ── GLOW SKIN — Skin Rejuvenation ──
+    {id:401,name:'Skin Rejuvenation — Single',cat:'Glow Skin',subcat:'Skin Rejuvenation',price:1000,durationMins:45,inPOS:true},
+    {id:402,name:'Underarms Rejuvenation',cat:'Glow Skin',subcat:'Skin Rejuvenation',price:1200,durationMins:20,inPOS:true},
+    {id:403,name:'Elbows Rejuvenation',cat:'Glow Skin',subcat:'Skin Rejuvenation',price:1000,durationMins:40,inPOS:true},
+    {id:404,name:'Inner Thighs Rejuvenation',cat:'Glow Skin',subcat:'Skin Rejuvenation',price:1300,durationMins:40,inPOS:true},
+    {id:405,name:'Remove & Rejuve Combo Underarms',cat:'Glow Skin',subcat:'Skin Rejuvenation',price:2200,durationMins:60,inPOS:true},
+    // ── GLOW SKIN — Diode Laser ──
+    {id:411,name:'Underarms Diode',cat:'Glow Skin',subcat:'Diode Laser',price:1200,durationMins:20,inPOS:true},
+    {id:412,name:'Upper Lip Diode',cat:'Glow Skin',subcat:'Diode Laser',price:800,durationMins:20,inPOS:true},
+    {id:413,name:'Lower Lip Diode',cat:'Glow Skin',subcat:'Diode Laser',price:800,durationMins:20,inPOS:true},
+    {id:414,name:'Cheeks Diode',cat:'Glow Skin',subcat:'Diode Laser',price:1000,durationMins:30,inPOS:true},
+    {id:415,name:'Arms Full Diode',cat:'Glow Skin',subcat:'Diode Laser',price:2200,durationMins:60,inPOS:true},
+    {id:416,name:'Arms Half Diode',cat:'Glow Skin',subcat:'Diode Laser',price:1500,durationMins:40,inPOS:true},
+    {id:417,name:'Legs Full Diode',cat:'Glow Skin',subcat:'Diode Laser',price:3500,durationMins:60,inPOS:true},
+    {id:418,name:'Legs Half Diode',cat:'Glow Skin',subcat:'Diode Laser',price:2500,durationMins:60,inPOS:true},
+    // ── GLOW SKIN — Pico Laser ──
+    {id:421,name:'Black Doll Carbon Laser',cat:'Glow Skin',subcat:'Pico Laser',price:1500,durationMins:60,inPOS:true},
+    {id:422,name:'Melasma/Freckles Face',cat:'Glow Skin',subcat:'Pico Laser',price:1600,durationMins:30,inPOS:true},
+    {id:423,name:'Melasma/Freckles Shoulders',cat:'Glow Skin',subcat:'Pico Laser',price:1900,durationMins:40,inPOS:true},
+    {id:424,name:'Melasma/Freckles Back',cat:'Glow Skin',subcat:'Pico Laser',price:2500,durationMins:60,inPOS:true},
+    {id:425,name:'Scar Lightening Face',cat:'Glow Skin',subcat:'Pico Laser',price:1500,durationMins:30,inPOS:true},
+    {id:426,name:'Scar Lightening Arms',cat:'Glow Skin',subcat:'Pico Laser',price:1000,durationMins:30,inPOS:true},
+    {id:427,name:'Scar Lightening Legs',cat:'Glow Skin',subcat:'Pico Laser',price:1500,durationMins:40,inPOS:true},
+    {id:428,name:'Scar Lightening Knees',cat:'Glow Skin',subcat:'Pico Laser',price:1300,durationMins:40,inPOS:true},
+    // ── GLOW INK — Tattoo Removal ──
+    {id:501,name:'Tattoo Removal — Small',cat:'Glow Ink',price:500,durationMins:20,inPOS:true},
+    {id:502,name:'Tattoo Removal — Medium',cat:'Glow Ink',price:1000,durationMins:30,inPOS:true},
+    {id:503,name:'Tattoo Removal — Large',cat:'Glow Ink',price:2000,durationMins:45,inPOS:true},
+    {id:504,name:'Tattoo Laser Removal',cat:'Glow Ink',price:1500,durationMins:60,inPOS:true},
+    // ── GLOW CLEAR — Wart Removal ──
+    {id:511,name:'Wart Removal — Small',cat:'Glow Clear',price:300,durationMins:20,inPOS:true},
+    {id:512,name:'Wart Removal — Medium',cat:'Glow Clear',price:500,durationMins:30,inPOS:true},
+    {id:513,name:'Wart Removal — Large',cat:'Glow Clear',price:800,durationMins:45,inPOS:true},
+    // ── EXILIS GLOW ──
+    {id:601,name:'Fat Reduction',cat:'Exilis Glow',price:2800,durationMins:60,inPOS:true},
+    {id:602,name:'Lifting',cat:'Exilis Glow',price:1800,durationMins:45,inPOS:true},
+    {id:603,name:'Full Face with Neck',cat:'Exilis Glow',price:3200,durationMins:60,inPOS:true},
+    {id:604,name:'Full Face',cat:'Exilis Glow',price:2800,durationMins:40,inPOS:true},
+    {id:605,name:'Double Chin with Neck',cat:'Exilis Glow',price:2000,durationMins:40,inPOS:true},
+    {id:606,name:'Face Per Area',cat:'Exilis Glow',price:1500,durationMins:20,inPOS:true},
+    {id:607,name:'Arms Exilis',cat:'Exilis Glow',price:1800,durationMins:40,inPOS:true},
+    {id:608,name:'Abdomen Exilis',cat:'Exilis Glow',price:2500,durationMins:60,inPOS:true},
+    {id:609,name:'Inner Thigh Exilis',cat:'Exilis Glow',price:2400,durationMins:40,inPOS:true},
+    {id:610,name:'Love Handle Exilis',cat:'Exilis Glow',price:2200,durationMins:40,inPOS:true},
+    {id:611,name:'Buttocks Exilis',cat:'Exilis Glow',price:2400,durationMins:40,inPOS:true},
+    {id:612,name:'Lower Leg Exilis',cat:'Exilis Glow',price:1600,durationMins:40,inPOS:true},
   ],
   packages:[
-    {id:1,name:'Facial Package — 5 Sessions',price:4500,sessions:5,active:true},
-    {id:2,name:'Laser Hair Removal Package — 6x',price:4200,sessions:6,active:true},
-    {id:3,name:'Exilis Body Package — 8x',price:14400,sessions:8,active:true},
-    {id:4,name:'Carbon Laser Package — 6x',price:5400,sessions:6,active:true},
+    // ── Diode Hair Removal ──
+    {id:1,name:'Underarms Diode Package',price:6000,sessions:6,active:true},
+    {id:2,name:'Upper Lip Diode Package',price:4000,sessions:6,active:true},
+    {id:3,name:'Lower Lip Diode Package',price:4000,sessions:6,active:true},
+    {id:4,name:'Cheeks Diode Package',price:5000,sessions:6,active:true},
+    {id:5,name:'Arms Full Diode Package',price:11000,sessions:6,active:true},
+    {id:6,name:'Arms Half Diode Package',price:7500,sessions:6,active:true},
+    {id:7,name:'Legs Full Diode Package',price:17500,sessions:6,active:true},
+    {id:8,name:'Legs Half Diode Package',price:12500,sessions:6,active:true},
+    // ── Skin Rejuvenation ──
+    {id:9,name:'Underarms Rejuvenation Package',price:6000,sessions:6,active:true},
+    {id:10,name:'Elbows Rejuvenation Package',price:5000,sessions:6,active:true},
+    {id:11,name:'Inner Thighs Rejuvenation Package',price:6500,sessions:6,active:true},
+    {id:12,name:'Remove & Rejuve Combo Package',price:11000,sessions:6,active:true},
+    // ── Exilis ──
+    {id:13,name:'Full Face with Neck Exilis Package',price:16000,sessions:6,active:true},
+    {id:14,name:'Full Face Exilis Package',price:14000,sessions:6,active:true},
+    {id:15,name:'Double Chin with Neck Exilis Package',price:10000,sessions:6,active:true},
+    {id:16,name:'Face Per Area Exilis Package',price:7500,sessions:6,active:true},
+    {id:17,name:'Arms Exilis Package',price:9000,sessions:6,active:true},
+    {id:18,name:'Abdomen Exilis Package',price:12500,sessions:6,active:true},
+    {id:19,name:'Inner Thigh Exilis Package',price:12000,sessions:6,active:true},
+    {id:20,name:'Love Handle Exilis Package',price:11000,sessions:6,active:true},
+    {id:21,name:'Buttocks Exilis Package',price:12000,sessions:6,active:true},
+    {id:22,name:'Lower Leg Exilis Package',price:8000,sessions:6,active:true},
+    // ── Pico Laser ──
+    {id:23,name:'Black Doll Carbon Laser Package',price:7500,sessions:6,active:true},
+    {id:24,name:'Melasma/Freckles Face Package',price:8000,sessions:6,active:true},
+    {id:25,name:'Melasma/Freckles Shoulders Package',price:9500,sessions:6,active:true},
+    {id:26,name:'Melasma/Freckles Back Package',price:12500,sessions:6,active:true},
+    {id:27,name:'Scar Lightening Face Package',price:7500,sessions:6,active:true},
+    {id:28,name:'Scar Lightening Arms Package',price:5000,sessions:6,active:true},
+    {id:29,name:'Scar Lightening Legs Package',price:7500,sessions:6,active:true},
+    {id:30,name:'Scar Lightening Knees Package',price:6500,sessions:6,active:true},
   ],
   users:[
     {id:1,name:'Staff 1',role:'staff',specialty:'Aesthetician',color:'#C4778A'},
@@ -549,7 +620,8 @@ function getSvcMeta(svcName,svcCat){
   if(c.indexOf('body contouring')>=0||c.indexOf('exilis')>=0||c.indexOf('pico')>=0||c.indexOf('diode')>=0||
      c.indexOf('laser')>=0||c.indexOf('glow skin')>=0||c.indexOf('glow ink')>=0||c.indexOf('glow clear')>=0||
      n.indexOf('exilis')>=0||n.indexOf('diode')>=0||n.indexOf('laser')>=0||n.indexOf('carbon')>=0||
-     n.indexOf('tattoo')>=0||n.indexOf('wart')>=0||n.indexOf('pico')>=0||n.indexOf('melasma')>=0||n.indexOf('scar')>=0)
+     n.indexOf('tattoo')>=0||n.indexOf('wart')>=0||n.indexOf('pico')>=0||n.indexOf('melasma')>=0||n.indexOf('scar')>=0||
+     n.indexOf('rejuvenation')>=0||n.indexOf('rejuve')>=0)
     return{type:'laser',buffer:15};
   if(c.indexOf('facial')>=0||n.indexOf('facial')>=0||n.indexOf('hydra')>=0)
     return{type:'facial',buffer:15};
