@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <style>
   *{box-sizing:border-box;margin:0;padding:0;}
@@ -195,7 +196,10 @@ try{
     appId:"1:399292982876:web:fc21e03399a470ee512899"
   });
   db = firebase.database();
+  firebase.auth().signInAnonymously().catch(()=>{});
 }catch(e){ db = null; }
+
+function uid(prefix=''){return prefix+Date.now().toString(36)+Math.random().toString(36).slice(2,8);}
 
 // ── EMAIL CONFIG (EmailJS) ────────────────────────────────────────
 const EMAILJS_PUBLIC_KEY  = 'Q6-l0KLPhVy0Y-UMa';
@@ -988,7 +992,7 @@ async function submitBooking(){
   // Safety timeout — show success after 8 seconds regardless
   const timeout=setTimeout(()=>{showSuccess(ref);sendConfirmationEmail({...appt,client:booking.name,name:booking.name},ref);},8000);
 
-  const ref='BK'+Date.now().toString().slice(-8);
+  const ref=uid('BK');
   const svcMeta=getSvcMeta(booking.service||'');
   const combo=isComboBooking();
   const appt={

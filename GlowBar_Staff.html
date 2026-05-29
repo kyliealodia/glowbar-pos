@@ -869,6 +869,7 @@ const zSal=salaries[0]||0,rSal=salaries[1]||0;
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script>
 // ══ FIREBASE ══
 let db=null, useCloud=false;
@@ -883,6 +884,7 @@ try{
     appId:"1:399292982876:web:fc21e03399a470ee512899"
   });
   db=firebase.database();
+  firebase.auth().signInAnonymously().catch(()=>{});
   useCloud=true;
 }catch(e){}
 

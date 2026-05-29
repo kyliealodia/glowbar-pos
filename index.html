@@ -26,6 +26,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <style>
 :root{
@@ -3004,6 +3005,9 @@ function initials(n){return (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2)
 function cap(s){return s?s.charAt(0).toUpperCase()+s.slice(1):'';}
 function fmtPrice(n){return '₱'+(n||0).toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function fmtDate(d){return new Date(d+'T00:00').toLocaleDateString('en-PH',{weekday:'short',month:'short',day:'numeric'});}
+function uid(prefix=''){return prefix+Date.now().toString(36)+Math.random().toString(36).slice(2,8);}
+// Initialize EmailJS
+(function(){if(typeof emailjs!=='undefined') emailjs.init('Q6-l0KLPhVy0Y-UMa');})();
 
 // ══ FIREBASE ══
 let db=null,useCloud=false;
@@ -3018,6 +3022,7 @@ try{
     appId:"1:399292982876:web:fc21e03399a470ee512899"
   });
   db=firebase.database(); useCloud=true;
+  firebase.auth().signInAnonymously().catch(()=>{});
 }catch(e){useCloud=false;}
 
 function sync(key){
@@ -4327,13 +4332,15 @@ function confirmPay(){
     const sched=[{month:0,dueDate:td(),amount:depositToday,paid:true,paidDate:new Date().toISOString()}];
     for(let i=1;i<=instMonths;i++){
       const d=new Date(td()+'T12:00');d.setMonth(d.getMonth()+i);
-      sched.push({month:i,dueDate:d.toISOString().split('T')[0],amount:monthly,paid:false});
+      // Last month pays exact remainder to prevent rounding over-charge
+      const amt=i===instMonths?Math.max(0,remaining-monthly*(instMonths-1)):monthly;
+      sched.push({month:i,dueDate:d.toISOString().split('T')[0],amount:amt,paid:false});
     }
     internalInstInfo={totalAmount:originalAmount,depositPaid:depositToday,remaining,months:instMonths,monthly,schedule:sched};
     finalTotal=depositToday;
   }
   const cn=selClient?selClient.name:'Walk-in Client';
-  const txid='TXN'+Date.now().toString().slice(-6);
+  const txid=uid('TXN');
   const now=new Date();
   // Deduct stock for products AND consumables for services
   cart.forEach(ci=>{
@@ -4446,7 +4453,7 @@ function confirmPay(){
   window._lastTxId=txid;
   // Save receipt to Firebase and send email
   {
-    const _rcptId='RCP-'+Date.now().toString(36).toUpperCase();
+    const _rcptId=uid('RCP-').toUpperCase();
     window._lastReceiptId=_rcptId;
     const _rcptPkgItems=cart.filter(i=>i.type==='package');
     const _rcptPkgInfo=(_rcptPkgItems.length&&_rcptClientSnap)?_rcptPkgItems.map(pi=>{
@@ -4490,6 +4497,30 @@ function confirmPay(){
   document.getElementById('tip0')?.classList.add('active');
   renderCart(); renderSvcs(); renderDashboard();
   showToast('Payment confirmed! '+fmtPrice(finalTotal),'ok');
+}
+function clearCart(){
+  cart=[]; selClient=null; tipAmount=0; tipMode='none'; discType='pct';
+  _pendingInstallmentPlan=null;
+  stopRefCam(); _refPhotoData=null;
+  window._linkedDepositAmt=0;
+  const _el=id=>document.getElementById(id);
+  if(_el('selClientTxt')) _el('selClientTxt').textContent='Select client…';
+  if(_el('discInp')) _el('discInp').value='';
+  if(_el('vatToggle')) _el('vatToggle').checked=false;
+  if(_el('tipCustomWrap')) _el('tipCustomWrap').style.display='none';
+  if(_el('tipCustomInp')) _el('tipCustomInp').value='';
+  ['0','50','100','Custom'].forEach(v=>{const b=_el('tip'+v);if(b)b.classList.remove('active');});
+  if(_el('tip0')) _el('tip0').classList.add('active');
+  if(_el('instPlanSummary')) _el('instPlanSummary').style.display='none';
+  if(_el('feeBreakdownWrap')) _el('feeBreakdownWrap').style.display='none';
+  if(_el('internalInstWrap')) _el('internalInstWrap').style.display='none';
+  if(_el('cashWrap')) _el('cashWrap').style.display='none';
+  if(_el('refCaptureWrap')) _el('refCaptureWrap').style.display='none';
+  document.querySelectorAll('.pay-m').forEach(b=>b.classList.remove('sel'));
+  try{resetRefPhotoUI();}catch(e){}
+  try{updateDepositDisplay();}catch(e){}
+  try{updateReferralRow();}catch(e){}
+  renderCart();
 }
 function printR(){const c=document.getElementById('receiptContent').innerHTML;const w=window.open('','_blank','width=380,height=560');w.document.write('<html><head><title>GlowBar Receipt</title><style>body{font-family:sans-serif;padding:18px;font-size:12px;}</style></head><body>'+c+'</body></html>');w.document.close();w.print();}
 
@@ -9820,7 +9851,7 @@ function processRefund(){
   if(amt<=0||amt>tx.total){showToast('Invalid refund amount','err');return;}
   tx.refunded=true;tx.refundAmt=amt;tx.refundReason=reason;
   tx.refundedAt=new Date().toISOString();tx.refundedBy=currentUser.name;
-  S.transactions.push({id:'RFD'+Date.now().toString().slice(-6),type:'refund',originalTxId:tx.id,client:tx.client,clientId:tx.clientId,total:-amt,refundAmt:amt,refundReason:reason,method:tx.method,time:new Date().toISOString(),staff:currentUser.name,items:[]});
+  S.transactions.push({id:uid('RFD'),type:'refund',originalTxId:tx.id,client:tx.client,clientId:tx.clientId,total:-amt,refundAmt:amt,refundReason:reason,method:tx.method,time:new Date().toISOString(),staff:currentUser.name,items:[]});
   if(tx.clientId){const cl=S.clients.find(c=>c.id===tx.clientId);if(cl){cl.totalSpent=Math.max(0,(cl.totalSpent||0)-amt);}}
   sync('transactions');sync('clients');
   closeM('refundModal');renderReports();renderDashboard();
@@ -9945,7 +9976,7 @@ function _createInstallmentRecord(clientId,plan,txId){
   if(!cl.installments)cl.installments=[];
   const pkgObj=S.packages.find(p=>p.id===plan.pkg.id);
   const inst={
-    id:'INST'+Date.now().toString().slice(-8),
+    id:uid('INST'),
     packageId:plan.pkg.id,
     packageName:plan.pkg.name,
     totalSessions:pkgObj?.sessions||0,
