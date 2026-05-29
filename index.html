@@ -489,6 +489,11 @@ html{height:-webkit-fill-available;}
 .cf-waiver-item input{accent-color:var(--gold);width:15px;height:15px;flex-shrink:0;margin-top:2px;}
 .cf-badge-signed{font-size:10px;font-weight:600;color:#2E7D32;background:#E8F5E9;padding:2px 8px;border-radius:10px;}
 .cf-badge-unsigned{font-size:10px;font-weight:600;color:#C84B00;background:#FFF3E0;padding:2px 8px;border-radius:10px;}
+.inst-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;display:inline-block;}
+.inst-badge-paid{background:#e8f5e9;color:#2E7D32;}
+.inst-badge-due{background:#fffbe6;color:#b45309;}
+.inst-badge-overdue{background:#ffebee;color:var(--danger);}
+.inst-badge-upcoming{background:var(--cream2);color:var(--ink3);}
 </style>
 </head>
 <body>
@@ -1656,6 +1661,15 @@ html{height:-webkit-fill-available;}
       </div>
     </div>
 
+    <!-- Installment Plan -->
+    <div id="instSetupWrap" style="display:none;margin-top:14px;padding:12px 14px;background:var(--cream2);border-radius:12px;border:1.5px solid var(--gold);">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
+        <div><div style="font-size:10px;font-weight:700;color:var(--gold-dk);text-transform:uppercase;letter-spacing:1px;">💳 Installment Payment</div><div style="font-size:11px;color:var(--ink3);margin-top:2px;" id="instSetupPkgName"></div></div>
+        <button class="btn btn-gold btn-sm" onclick="openInstallmentSetup()">Setup Plan</button>
+      </div>
+      <div id="instPlanSummary" style="display:none;margin-top:8px;border-top:1px solid var(--border2);padding-top:8px;"></div>
+    </div>
+
     <button class="btn btn-gold btn-lg" onclick="confirmPay()" style="margin-top:14px;">✓ Confirm Payment</button>
   </div>
 </div>
@@ -2558,6 +2572,12 @@ html{height:-webkit-fill-available;}
       <div id="cpConsentsWrap" style="margin-bottom:18px;">
         <div style="font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">📋 Consent Forms</div>
         <div id="cpConsentsGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;"></div>
+      </div>
+
+      <!-- Installment Plans -->
+      <div id="cpInstallmentsWrap" style="display:none;margin-bottom:18px;">
+        <div style="font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">💳 Installment Plans</div>
+        <div id="cpInstallments"></div>
       </div>
 
       <!-- Referral Records -->
@@ -3956,6 +3976,10 @@ function _openPaymentCore(){
   window._linkedDepositAmt=0;
   updateReferralRow();
   updateDepositDisplay();
+  _pendingInstallmentPlan=null;
+  const ipSummary=document.getElementById('instPlanSummary');
+  if(ipSummary)ipSummary.style.display='none';
+  checkInstallmentEligibility();
   openM('payModal');
 }
 function selPay(el){
@@ -4111,7 +4135,9 @@ function confirmPay(){
   const vat=vatOn?afterDisc*0.12:0;
   const total=afterDisc+tip+vat;
   const dep=window._linkedDepositAmt||0;
-  const finalTotal=Math.max(0,total-dep);
+  let finalTotal=Math.max(0,total-dep);
+  // Installment: only charge first payment today
+  if(_pendingInstallmentPlan) finalTotal=_pendingInstallmentPlan.schedule[0].amount;
   const cn=selClient?selClient.name:'Walk-in Client';
   const txid='TXN'+Date.now().toString().slice(-6);
   const now=new Date();
@@ -4158,11 +4184,13 @@ function confirmPay(){
   }
   const cashGiven=method==='cash'?(parseFloat(document.getElementById('cashGiven').value)||0):0;
   const cashChange=method==='cash'?Math.max(0,cashGiven-finalTotal):0;
-  S.transactions.push({id:txid,client:cn,clientId:selClient?.id||null,items:JSON.parse(JSON.stringify(cart)),sub,disc,discType,tip,vat,vatOn,total:finalTotal,depositApplied:dep||null,method,cashGiven:cashGiven||null,cashChange:cashChange||null,refPhoto:_refPhotoData||null,time:now.toISOString(),staff:currentUser.name});
+  const instMeta=_pendingInstallmentPlan?{visit:1,totalVisits:_pendingInstallmentPlan.schedule.length,totalPrice:_pendingInstallmentPlan.totalPrice,packageName:_pendingInstallmentPlan.pkg.name}:null;
+  S.transactions.push({id:txid,client:cn,clientId:selClient?.id||null,items:JSON.parse(JSON.stringify(cart)),sub,disc,discType,tip,vat,vatOn,total:finalTotal,depositApplied:dep||null,method,cashGiven:cashGiven||null,cashChange:cashChange||null,refPhoto:_refPhotoData||null,time:now.toISOString(),staff:currentUser.name,installmentInfo:instMeta||null});
   window.lastTx=S.transactions[S.transactions.length-1];
   window._lastPaidClientId = selClient?.id||null;
   window._lastTxId = txid;
   sync('transactions'); sync('products'); if(selClient)sync('clients');
+  if(_pendingInstallmentPlan&&selClient){_createInstallmentRecord(selClient.id,_pendingInstallmentPlan,txid);_pendingInstallmentPlan=null;}
   // Award loyalty points
   if(selClient) awardLoyaltyPoints(selClient.id, total);
   // Mark linked appointment as completed
@@ -4193,6 +4221,7 @@ function confirmPay(){
     ${dep>0?`<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--success);margin-bottom:3px;"><span>💰 Deposit Applied</span><span>-${fmtPrice(dep)}</span></div>`:''}
     <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:600;border-top:1px solid var(--cream3);padding-top:8px;margin-top:4px;"><span>TOTAL</span><span>${fmtPrice(finalTotal)}</span></div>
     <div style="text-align:center;margin-top:12px;padding:10px;background:rgba(74,140,92,0.08);border-radius:10px;color:var(--success);font-weight:600;font-size:13px;">✓ PAID via ${method.toUpperCase()}</div>
+    ${instMeta?`<div style="margin-top:10px;padding:10px 12px;background:#fffbe6;border-radius:10px;border:1px solid #f0d9a8;"><div style="font-size:11px;font-weight:700;color:var(--gold-dk);margin-bottom:4px;">💳 Installment Plan — Visit 1 of ${instMeta.totalVisits}</div><div style="font-size:11px;color:var(--ink3);">${instMeta.packageName} · Total: ${fmtPrice(instMeta.totalPrice)}</div><div style="font-size:12px;margin-top:3px;">Paid today: <strong>${fmtPrice(finalTotal)}</strong> · Remaining: <strong>${fmtPrice(instMeta.totalPrice-finalTotal)}</strong></div></div>`:''}
     ${method==='cash'&&cashGiven>0?`<div style="margin-top:10px;padding:10px 12px;background:var(--cream2);border-radius:10px;">
       <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--ink2);margin-bottom:4px;"><span>Cash Received</span><span style="font-weight:600;">${fmtPrice(cashGiven)}</span></div>
       <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:700;color:var(--success);"><span>Change</span><span>${fmtPrice(cashChange)}</span></div>
@@ -4782,13 +4811,15 @@ function showDayAppts(ds){
   el.innerHTML=bks.length?bks.map(b=>{
     const bMeta=getSvcMeta(b.service||'');
     const alertDot=nailAlert&&bMeta.type==='nail'?'<span style="color:#e97316;font-size:11px;margin-left:4px;">⚠</span>':'';
-    return `<div class="appt-card" onclick="openApptDetail(${b.id})">
+    const instFlag=b.status!=='completed'&&b.status!=='cancelled'?getApptInstFlag(b.client,b.date):null;
+    return `<div class="appt-card" onclick="openApptDetail(${b.id})" style="${instFlag?'border-color:'+(instFlag.overdue?'var(--danger)':'var(--warn)')+'!important;':''}" >
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
         <span class="appt-time">${b.time}${b.duration?' ('+b.duration+'m)':''}</span><span class="pill pill-${b.status==='confirmed'?'green':b.status==='pending'?'amber':b.status==='completed'?'gray':'red'}">${cap(b.status)}</span>
       </div>
       <div class="appt-client">${b.client}${b.groupSize>1?' <span style="font-size:10px;color:var(--gold);">👥 ×'+b.groupSize+'</span>':''}</div>
       <div class="appt-svc">${b.service}${alertDot}</div>
       <div class="appt-staff">👤 ${b.staff||'Unassigned'}</div>
+      ${instFlag?`<div style="font-size:10px;font-weight:600;color:${instFlag.overdue?'var(--danger)':'var(--warn)'};margin-top:3px;">💳 ${instFlag.overdue?'Overdue':'Due'}: ${fmtPrice(instFlag.total)}</div>`:''}
       ${(()=>{if(!b.depositAmt)return'';const p=S.products.find(x=>x.name===b.service);const bal=p?.price?Math.max(0,p.price-b.depositAmt):null;return`<div style="font-size:11px;color:var(--success);">💰 Dep: ${fmtPrice(b.depositAmt)}${bal!==null?` · Bal: ${fmtPrice(bal)}`:''}</div>`;})()}
     </div>`;
   }).join(''):'<div style="color:var(--ink3);font-size:12px;text-align:center;padding:12px;">No appointments</div>';
@@ -5239,6 +5270,7 @@ function renderBookings(){
         <div class="bk-svc">${b.service} · ${b.staff||'Unassigned'}</div>
         ${b.notes?`<div style="font-size:10px;color:var(--ink3);">${b.notes}</div>`:''}
         ${(()=>{if(!b.depositAmt)return'';const p=S.products.find(x=>x.name===b.service);const bal=p?.price?Math.max(0,p.price-b.depositAmt):null;return`<div style="font-size:10px;color:var(--success);margin-top:2px;">💰 Deposit: ${fmtPrice(b.depositAmt)}${bal!==null?` · Balance due: ${fmtPrice(bal)}`:''}</div>`;})()}
+        ${(()=>{if(b.status==='completed'||b.status==='cancelled')return'';const f=getApptInstFlag(b.client,b.date);return f?`<div style="font-size:10px;font-weight:600;color:${f.overdue?'var(--danger)':'var(--warn)'};margin-top:2px;">💳 Installment ${f.overdue?'overdue':'due'}: ${fmtPrice(f.total)}</div>`:''})()}
       </div>
       <span class="pill pill-${b.status==='confirmed'?'green':b.status==='pending'?'amber':b.status==='completed'?'gray':'red'}">${cap(b.status)}</span>
       <div style="display:flex;gap:5px;margin-left:8px;flex-wrap:wrap;">
@@ -6450,6 +6482,37 @@ function renderDashAlerts(){
     });
   }
 
+  // 5b. Installment payments due today
+  const instDueToday=[];
+  const instOverdue=[];
+  S.clients.forEach(cl=>{
+    if(!cl.installments)return;
+    cl.installments.forEach(inst=>{
+      if(!inst.active)return;
+      inst.schedule.forEach(s=>{
+        if(s.paid)return;
+        if(s.dueDate===today) instDueToday.push({client:cl.name,clientId:cl.id,instId:inst.id,pkg:inst.packageName,amount:s.amount,visitNo:s.visitNo});
+        else if(s.dueDate<today) instOverdue.push({client:cl.name,clientId:cl.id,instId:inst.id,pkg:inst.packageName,amount:s.amount,visitNo:s.visitNo,dueDate:s.dueDate});
+      });
+    });
+  });
+  if(instDueToday.length){
+    alerts.push({
+      type:'instdue', color:'var(--warn)', icon:'💳',
+      title:`${instDueToday.length} installment payment${instDueToday.length!==1?'s':''} due today`,
+      body:instDueToday.map(x=>`${x.client} — ${x.pkg} Visit ${x.visitNo}: ${fmtPrice(x.amount)}`).join('<br>'),
+      action:'goPage(\'clients\')', actionLabel:'View Clients'
+    });
+  }
+  if(instOverdue.length){
+    alerts.push({
+      type:'instod', color:'var(--danger)', icon:'⚠️',
+      title:`${instOverdue.length} overdue installment payment${instOverdue.length!==1?'s':''}`,
+      body:instOverdue.map(x=>`${x.client} — ${x.pkg} Visit ${x.visitNo}: ${fmtPrice(x.amount)} (due ${x.dueDate})`).join('<br>'),
+      action:'goPage(\'clients\')', actionLabel:'View Clients'
+    });
+  }
+
   // 6. No-shows from yesterday
   const yesterday=new Date(); yesterday.setDate(yesterday.getDate()-1);
   const yStr=yesterday.toISOString().split('T')[0];
@@ -6785,12 +6848,12 @@ function populateForms(){
   const svcOpts='<option value="">Select service…</option>'+S.products.filter(p=>p.inPOS).map(p=>`<option>${p.name}</option>`).join('');
   ['apService','qbService','asService'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=svcOpts;});
   const cats=[...new Set(S.products.map(p=>p.cat).filter(Boolean)),'Skincare Products','Supplements','Other'];
-  const dl=document.getElementById('catSuggestions');
-  if(dl) dl.innerHTML=cats.map(c=>`<option>${c}</option>`).join('');
+  const dlCat=document.getElementById('catSuggestions');
+  if(dlCat) dlCat.innerHTML=cats.map(c=>`<option>${c}</option>`).join('');
   const staffOpts='<option value="">Unassigned</option>'+S.users.map(u=>`<option>${u.name}</option>`).join('');
   ['apStaff','qbStaff','asStaff','bkFilterStaff'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=staffOpts;});
-  const dl=document.getElementById('clientsDL');
-  if(dl)dl.innerHTML=S.clients.map(c=>`<option value="${c.name}">`).join('');
+  const dlCl=document.getElementById('clientsDL');
+  if(dlCl)dlCl.innerHTML=S.clients.map(c=>`<option value="${c.name}">`).join('');
 }
 
 // ══ MODAL HELPERS ══
@@ -7900,6 +7963,7 @@ function viewClientProfile(id){
   window._cpClientId=id;
   renderClientPhotos(c);
   renderClientConsents(id);
+  renderClientInstallments(id);
 
   // Referral records
   const refCredit=c.referralCredit||0;
@@ -9293,6 +9357,305 @@ function processRefund(){
   showToast('Refund of '+fmtPrice(amt)+' processed ✓','ok');
 }
 
+// ══ INSTALLMENTS ══
+let _instSetupData=null,_pendingInstallmentPlan=null,_instMgmtClientId=null,_instMgmtInstId=null;
+
+function checkInstallmentEligibility(){
+  const pkgItems=cart.filter(i=>i.type==='package');
+  const wrap=document.getElementById('instSetupWrap');
+  if(!wrap)return;
+  if(pkgItems.length&&selClient){
+    wrap.style.display='block';
+    document.getElementById('instSetupPkgName').textContent=pkgItems.map(i=>i.name+(i.qty>1?' ×'+i.qty:'')).join(', ');
+  } else {
+    wrap.style.display='none';
+    _pendingInstallmentPlan=null;
+  }
+}
+
+function openInstallmentSetup(){
+  const pkgItems=cart.filter(i=>i.type==='package');
+  if(!pkgItems.length||!selClient){showToast('Select a client and add a package first','err');return;}
+  const pkg=pkgItems[0];
+  const totalPrice=pkg.price*pkg.qty;
+  _instSetupData={pkg,totalPrice};
+  document.getElementById('instTotalAmt').textContent=fmtPrice(totalPrice);
+  document.getElementById('instClientName').textContent=selClient.name;
+  document.getElementById('instPkgName').textContent=pkg.name+(pkg.qty>1?' ×'+pkg.qty:'');
+  document.getElementById('instVisitCount').value=3;
+  buildInstSchedule();
+  openM('installmentSetupModal');
+}
+
+function buildInstSchedule(){
+  if(!_instSetupData)return;
+  const visits=Math.min(6,Math.max(2,parseInt(document.getElementById('instVisitCount')?.value)||3));
+  const total=_instSetupData.totalPrice;
+  const today=td();
+  const rows=[];
+  for(let i=0;i<visits;i++){
+    let amt;
+    if(i===0) amt=Math.max(100,Math.round(total*0.25/100)*100);
+    else if(i===visits-1) amt=total-rows.reduce((s,r)=>s+r.amt,0);
+    else {
+      const firstAmt=Math.max(100,Math.round(total*0.25/100)*100);
+      amt=Math.round((total-firstAmt)/(visits-1)/100)*100;
+    }
+    const d=new Date(today+'T12:00');
+    d.setDate(d.getDate()+i*14);
+    rows.push({visitNo:i+1,amt:Math.max(0,amt),dueDate:d.toISOString().split('T')[0]});
+  }
+  document.getElementById('instScheduleBody').innerHTML=rows.map((r,i)=>`
+    <div style="display:grid;grid-template-columns:90px 1fr 1fr;gap:10px;align-items:end;padding:10px 12px;border-radius:10px;margin-bottom:8px;border:1.5px solid ${i===0?'var(--success)':'var(--border2)'};background:${i===0?'#f0fff4':'var(--cream2)'};">
+      <div style="font-size:11px;font-weight:700;color:${i===0?'var(--success)':'var(--ink3)'};">Visit ${r.visitNo}${i===0?' <span style="font-weight:400;font-size:10px;">(today)</span>':''}</div>
+      <div><label style="font-size:10px;color:var(--ink4);display:block;margin-bottom:3px;">Amount (₱)</label><input class="form-input" type="number" id="instAmt${r.visitNo}" value="${r.amt}" min="1" step="50" oninput="recalcInstBalance()" style="font-size:13px;"></div>
+      <div><label style="font-size:10px;color:var(--ink4);display:block;margin-bottom:3px;">Due Date</label><input class="form-input" type="date" id="instDate${r.visitNo}" value="${r.dueDate}" style="font-size:13px;"></div>
+    </div>`).join('');
+  recalcInstBalance();
+}
+
+function recalcInstBalance(){
+  if(!_instSetupData)return;
+  const visits=Math.min(6,Math.max(2,parseInt(document.getElementById('instVisitCount')?.value)||3));
+  const total=_instSetupData.totalPrice;
+  let sum=0;
+  for(let i=1;i<=visits;i++) sum+=parseFloat(document.getElementById('instAmt'+i)?.value)||0;
+  const diff=total-sum;
+  const el=document.getElementById('instBalanceCheck');
+  if(el){
+    if(Math.abs(diff)<1){el.textContent='✓ Amounts add up to total price';el.style.color='var(--success)';}
+    else if(diff>0){el.textContent=`⚠ ₱${diff.toLocaleString()} unaccounted — increase visit amounts`;el.style.color='var(--warn)';}
+    else{el.textContent=`⚠ ₱${Math.abs(diff).toLocaleString()} over total — reduce visit amounts`;el.style.color='var(--danger)';}
+  }
+}
+
+function confirmInstallmentSetup(){
+  if(!_instSetupData)return;
+  const visits=Math.min(6,Math.max(2,parseInt(document.getElementById('instVisitCount')?.value)||3));
+  const total=_instSetupData.totalPrice;
+  const schedule=[];
+  let sumAmt=0;
+  for(let i=1;i<=visits;i++){
+    const amt=parseFloat(document.getElementById('instAmt'+i)?.value)||0;
+    const dueDate=document.getElementById('instDate'+i)?.value||td();
+    if(amt<=0){showToast('Visit '+i+' amount must be > 0','err');return;}
+    if(!dueDate){showToast('Visit '+i+' needs a due date','err');return;}
+    sumAmt+=amt;
+    schedule.push({visitNo:i,amount:amt,dueDate,paid:false});
+  }
+  if(Math.abs(sumAmt-total)>1){showToast('Amounts must total '+fmtPrice(total),'err');return;}
+  _pendingInstallmentPlan={pkg:_instSetupData.pkg,totalPrice:total,schedule};
+  closeM('installmentSetupModal');
+  _renderInstPlanInPayModal();
+  showToast('Plan set — charging today: '+fmtPrice(schedule[0].amount),'ok');
+}
+
+function _renderInstPlanInPayModal(){
+  const plan=_pendingInstallmentPlan;
+  if(!plan)return;
+  const wrap=document.getElementById('instPlanSummary');
+  if(!wrap)return;
+  wrap.style.display='block';
+  wrap.innerHTML=`
+    <div style="font-size:11px;font-weight:700;color:var(--success);margin-bottom:6px;">✓ Installment Plan Active</div>
+    ${plan.schedule.map((s,i)=>`<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px;"><span style="color:var(--ink3);">Visit ${s.visitNo} · ${s.dueDate}</span><span style="font-weight:${i===0?'700':'400'};color:${i===0?'var(--gold-dk)':'var(--ink3)'};">${fmtPrice(s.amount)}</span></div>`).join('')}
+    <div style="border-top:1px solid var(--border2);margin-top:6px;padding-top:6px;font-size:12px;">Charge today: <strong style="color:var(--gold-dk);">${fmtPrice(plan.schedule[0].amount)}</strong></div>
+    <button onclick="cancelInstallmentPlan()" style="font-size:10px;color:var(--ink4);background:none;border:none;cursor:pointer;margin-top:3px;text-decoration:underline;padding:0;">Cancel plan</button>`;
+}
+
+function cancelInstallmentPlan(){
+  _pendingInstallmentPlan=null;
+  const wrap=document.getElementById('instPlanSummary');
+  if(wrap)wrap.style.display='none';
+}
+
+function _createInstallmentRecord(clientId,plan,txId){
+  const cl=S.clients.find(c=>c.id===clientId);
+  if(!cl)return;
+  if(!cl.installments)cl.installments=[];
+  const pkgObj=S.packages.find(p=>p.id===plan.pkg.id);
+  const inst={
+    id:'INST'+Date.now().toString().slice(-8),
+    packageId:plan.pkg.id,
+    packageName:plan.pkg.name,
+    totalSessions:pkgObj?.sessions||0,
+    totalPrice:plan.totalPrice,
+    createdAt:new Date().toISOString(),
+    createdBy:currentUser?.name||'',
+    txId,active:true,
+    schedule:plan.schedule.map((s,i)=>({
+      ...s,
+      paid:i===0,
+      paidAt:i===0?new Date().toISOString():null,
+      collectedBy:i===0?(currentUser?.name||''):null
+    }))
+  };
+  cl.installments.push(inst);
+  sync('clients');
+}
+
+function _getInstSummary(inst){
+  const paid=inst.schedule.filter(s=>s.paid).reduce((a,s)=>a+s.amount,0);
+  const remaining=inst.totalPrice-paid;
+  const nextDue=inst.schedule.find(s=>!s.paid);
+  return{paid,remaining,nextDue};
+}
+
+function getClientActiveInsts(clientId){
+  const cl=S.clients.find(c=>c.id===clientId);
+  return(cl?.installments||[]).filter(i=>i.active);
+}
+
+// ── Installment management modal ──
+function openInstMgmt(clientId,instId){
+  _instMgmtClientId=clientId;
+  _instMgmtInstId=instId;
+  _renderInstMgmt();
+  openM('instMgmtModal');
+}
+
+function _renderInstMgmt(){
+  const cl=S.clients.find(c=>c.id===_instMgmtClientId);
+  const inst=(cl?.installments||[]).find(i=>i.id===_instMgmtInstId);
+  const body=document.getElementById('instMgmtBody');
+  if(!cl||!inst||!body){if(body)body.innerHTML='<p>Not found</p>';return;}
+  const{paid,remaining,nextDue}=_getInstSummary(inst);
+  const today=td();
+  const paidPct=Math.round(paid/inst.totalPrice*100);
+  body.innerHTML=`
+    <div style="background:var(--cream2);border-radius:10px;padding:14px;margin-bottom:16px;">
+      <div style="font-size:14px;font-weight:700;margin-bottom:3px;">${inst.packageName}</div>
+      <div style="font-size:12px;color:var(--ink3);margin-bottom:10px;">Client: ${cl.name} · ${inst.totalSessions} sessions</div>
+      <div style="display:flex;gap:18px;flex-wrap:wrap;">
+        <div><div style="font-size:10px;color:var(--ink4);">Total</div><div style="font-size:16px;font-weight:700;">${fmtPrice(inst.totalPrice)}</div></div>
+        <div><div style="font-size:10px;color:var(--ink4);">Paid</div><div style="font-size:16px;font-weight:700;color:var(--success);">${fmtPrice(paid)}</div></div>
+        <div><div style="font-size:10px;color:var(--ink4);">Remaining</div><div style="font-size:16px;font-weight:700;color:${remaining>0?'var(--danger)':'var(--success)'};">${fmtPrice(remaining)}</div></div>
+      </div>
+      <div style="height:6px;background:var(--cream3);border-radius:3px;margin-top:12px;overflow:hidden;"><div style="width:${paidPct}%;height:100%;background:var(--success);border-radius:3px;"></div></div>
+      <div style="font-size:10px;color:var(--ink4);margin-top:4px;">${paidPct}% paid</div>
+    </div>
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--ink3);margin-bottom:10px;">Payment Schedule</div>
+    ${inst.schedule.map((s,i)=>{
+      const isOD=!s.paid&&s.dueDate<today,isDT=!s.paid&&s.dueDate===today;
+      let bg,border,badge,badgeStyle;
+      if(s.paid){bg='#f0fff4';border='var(--success)';badge='✓ Paid';badgeStyle='background:#e8f5e9;color:#2E7D32';}
+      else if(isOD){bg='#fff0f0';border='var(--danger)';badge='⚠ Overdue';badgeStyle='background:#ffebee;color:var(--danger)';}
+      else if(isDT){bg='#fffbe6';border='var(--warn)';badge='📌 Due Today';badgeStyle='background:#fffde7;color:#b45309';}
+      else{bg='var(--cream2)';border='var(--border2)';badge='Upcoming';badgeStyle='background:var(--cream3);color:var(--ink3)';}
+      return `<div style="padding:12px 14px;border-radius:10px;border:1.5px solid ${border};background:${bg};margin-bottom:8px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <span style="font-size:12px;font-weight:600;">Visit ${s.visitNo}</span>
+          <span class="inst-badge" style="${badgeStyle};font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;">${badge}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;margin-bottom:4px;"><span>${fmtPrice(s.amount)}</span><span style="font-size:11px;font-weight:400;color:var(--ink3);">Due: ${s.dueDate}</span></div>
+        ${s.paid?`<div style="font-size:10px;color:var(--success);">Collected ${s.paidAt?new Date(s.paidAt).toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'numeric'}):''} by ${s.collectedBy||'—'}</div>`:''}
+        ${!s.paid?`<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
+          <button class="btn btn-gold btn-sm" onclick="markInstPaid(${i})">✓ Collect Payment</button>
+          <button class="btn btn-outline btn-sm" onclick="rescheduleInstVisit(${i})">📅 Reschedule</button>
+        </div>`:''}
+      </div>`;
+    }).join('')}
+    ${!inst.active||inst.schedule.every(s=>s.paid)?'<div style="text-align:center;padding:12px;font-size:13px;font-weight:600;color:var(--success);">✓ Plan fully paid</div>':
+    `<div style="margin-top:8px;"><button class="btn btn-outline btn-sm" onclick="deactivateInstPlan()" style="color:var(--danger);border-color:var(--danger);">Archive Plan</button></div>`}`;
+}
+
+function markInstPaid(visitIdx){
+  const cl=S.clients.find(c=>c.id===_instMgmtClientId);
+  const inst=(cl?.installments||[]).find(i=>i.id===_instMgmtInstId);
+  if(!cl||!inst||visitIdx<0||visitIdx>=inst.schedule.length)return;
+  const s=inst.schedule[visitIdx];
+  if(s.paid){showToast('Already collected','err');return;}
+  // Check prior visits are paid
+  if(visitIdx>0&&!inst.schedule[visitIdx-1].paid){showToast('Previous visit payment not yet collected','err');return;}
+  s.paid=true;s.paidAt=new Date().toISOString();s.collectedBy=currentUser?.name||'';
+  if(inst.schedule.every(s2=>s2.paid))inst.active=false;
+  sync('clients');
+  showToast('Visit '+(visitIdx+1)+' payment collected ✓','ok');
+  _renderInstMgmt();
+  renderClientInstallments(_instMgmtClientId);
+  renderDashboard();
+}
+
+function rescheduleInstVisit(visitIdx){
+  const cl=S.clients.find(c=>c.id===_instMgmtClientId);
+  const inst=(cl?.installments||[]).find(i=>i.id===_instMgmtInstId);
+  if(!cl||!inst)return;
+  const s=inst.schedule[visitIdx];
+  const newDate=prompt('New due date (YYYY-MM-DD):',s.dueDate);
+  if(!newDate||!/^\d{4}-\d{2}-\d{2}$/.test(newDate)){if(newDate!==null)showToast('Use format YYYY-MM-DD','err');return;}
+  s.dueDate=newDate;
+  sync('clients');
+  showToast('Due date updated','ok');
+  _renderInstMgmt();
+  renderClientInstallments(_instMgmtClientId);
+}
+
+function deactivateInstPlan(){
+  const cl=S.clients.find(c=>c.id===_instMgmtClientId);
+  const inst=(cl?.installments||[]).find(i=>i.id===_instMgmtInstId);
+  if(!cl||!inst)return;
+  inst.active=false;
+  sync('clients');
+  showToast('Plan archived','ok');
+  closeM('instMgmtModal');
+  renderClientInstallments(_instMgmtClientId);
+  renderDashboard();
+}
+
+// ── Client profile ──
+function renderClientInstallments(clientId){
+  const cl=S.clients.find(c=>c.id===clientId);
+  const wrap=document.getElementById('cpInstallmentsWrap');
+  const el=document.getElementById('cpInstallments');
+  if(!wrap||!el||!cl)return;
+  const insts=(cl.installments||[]);
+  const active=insts.filter(i=>i.active||i.schedule.some(s=>!s.paid));
+  if(!active.length){wrap.style.display='none';return;}
+  wrap.style.display='block';
+  const today=td();
+  el.innerHTML=active.map(inst=>{
+    const{paid,remaining,nextDue}=_getInstSummary(inst);
+    const paidPct=Math.round(paid/inst.totalPrice*100);
+    const hasOD=inst.schedule.some(s=>!s.paid&&s.dueDate<today);
+    const hasDT=inst.schedule.some(s=>!s.paid&&s.dueDate===today);
+    let statusColor='var(--gold-dk)',statusLabel='Active';
+    if(hasOD){statusColor='var(--danger)';statusLabel='Overdue';}
+    else if(hasDT){statusColor='var(--warn)';statusLabel='Due Today';}
+    return `<div style="background:#fff;border:1.5px solid var(--border2);border-radius:12px;padding:14px 16px;margin-bottom:10px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div style="font-size:13px;font-weight:600;">${inst.packageName}</div>
+        <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:${statusColor}22;color:${statusColor};">${statusLabel}</span>
+      </div>
+      <div style="display:flex;gap:14px;margin-bottom:8px;flex-wrap:wrap;">
+        <span style="font-size:11px;color:var(--ink3);">Paid: <strong style="color:var(--success);">${fmtPrice(paid)}</strong></span>
+        <span style="font-size:11px;color:var(--ink3);">Remaining: <strong style="color:${remaining>0?'var(--danger)':'var(--success)'};">${fmtPrice(remaining)}</strong></span>
+        ${nextDue?`<span style="font-size:11px;color:var(--ink3);">Next due: <strong>${fmtPrice(nextDue.amount)} · ${nextDue.dueDate}</strong></span>`:''}
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
+        ${inst.schedule.map((s,i)=>{
+          const sColor=s.paid?'var(--success)':s.dueDate<today?'var(--danger)':s.dueDate===today?'var(--warn)':'var(--border2)';
+          const sBg=s.paid?'#e8f5e9':s.dueDate<today?'#ffebee':s.dueDate===today?'#fffde7':'transparent';
+          return `<div style="font-size:10px;padding:3px 8px;border-radius:6px;border:1px solid ${sColor};background:${sBg};color:${s.paid?'var(--success)':s.dueDate<today?'var(--danger)':'var(--ink3)'};">V${s.visitNo}: ${s.paid?'✓':fmtPrice(s.amount)}</div>`;
+        }).join('')}
+      </div>
+      <div style="height:5px;background:var(--cream3);border-radius:3px;overflow:hidden;margin-bottom:10px;"><div style="width:${paidPct}%;height:100%;background:var(--success);border-radius:3px;"></div></div>
+      <button class="btn btn-outline btn-sm" onclick="openInstMgmt(${clientId},'${inst.id}')">Manage Plan</button>
+    </div>`;
+  }).join('');
+}
+
+// ── Check installment due for appointment ──
+function getApptInstFlag(clientName,apptDate){
+  const cl=S.clients.find(c=>c.name.toLowerCase()===clientName.toLowerCase());
+  if(!cl||!cl.installments)return null;
+  const dueInsts=cl.installments.filter(i=>i.active&&i.schedule.some(s=>!s.paid&&s.dueDate<=apptDate));
+  if(!dueInsts.length)return null;
+  const visits=dueInsts.flatMap(i=>i.schedule.filter(s=>!s.paid&&s.dueDate<=apptDate));
+  const total=visits.reduce((a,s)=>a+s.amount,0);
+  const isOD=dueInsts.some(i=>i.schedule.some(s=>!s.paid&&s.dueDate<apptDate));
+  return{total,count:visits.length,overdue:isOD,clientId:cl.id,insts:dueInsts};
+}
+
 // ══ DEPOSIT DISPLAY ══
 function updateDepositDisplay(){
   const sel=document.getElementById('linkApptSelect');
@@ -9878,6 +10241,46 @@ function _buildSignedView(client, formKey, consent){
     <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:10px;padding:14px 20px;border-top:1px solid var(--border2);">
       <button class="btn btn-outline" onclick="skipConsentQueue()">Skip for now</button>
       <button class="btn btn-gold" onclick="startConsentQueue()">Sign Now →</button>
+    </div>
+  </div>
+</div>
+
+<!-- Installment Setup Modal -->
+<div class="overlay hidden" id="installmentSetupModal">
+  <div class="modal modal-md" style="max-height:90vh;overflow-y:auto;">
+    <div class="modal-hdr"><div class="modal-title">💳 Setup Installment Plan</div><div class="modal-x" onclick="closeM('installmentSetupModal')">✕</div></div>
+    <div class="modal-body">
+      <div style="background:var(--cream2);border-radius:10px;padding:12px 14px;margin-bottom:16px;">
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;"><span style="color:var(--ink3);">Client</span><span id="instClientName" style="font-weight:600;"></span></div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;"><span style="color:var(--ink3);">Package</span><span id="instPkgName" style="font-weight:600;"></span></div>
+        <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:700;margin-top:6px;border-top:1px solid var(--border2);padding-top:6px;"><span>Total Price</span><span id="instTotalAmt" style="color:var(--gold-dk);"></span></div>
+      </div>
+      <div class="form-group" style="margin-bottom:16px;">
+        <label class="form-label">Number of Payment Visits</label>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <input class="form-input" type="number" id="instVisitCount" value="3" min="2" max="6" oninput="buildInstSchedule()" style="width:80px;">
+          <span style="font-size:11px;color:var(--ink4);">Default: 3. First payment collected today.</span>
+        </div>
+      </div>
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--ink3);margin-bottom:10px;">Payment Schedule</div>
+      <div id="instScheduleBody"></div>
+      <div id="instBalanceCheck" style="font-size:12px;margin-top:8px;padding:8px 12px;background:var(--cream2);border-radius:8px;"></div>
+      <div style="font-size:11px;color:var(--ink4);margin-top:10px;">📅 Due dates default to every 2 weeks. Edit any field to customize.</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeM('installmentSetupModal')">Cancel</button>
+      <button class="btn btn-gold" onclick="confirmInstallmentSetup()">✓ Confirm Plan</button>
+    </div>
+  </div>
+</div>
+
+<!-- Installment Management Modal -->
+<div class="overlay hidden" id="instMgmtModal">
+  <div class="modal modal-md" style="max-height:92vh;overflow-y:auto;">
+    <div class="modal-hdr"><div class="modal-title">💳 Installment Plan</div><div class="modal-x" onclick="closeM('instMgmtModal')">✕</div></div>
+    <div id="instMgmtBody" class="modal-body" style="padding-top:0;"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeM('instMgmtModal')">Close</button>
     </div>
   </div>
 </div>
