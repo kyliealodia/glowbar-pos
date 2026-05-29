@@ -520,7 +520,7 @@ body{font-family:system-ui,sans-serif;background:var(--cream);color:var(--text);
   <div class="summary" id="summary-grid"></div>
   <div class="bar-wrap">
     <div class="bar-bg"><div class="bar-fill" id="budget-bar" style="width:0%"></div></div>
-    <div class="bar-lbl"><span>₱0</span><span id="bar-mid"></span><span>₱400,000 cash on hand</span></div>
+    <div class="bar-lbl"><span>₱0</span><span id="bar-mid"></span><span>₱500,000 total funds</span></div>
   </div>
   <div id="cats-container"></div>
   <div class="add-cat-wrap">
@@ -736,6 +736,9 @@ function debounce(key, fn, delay){
 }
 
 const BUDGET=400000;
+const MCJAMES_FUND=100000;
+const KYLIE_FUND=400000;
+const TOTAL_FUNDS=MCJAMES_FUND+KYLIE_FUND;
 let CATS=[
   {id:'permits',name:'Permits & licenses',items:[
     {name:'DTI Registration',p:530},{name:'Barangay Clearance',p:600},{name:"Mayor's Permit",p:4500},
@@ -925,8 +928,8 @@ function saveData(){
 }
 const fmt=n=>'₱'+Math.round(n).toLocaleString();
 function fmtD(n){if(n===0)return '<span style="color:var(--muted)">—</span>';const a=Math.abs(Math.round(n));return n<0?`<span style="color:var(--green)">-₱${a.toLocaleString()} saved</span>`:`<span style="color:var(--red)">+₱${a.toLocaleString()} over</span>`;}
-function getS(c,i){return state[c+'_'+i]||{actual:'',dp:0,notes:''}}
-function setS(c,i,f,v){const k=c+'_'+i;if(!state[k])state[k]={actual:'',dp:0,notes:''};state[k][f]=v;refreshRowBal(c,i);refreshCat(c);refreshSummary();
+function getS(c,i){return state[c+'_'+i]||{actual:'',dp:0,notes:'',paidBy:''}}
+function setS(c,i,f,v){const k=c+'_'+i;if(!state[k])state[k]={actual:'',dp:0,notes:'',paidBy:''};state[k][f]=v;refreshRowBal(c,i);refreshCat(c);refreshSummary();
   if(f==='actual'){clearTimeout(window._capPushTimer);window._capPushTimer=setTimeout(()=>{if(window.pushCapitalToPOS)window.pushCapitalToPOS();},2000);}
 }
 function refreshRowBal(c,i){
@@ -958,29 +961,59 @@ function totals(cat){let pl=0,ef=0,ac=0,dp=0;
   return{pl,ef,ac,dp};}
 function sc(ef,pl){if(!pl)return 'ok';const r=ef/pl;return r>1?'over':r>0.9?'warn-b':'ok'}
 
-const FULL_BUDGET=500000;
 function refreshSummary(){
-  let tp=0,te=0,ta=0,td=0;
-  CATS.forEach(c=>{const t=totals(c);tp+=t.pl;te+=t.ef;ta+=t.ac;td+=t.dp});
-  const diff=te-tp,unp=ta-td,pct=Math.min(100,Math.round(td/BUDGET*100));
-  const contingency=FULL_BUDGET-te;
-  // cash remaining = cash on hand minus total downpayments made
-  const left=BUDGET-td;
+  let mcjamesUsed=0,kylieUsed=0,pendingAmt=0;
+  CATS.forEach(cat=>{
+    cat.items.forEach((item,i)=>{
+      const s=getS(cat.id,i);
+      const paidBy=s.paidBy||'';
+      const eff=effV(s,item.p);
+      if(!eff)return;
+      if(paidBy==='mcjames')mcjamesUsed+=eff;
+      else if(paidBy==='kylie')kylieUsed+=eff;
+      else if(paidBy==='pending')pendingAmt+=eff;
+    });
+  });
+  const paidTotal=mcjamesUsed+kylieUsed;
+  const grandTotal=paidTotal+pendingAmt;
+  const availableCash=TOTAL_FUNDS-paidTotal;
+  const mcjamesRemaining=MCJAMES_FUND-mcjamesUsed;
+  const kylieRemaining=KYLIE_FUND-kylieUsed;
   document.getElementById('summary-grid').innerHTML=`
-    <div class="metric"><div class="metric-label">Cash on hand</div><div class="metric-value gd">${fmt(BUDGET)}</div></div>
-    <div class="metric"><div class="metric-label">Total planned</div><div class="metric-value">${fmt(tp)}</div></div>
-    <div class="metric"><div class="metric-label">Effective total</div><div class="metric-value">${fmt(te)}</div></div>
-    <div class="metric"><div class="metric-label">vs planned</div><div class="metric-value ${diff<0?'g':diff>0?'r':''}">${diff===0?'—':(diff<0?'-':'+')}₱${Math.abs(Math.round(diff)).toLocaleString()}</div></div>
-    <div class="metric"><div class="metric-label">Cash remaining</div><div class="metric-value ${left<0?'r':left<50000?'a':'g'}">${fmt(left)}</div></div>
-    <div class="metric"><div class="metric-label">Downpayments</div><div class="metric-value a">${fmt(td)}</div></div>
-    <div class="metric"><div class="metric-label">Unpaid balances</div><div class="metric-value ${unp>0?'r':'g'}">${fmt(unp)}</div></div>
-    <div class="metric" style="border:0.5px solid var(--gold-l);background:var(--cream2)"><div class="metric-label" style="color:var(--gold-d)">Contingency (₱500K − effective)</div><div class="metric-value ${contingency<0?'r':'g'}">${contingency<0?'-':''}<span style="font-size:12px">₱</span>${Math.abs(Math.round(contingency)).toLocaleString()}</div></div>`;
+    <div class="metric" style="border:0.5px solid #b8d4c8">
+      <div class="metric-label" style="color:var(--gold-d)">Kuya Mcjames Fund</div>
+      <div class="metric-value gd">${fmt(MCJAMES_FUND)}</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:3px">Used: <strong>${fmt(mcjamesUsed)}</strong></div>
+      <div style="font-size:11px;font-weight:600;color:${mcjamesRemaining<0?'var(--red)':mcjamesRemaining<10000?'var(--warn)':'var(--green)'}">Remaining: ${fmt(Math.abs(mcjamesRemaining))}${mcjamesRemaining<0?' over':''}</div>
+    </div>
+    <div class="metric" style="border:0.5px solid #c8b8d4">
+      <div class="metric-label" style="color:var(--gold-d)">Kylie Fund</div>
+      <div class="metric-value gd">${fmt(KYLIE_FUND)}</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:3px">Used: <strong>${fmt(kylieUsed)}</strong></div>
+      <div style="font-size:11px;font-weight:600;color:${kylieRemaining<0?'var(--red)':kylieRemaining<50000?'var(--warn)':'var(--green)'}">Remaining: ${fmt(Math.abs(kylieRemaining))}${kylieRemaining<0?' over':''}</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Pending / Not yet paid</div>
+      <div class="metric-value a">${fmt(pendingAmt)}</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:3px">Not deducted from any fund</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Grand total</div>
+      <div class="metric-value">${fmt(grandTotal)}</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:3px">Paid + pending</div>
+    </div>
+    <div class="metric" style="border:0.5px solid var(--gold-l);background:var(--cream2)">
+      <div class="metric-label" style="color:var(--gold-d)">Available cash</div>
+      <div class="metric-value ${availableCash<0?'r':availableCash<50000?'a':'g'}">${fmt(Math.abs(availableCash))}${availableCash<0?' over':''}</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:2px">₱500K funds − paid only</div>
+    </div>`;
+  const pct=Math.min(100,Math.round(paidTotal/TOTAL_FUNDS*100));
   const bar=document.getElementById('budget-bar');
   bar.style.width=pct+'%';bar.style.background=pct>100?'var(--red)':pct>85?'#E4A834':'linear-gradient(90deg,var(--gold-l),var(--gold))';
-  document.getElementById('bar-mid').textContent=pct+'% of cash used';
+  document.getElementById('bar-mid').textContent=pct+'% of ₱500K used';
   const al=document.getElementById('alert-el');
-  if(td>BUDGET){al.className='alert show';al.textContent=`⚠ Downpayments (${fmt(td)}) exceed your ₱400,000 cash by ${fmt(td-BUDGET)}.`;}
-  else if(left<50000&&left>=0){al.className='alert show';al.textContent=`Less than ${fmt(left)} cash remaining — review before next purchase.`;}
+  if(availableCash<0){al.className='alert show';al.textContent=`⚠ Paid expenses (${fmt(paidTotal)}) exceed combined funds of ₱500,000 by ${fmt(-availableCash)}.`;}
+  else if(availableCash<50000){al.className='alert show';al.textContent=`Less than ${fmt(availableCash)} available — review before next purchase.`;}
   else al.className='alert';
 }
 
@@ -994,7 +1027,7 @@ function refreshCat(id){
   const f=hdr.querySelector('.pfill');f.style.width=pct+'%';f.className='pfill '+s;
   const foot=document.getElementById('foot-'+id);if(!foot)return;
   const unp=t.ac-t.dp;
-  foot.innerHTML=`<td style="text-align:left">Total</td><td>${fmt(t.pl)}</td><td></td><td>${fmt(t.ef)}</td><td>${fmtD(diff)}</td><td>${fmt(t.dp)}</td><td style="color:${unp>0?'var(--red)':'var(--green)'}">${unp!==0?(unp>0?'-':'')+'₱'+Math.abs(Math.round(unp)).toLocaleString():'—'}</td><td></td>`;
+  foot.innerHTML=`<td style="text-align:left">Total</td><td>${fmt(t.pl)}</td><td></td><td></td><td>${fmt(t.ef)}</td><td>${fmtD(diff)}</td><td>${fmt(t.dp)}</td><td style="color:${unp>0?'var(--red)':'var(--green)'}">${unp!==0?(unp>0?'-':'')+'₱'+Math.abs(Math.round(unp)).toLocaleString():'—'}</td><td></td>`;
 }
 
 function toggleCat(id){
@@ -1019,10 +1052,17 @@ function rowHtml(cat,item,i){
       ?'<span style="color:var(--green)">Fully paid</span>'
       :`<span style="color:${unp>0?'var(--red)':'var(--green)'}">${unp>0?'-':''}₱${Math.abs(Math.round(unp)).toLocaleString()}</span>`;
   const nm=item.name.replace(/"/g,'&quot;');
+  const pb=s.paidBy||'';
   return `<tr>
     <td><input class="ni" type="text" value="${nm}" oninput="updN('${cat.id}',${i},this.value)"></td>
     <td><input class="ii" type="number" placeholder="0" value="${item.p||''}" oninput="updP('${cat.id}',${i},this.value)"></td>
     <td><input class="ii" type="number" placeholder="0" value="${s.actual}" oninput="setS('${cat.id}',${i},'actual',this.value)"></td>
+    <td style="text-align:left"><select style="border:0.5px solid var(--border);border-radius:7px;padding:3px 4px;font-size:11px;background:#fff;color:var(--text);font-family:inherit;max-width:110px" onchange="setS('${cat.id}',${i},'paidBy',this.value)">
+      <option value=""${pb===''?' selected':''}>— who paid? —</option>
+      <option value="mcjames"${pb==='mcjames'?' selected':''}>Kuya Mcjames</option>
+      <option value="kylie"${pb==='kylie'?' selected':''}>Kylie</option>
+      <option value="pending"${pb==='pending'?' selected':''}>Not yet paid</option>
+    </select></td>
     <td id="eff-${cat.id}-${i}">${isA?fmt(actualVal):'<span style="color:var(--muted)">—</span>'}</td>
     <td id="vsp-${cat.id}-${i}">${isA?(d===0?'<span style="color:var(--muted)">On budget</span>':fmtD(d)):(isNotBought&&planned>0?fmtD(-planned):'<span style="color:var(--muted)">—</span>')}</td>
     <td><input class="ii" type="number" placeholder="0" value="${s.dp||''}" oninput="setS('${cat.id}',${i},'dp',+this.value)"></td>
@@ -1092,7 +1132,7 @@ function buildCats(){
       </div>
       <div class="cat-body${isOpen?' open':''}" id="body-${cat.id}">
         <table class="tbl">
-          <thead><tr><th style="text-align:left">Item</th><th>Planned</th><th>Actual paid</th><th>Effective</th><th>vs planned</th><th>Downpayment</th><th>Balance</th><th>Notes</th><th></th></tr></thead>
+          <thead><tr><th style="text-align:left">Item</th><th>Planned</th><th>Actual paid</th><th style="text-align:left">Paid by</th><th>Effective</th><th>vs planned</th><th>Downpayment</th><th>Balance</th><th>Notes</th><th></th></tr></thead>
           <tbody>${cat.items.map((item,i)=>rowHtml(cat,item,i)).join('')}</tbody>
           <tfoot><tr id="foot-${cat.id}"></tr></tfoot>
         </table>
