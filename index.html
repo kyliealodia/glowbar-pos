@@ -1224,7 +1224,7 @@ html{height:-webkit-fill-available;}
             <div class="manual-sec-title">2. 🛍️ Point of Sale</div>
             <p>The POS is where you process all client payments.</p>
             <div class="manual-step"><span class="manual-num">1</span><div><strong>Select a client</strong> — tap "Select Client" at the top. If it's a walk-in, tap "Walk-in Client".</div></div>
-            <div class="manual-step"><span class="manual-num">2</span><div><strong>Browse services</strong> — use the category tabs (All, Facial Treatments, Injectables, etc.) to find the service. Tap a sub-category chip to filter further (e.g. Brightening, Signature).</div></div>
+            <div class="manual-step"><span class="manual-num">2</span><div><strong>Browse services</strong> — use the category tabs (All, Glow Nails, Glow Facials, Glow Skin, etc.) to find the service. Tap a sub-category chip to filter further (e.g. Facials, Diode Laser).</div></div>
             <div class="manual-step"><span class="manual-num">3</span><div><strong>Tap a service</strong> to add it to the cart. If the service has add-ons, a popup appears — select any extras or tap "Skip".</div></div>
             <div class="manual-step"><span class="manual-num">4</span><div><strong>Adjust the cart</strong> — use + / − to change quantity, or tap ✕ to remove an item.</div></div>
             <div class="manual-step"><span class="manual-num">5</span><div><strong>Apply discount</strong> — tap the Discount field and enter a value. Toggle between % or ₱ amount.</div></div>
@@ -1259,7 +1259,7 @@ html{height:-webkit-fill-available;}
             <div class="manual-sec-title">5. 🧴 Products & Services</div>
             <p>Manage everything shown in the POS menu plus your physical inventory.</p>
             <div class="manual-step"><span class="manual-num">1</span><div>Tap <strong>+ Add Product</strong> to create a new service or product.</div></div>
-            <div class="manual-step"><span class="manual-num">2</span><div>Set the <strong>Category</strong> (e.g. Facial Treatments) and <strong>Sub-category</strong> (e.g. Brightening) — sub-categories create filter chips in the POS menu.</div></div>
+            <div class="manual-step"><span class="manual-num">2</span><div>Set the <strong>Category</strong> (e.g. Glow Facials, Glow Skin) and <strong>Sub-category</strong> (e.g. Facials, Diode Laser) — sub-categories create filter chips in the POS menu.</div></div>
             <div class="manual-step"><span class="manual-num">3</span><div>Under <strong>🧪 Consumables per Session</strong> — link inventory items (e.g. 2ml Vitamin C Serum) that auto-deduct when this service is sold.</div></div>
             <div class="manual-step"><span class="manual-num">4</span><div>Under <strong>✨ Service Add-ons</strong> — add optional extras clients can choose at POS (e.g. Eye Treatment +₱300).</div></div>
             <div class="manual-step"><span class="manual-num">5</span><div>Toggle <strong>Show in POS</strong> to control what appears in the POS menu. Inventory items (ml, g, vials) should have this off.</div></div>
@@ -1745,10 +1745,8 @@ html{height:-webkit-fill-available;}
       <div class="form-group"><label class="form-label">Product / Service Name *</label><input class="form-input" id="apName" placeholder="e.g. Botox, HydraFacial, Vitamin C Serum"></div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Category</label>
-          <select class="form-select" id="apCat">
-            <option>Facial Treatments</option><option>Injectables</option><option>Laser Treatments</option>
-            <option>Body Contouring</option><option>Skincare Products</option><option>Packages</option><option>Supplements</option><option>Other</option>
-          </select>
+          <input class="form-input" id="apCat" placeholder="e.g. Glow Facials" list="catSuggestions">
+          <datalist id="catSuggestions"></datalist>
         </div>
         <div class="form-group"><label class="form-label">Sub-category <span style="color:var(--ink4);font-weight:400;">(optional)</span></label>
           <input class="form-input" id="apSubcat" placeholder="e.g. Brightening, Signature, Moisturizing…" list="subcatSuggestions">
@@ -5567,7 +5565,7 @@ function openAddProd(){
   document.getElementById('addProdTitle').textContent='Add Product / Service';
   ['apName','apPrice','apCost','apStock','apLowAt','apNotes','apContainerSize','apParLevel','apReorderQty'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('apUnit').value='sessions';
-  document.getElementById('apCat').value='Facial Treatments';
+  document.getElementById('apCat').value='Glow Facials';
   if(document.getElementById('apSubcat')) document.getElementById('apSubcat').value='';
   document.getElementById('apShowInPOS').checked=true;
   updateContainerLabel();
@@ -5665,11 +5663,11 @@ let csvImportData=[];
 function downloadProductTemplate(){
   const headers='Name,Category,SubCategory,Unit,Price,Cost,Stock,LowAt,ShowInPOS,Notes';
   const examples=[
-    'HydraFacial — Signature,Facial Treatments,Signature,sessions,2500,800,20,5,Yes,Classic HydraFacial',
-    'HydraFacial — Brightening,Facial Treatments,Brightening,sessions,3000,900,20,5,Yes,With Vitamin C boost',
-    'HydraFacial — Anti-Ageing,Facial Treatments,Anti-Ageing,sessions,3500,1000,15,5,Yes,With peptide infusion',
-    'Botox — Forehead,Injectables,,vials,8000,3000,15,3,Yes,Allergan brand',
-    'Carbon Laser Facial,Laser Treatments,,sessions,4500,1200,30,5,Yes,',
+    'HydraFacial — Signature,Glow Facials,Facials,sessions,2500,800,20,5,Yes,Classic HydraFacial',
+    'Underarms Diode,Glow Skin,Diode Laser,sessions,1200,120,20,5,Yes,',
+    'Fat Reduction,Exilis Glow,,sessions,2800,140,20,5,Yes,',
+    'Manicure,Glow Nails,Manicure & Pedicure,sessions,249,115,999,0,Yes,',
+    'Underarm Wax,Hair Waxing,,sessions,500,117,999,0,Yes,',
   ].join('\n');
   const csv=headers+'\n'+examples;
   const a=document.createElement('a');
@@ -5710,7 +5708,7 @@ function parseAndPreviewCSV(text){
 
   if(nameIdx<0){showToast('CSV must have a Name column','err');return;}
 
-  const VALID_CATS=['Facial Treatments','Injectables','Laser Treatments','Body Contouring','Skincare Products','Packages','Supplements','Other'];
+  const VALID_CATS=['Glow Nails','Glow Wax','Hair Waxing','Glow Facials','Glow Skin','Glow Ink','Glow Clear','Exilis Glow','Skincare Products','Supplements','Other'];
   const VALID_UNITS=['pcs','sessions','ml','g','vials','syringes','bottles','boxes','sets'];
 
   csvImportData=[];
@@ -6740,6 +6738,9 @@ function exportReport(){
 function populateForms(){
   const svcOpts='<option value="">Select service…</option>'+S.products.filter(p=>p.inPOS).map(p=>`<option>${p.name}</option>`).join('');
   ['apService','qbService','asService'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=svcOpts;});
+  const cats=[...new Set(S.products.map(p=>p.cat).filter(Boolean)),'Skincare Products','Supplements','Other'];
+  const dl=document.getElementById('catSuggestions');
+  if(dl) dl.innerHTML=cats.map(c=>`<option>${c}</option>`).join('');
   const staffOpts='<option value="">Unassigned</option>'+S.users.map(u=>`<option>${u.name}</option>`).join('');
   ['apStaff','qbStaff','asStaff','bkFilterStaff'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=staffOpts;});
   const dl=document.getElementById('clientsDL');
