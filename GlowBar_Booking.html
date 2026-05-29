@@ -415,6 +415,10 @@ const DEMO_DATA = {
 };
 
 async function loadData(){
+  // Ensure anonymous auth token is ready before reading protected Firebase paths
+  if(db && !firebase.auth().currentUser){
+    try{ await firebase.auth().signInAnonymously(); }catch(e){}
+  }
   // Safety timeout — if Firebase takes more than 6 seconds, use demo data
   const timeout = new Promise(resolve=>setTimeout(()=>resolve('timeout'), 6000));
 

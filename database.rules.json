@@ -7,15 +7,13 @@
           ".write": "auth != null"
         }
       },
-      "settings": {
-        ".read": true,
-        ".write": "auth != null"
-      },
-      "serviceNames": {
-        ".read": true,
-        ".write": "auth != null"
-      },
-      ".read": "auth != null",
+      "settings":     { ".read": true, ".write": "auth != null" },
+      "serviceNames": { ".read": true, ".write": "auth != null" },
+      ".read":  "auth != null",
+      ".write": "auth != null"
+    },
+    "tracker": {
+      ".read":  "auth != null",
       ".write": "auth != null"
     }
   }

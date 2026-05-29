@@ -8,6 +8,7 @@
 // ── FIREBASE REALTIME DATABASE SETUP ─────────────────────────────
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, get, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAoSdhij_phFCaKQMWca40x6xXD5hhi7vU",
@@ -22,6 +23,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
+const _auth = getAuth(app);
 const TRACKER_REF = ref(db, 'tracker/glowbar_main');
 const TRACKED = ['glowbar_v4','glowbar_cons','glowbar_svc2','glowbar_svcs','glowbar_staff','glowbar_monthly'];
 
@@ -303,6 +305,7 @@ function bootApp(){
 // ── LOAD FROM REALTIME DB ─────────────────────────────────────────
 async function initFirebase(){
   setSyncStatus('loading');
+  try { await signInAnonymously(_auth); } catch(e){}
   try {
     const snap = await get(TRACKER_REF);
     if(snap.exists()){
