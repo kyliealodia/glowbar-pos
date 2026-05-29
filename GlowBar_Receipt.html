@@ -89,6 +89,8 @@ function renderReceipt(r){
   const hasPackage=r.packageInfo&&r.packageInfo.length>0;
   const hasInstallment=r.installmentInfo||r.internalInstallment;
   const methodLabel=cap(r.method||'cash')+(r.feeTerm?' ('+r.feeTerm+' months)':'');
+  const hasScpwd=r.scpwd&&r.scpwd.discAmt>0;
+  const hasBir=r.tin||r.birPermit||r.lguPermit||r.businessAddress;
 
   // Services rows
   const svcRows=(r.services||[]).map(s=>`
@@ -100,8 +102,15 @@ function renderReceipt(r){
   // Payment breakdown
   const payRows=[];
   if(r.disc>0) payRows.push(`<div class="row"><span class="label">Discount</span><span class="value danger">-${fp(r.disc)}</span></div>`);
+  if(hasScpwd) payRows.push(`<div class="row"><span class="label">SC/PWD Discount (20%)<br><span style="font-size:10px;">${r.scpwd.type==='SC'?'Senior Citizen':'PWD'} · ID: ${r.scpwd.idNum}</span></span><span class="value danger">-${fp(r.scpwd.discAmt)}</span></div>`);
   if(r.depositApplied>0) payRows.push(`<div class="row"><span class="label">Deposit Applied</span><span class="value success">-${fp(r.depositApplied)}</span></div>`);
-  if(r.vat>0) payRows.push(`<div class="row"><span class="label">VAT (12%)</span><span class="value">+${fp(r.vat)}</span></div>`);
+  if(hasScpwd){
+    payRows.push(`<div class="row" style="font-size:11px;"><span class="label" style="color:#27ae60;">VAT Status</span><span class="value" style="color:#27ae60;font-size:11px;">VAT-Exempt (RA 9994/9442)</span></div>`);
+  } else if(r.vat>0){
+    payRows.push(`<div class="row"><span class="label">VAT (12%)</span><span class="value">+${fp(r.vat)}</span></div>`);
+  } else if(r.vatOn===false){
+    payRows.push(`<div class="row" style="font-size:11px;"><span class="label" style="color:var(--ink3);">VAT Status</span><span class="value" style="font-size:11px;color:var(--ink3);">VAT-Exempt</span></div>`);
+  }
   if(hasFee) payRows.push(`
     <div class="row"><span class="label">Original Amount</span><span class="value">${fp(r.originalAmount)}</span></div>
     <div class="row"><span class="label">Fee (${Math.round(r.feePct*100)}%)</span><span class="value danger">+${fp(r.payFee)}</span></div>`);
@@ -135,12 +144,15 @@ function renderReceipt(r){
     </div>
     <div class="receipt-body">
       <div class="brand">
-        <h1>GlowBar</h1>
+        <h1>${r.businessName||'GlowBar'}</h1>
         <div class="tagline">Beauty · Confidence · Glow</div>
+        ${r.businessAddress?`<div style="font-size:11px;color:#6a5a4a;margin-top:4px;">${r.businessAddress}</div>`:''}
       </div>
+      ${hasBir?`<div style="text-align:center;font-size:10px;color:#8a7a6a;line-height:1.8;margin-bottom:12px;">${r.tin?`TIN: ${r.tin}<br>`:''}${r.birPermit?`BIR Permit: ${r.birPermit}<br>`:''}${r.lguPermit?`LGU Permit: ${r.lguPermit}`:''}
+      </div>`:''}
 
       <div class="receipt-num">
-        <div class="rnum">Receipt ${r.id}</div>
+        <div class="rnum">${r.orNumber?'OR No. '+r.orNumber+' · ':''}Receipt ${r.id}</div>
         <div class="rdate">${fdt(r.createdAt)}</div>
       </div>
 
@@ -174,9 +186,10 @@ function renderReceipt(r){
       <hr class="divider">
 
       <div class="footer-note">
-        Thank you for visiting GlowBar!<br>
+        Thank you for visiting ${r.businessName||'GlowBar'}!<br>
         For questions, contact us at hello@glowbarph.com<br>
-        Receipt ID: ${r.id} · Ref: ${r.txId||''}
+        Receipt ID: ${r.id}${r.orNumber?' · OR No. '+r.orNumber:''} · Ref: ${r.txId||''}
+        ${hasScpwd?`<br><span style="font-size:9px;">SC/PWD Discount applied per RA 9994/RA 9442. ID verified.</span>`:''}
       </div>
 
       <button class="print-btn" onclick="window.print()">🖨 Print Receipt</button>

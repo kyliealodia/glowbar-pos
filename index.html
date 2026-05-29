@@ -752,11 +752,13 @@ html{height:-webkit-fill-available;}
       <!-- CLIENTS -->
       <div class="page" id="page-clients">
         <div class="sec-hdr"><h2 class="sec-title">Clients</h2><button class="btn btn-gold btn-sm" onclick="openAddClient()">+ Add Client</button></div>
+        <div style="margin-bottom:10px;"><input class="form-input" type="search" id="clientSearchInput" placeholder="Search by name, phone, or email…" oninput="_clientSearch=this.value;_clientPage=0;renderClientsTable();" style="max-width:320px;font-size:13px;"></div>
         <div class="card" style="overflow:hidden;">
           <table class="inv-table" style="width:100%;">
             <thead><tr><th>Client</th><th>Contact</th><th>Visits</th><th>Total Spent</th><th>Status</th><th>Actions</th></tr></thead>
             <tbody id="clientsBody"></tbody>
           </table>
+          <div id="clientsPagination" style="padding:10px 14px;border-top:1px solid var(--border);"></div>
         </div>
       </div>
 
@@ -906,7 +908,9 @@ html{height:-webkit-fill-available;}
                 <button id="txArchiveBtn" class="btn btn-outline btn-sm" onclick="openTxArchive()" style="display:none;font-size:11px;">📦 Deleted Archive</button>
               </div>
             </div>
+            <div id="txSearchWrap" style="padding:10px 14px;border-bottom:1px solid var(--border);"><input class="form-input" type="search" id="txSearchInput" placeholder="Search transactions…" oninput="_txSearch=this.value;_txPage=0;renderReports();" style="max-width:320px;font-size:13px;"></div>
             <div id="rptTxnList" style="overflow-x:auto;"></div>
+            <div id="txPagination" style="padding:10px 14px;border-top:1px solid var(--border);display:none;"></div>
           </div>
         </div>
 
@@ -1660,6 +1664,29 @@ html{height:-webkit-fill-available;}
       </div>
     </div>
 
+    <!-- SC/PWD Discount -->
+    <div id="scpwdWrap" style="margin-top:14px;padding:12px 14px;background:var(--cream2);border-radius:12px;border:1.5px solid var(--border2);">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+        <div style="font-size:10px;font-weight:700;color:var(--gold-dk);text-transform:uppercase;letter-spacing:1px;">🪪 SC / PWD Discount</div>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--ink2);font-weight:500;">
+          <input type="checkbox" id="scpwdToggle" style="accent-color:var(--gold);width:15px;height:15px;" onchange="toggleScpwd()"> Enable (20% + VAT Exempt)
+        </label>
+      </div>
+      <div id="scpwdFields" style="display:none;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;">
+        <div>
+          <label style="font-size:10px;color:var(--ink3);display:block;margin-bottom:3px;">Type</label>
+          <select class="form-select" id="scpwdType" style="font-size:13px;">
+            <option value="SC">Senior Citizen</option>
+            <option value="PWD">PWD</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:10px;color:var(--ink3);display:block;margin-bottom:3px;">ID Number <span style="color:var(--danger);">*</span></label>
+          <input class="form-input" type="text" id="scpwdIdNum" placeholder="Required" style="font-size:13px;">
+        </div>
+      </div>
+    </div>
+
     <!-- Cash amount received — shown only for Cash -->
     <div id="cashWrap" style="margin-top:14px;padding:14px;background:var(--cream2);border-radius:12px;border:1.5px solid var(--border2);">
       <div style="font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">💵 Cash Received</div>
@@ -2076,6 +2103,25 @@ html{height:-webkit-fill-available;}
         <div class="form-row" style="margin-top:10px;">
           <div class="form-group"><label class="form-label" style="font-size:11px;">Start Time</label><input class="form-input" type="time" id="csPtStart" value="09:00"></div>
           <div class="form-group"><label class="form-label" style="font-size:11px;">End Time</label><input class="form-input" type="time" id="csPtEnd" value="17:00"></div>
+        </div>
+      </div>
+      <div style="border-top:1px solid var(--border);padding-top:16px;">
+        <div class="form-label" style="margin-bottom:10px;">BIR / Business Info <span style="font-size:10px;color:var(--ink4);">(for official receipts)</span></div>
+        <div class="form-group">
+          <label class="form-label">Business Address</label>
+          <input class="form-input" id="csBusinessAddress" placeholder="Street, Barangay, City, Province">
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">TIN</label><input class="form-input" id="csTin" placeholder="000-000-000-000"></div>
+          <div class="form-group"><label class="form-label">BIR Permit No.</label><input class="form-input" id="csBirPermit" placeholder="e.g. 12345678"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">LGU Business Permit</label><input class="form-input" id="csLguPermit" placeholder="e.g. BP-2024-00123"></div>
+          <div class="form-group"><label class="form-label">OR Starting No.</label><input class="form-input" type="number" id="csOrStart" placeholder="1001" min="1"></div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Auto-logout timeout (minutes) <span style="font-size:10px;color:var(--ink4);">Default: 10</span></label>
+          <input class="form-input" type="number" id="csTimeoutMins" placeholder="10" min="5" max="120" value="10">
         </div>
       </div>
     </div>
@@ -3415,25 +3461,25 @@ function updateLoginBtn(){
   if(!currentUser){document.getElementById('loginBtn').disabled=true;return;}
   const pin=document.getElementById('pinInput').value;
   const btn=document.getElementById('loginBtn');
-  if(pin.length>0 && pin!==currentUser.pin){
-    btn.disabled=true;
-    btn.textContent='Incorrect PIN';
-    btn.style.background='var(--danger)';
-  } else if(pin.length===0){
-    btn.disabled=true;
-    btn.textContent='Enter PIN to Sign In';
-    btn.style.background='';
+  if(pin.length===0){
+    btn.disabled=true;btn.textContent='Enter PIN to Sign In';btn.style.background='';
+  } else if(!currentUser.pinHashed&&pin!==currentUser.pin){
+    btn.disabled=true;btn.textContent='Incorrect PIN';btn.style.background='var(--danger)';
   } else {
-    btn.disabled=false;
-    btn.textContent='Sign In ✓';
-    btn.style.background='';
+    btn.disabled=false;btn.textContent='Sign In ✓';btn.style.background='';
   }
 }
 
-function doLogin(){
+async function doLogin(){
   if(!currentUser){showToast('Select a staff member','err');return;}
   const pin=document.getElementById('pinInput').value;
-  if(pin!==currentUser.pin){
+  let pinOk=false;
+  if(currentUser.pinHashed){
+    try{pinOk=(await hashPin(pin))===currentUser.pin;}catch(e){pinOk=false;}
+  } else {
+    pinOk=pin===currentUser.pin;
+  }
+  if(!pinOk){
     showToast('Incorrect PIN. Please try again.','err');
     document.getElementById('pinInput').value='';
     document.getElementById('pinInput').focus();
@@ -3451,12 +3497,12 @@ function doLogin(){
   // Check if already clocked in today
   updateClockButtons();
   updateAdminTools();
+  startInactivityWatch();
   showToast('Welcome, '+currentUser.name.split(' ')[0]+'! ✨','ok');
 }
 
 function doLogout(){
-  // Just switch user — no sign-out log, no confirm needed
-  // Clock in/out is separate from device session
+  stopInactivityWatch();
   currentUser=null; cart=[]; selClient=null;
   Object.values(timers).forEach(clearInterval); timers={};
   document.getElementById('pinInput').value='';
@@ -3465,6 +3511,50 @@ function doLogout(){
   document.getElementById('mainApp').style.display='none';
   document.getElementById('loginScreen').style.display='flex';
 }
+
+// ── PIN HASHING ──
+async function hashPin(pin){
+  const enc=new TextEncoder().encode(String(pin));
+  const buf=await crypto.subtle.digest('SHA-256',enc);
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+// ── SESSION TIMEOUT ──
+let _inactivityTimer=null,_inactivityWarnTimer=null;
+function resetInactivityTimer(){
+  clearTimeout(_inactivityTimer);clearTimeout(_inactivityWarnTimer);
+  const mins=parseInt(S.settings?.timeoutMins)||10;
+  _inactivityWarnTimer=setTimeout(()=>showToast('Auto-logout in 2 minutes due to inactivity','warn'),(mins-2)*60000);
+  _inactivityTimer=setTimeout(()=>{showToast('Session timed out due to inactivity','err');doLogout();},(mins)*60000);
+}
+function startInactivityWatch(){
+  stopInactivityWatch();
+  ['click','mousedown','keydown','touchstart'].forEach(e=>document.addEventListener(e,resetInactivityTimer,{passive:true}));
+  resetInactivityTimer();
+}
+function stopInactivityWatch(){
+  clearTimeout(_inactivityTimer);clearTimeout(_inactivityWarnTimer);
+  ['click','mousedown','keydown','touchstart'].forEach(e=>document.removeEventListener(e,resetInactivityTimer));
+}
+
+// ── SC/PWD TOGGLE ──
+function toggleScpwd(){
+  const el=document.getElementById('scpwdFields');
+  if(el) el.style.display=document.getElementById('scpwdToggle').checked?'grid':'none';
+}
+
+// ── PAGINATION HELPERS ──
+let _txPage=0,_txSearch='',_clientPage=0,_clientSearch='';
+function _buildPager(total,cur,fn,count){
+  if(total<=1) return `<div style="font-size:11px;color:var(--ink3);">${count} record${count!==1?'s':''}</div>`;
+  const btns=[];
+  if(cur>0) btns.push(`<button class="btn btn-outline btn-sm" onclick="${fn}(${cur-1})" style="font-size:11px;padding:4px 10px;">← Prev</button>`);
+  btns.push(`<span style="font-size:12px;color:var(--ink2);padding:4px 8px;">Page ${cur+1} of ${total} &nbsp;·&nbsp; ${count} records</span>`);
+  if(cur<total-1) btns.push(`<button class="btn btn-outline btn-sm" onclick="${fn}(${cur+1})" style="font-size:11px;padding:4px 10px;">Next →</button>`);
+  return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">${btns.join('')}</div>`;
+}
+function goTxPage(p){_txPage=p;renderReports();}
+function goClientPage(p){_clientPage=p;renderClientsTable();}
 
 // ── CLOCK IN / OUT ──
 let _clockAction=null, _clockCamStream=null, _clockSnapTaken=false;
@@ -4300,9 +4390,22 @@ function confirmPay(){
   const afterDisc=sub-disc;
   if(tipMode==='custom') tipAmount=parseFloat(document.getElementById('tipCustomInp')?.value)||0;
   const tip=tipAmount;
-  const vatOn=document.getElementById('vatToggle')?.checked;
-  const vat=vatOn?afterDisc*0.12:0;
-  const total=afterDisc+tip+vat;
+  // SC/PWD Discount — RA 9994 (Senior Citizen) / RA 9442 (PWD)
+  const scpwdEnabled=document.getElementById('scpwdToggle')?.checked;
+  const scpwdType=document.getElementById('scpwdType')?.value||'SC';
+  const scpwdId=(document.getElementById('scpwdIdNum')?.value||'').trim();
+  if(scpwdEnabled&&!scpwdId){showToast('SC/PWD ID number is required','err');return;}
+  const scpwdDiscAmt=scpwdEnabled?Math.round(afterDisc*0.20*100)/100:0;
+  const afterScpwd=afterDisc-scpwdDiscAmt;
+  let vatOn=document.getElementById('vatToggle')?.checked;
+  if(scpwdEnabled) vatOn=false;
+  const vat=vatOn?afterScpwd*0.12:0;
+  const total=afterScpwd+tip+vat;
+  // OR Number (BIR Official Receipt)
+  const _orStart=parseInt(S.settings?.orStart)||1;
+  const _orCounter=parseInt(S.settings?.orCounter)||_orStart;
+  const orNumber=String(_orCounter).padStart(8,'0');
+  if(S.settings) S.settings.orCounter=_orCounter+1;
   const dep=window._linkedDepositAmt||0;
   let finalTotal=Math.max(0,total-dep);
   // Package installment: only charge first payment today
@@ -4386,13 +4489,13 @@ function confirmPay(){
   const cashGiven=method==='cash'?(parseFloat(document.getElementById('cashGiven').value)||0):0;
   const cashChange=method==='cash'?Math.max(0,cashGiven-finalTotal):0;
   const instMeta=_pendingInstallmentPlan?{visit:1,totalVisits:_pendingInstallmentPlan.schedule.length,totalPrice:_pendingInstallmentPlan.totalPrice,packageName:_pendingInstallmentPlan.pkg.name}:null;
-  S.transactions.push({id:txid,client:cn,clientId:selClient?.id||null,items:JSON.parse(JSON.stringify(cart)),sub,disc,discType,tip,vat,vatOn,total:finalTotal,originalAmount:payFeeAmt>0?originalAmount:null,payFee:payFeeAmt||null,feePct:payFeePct||null,feeTerm:payFeeTerm||null,depositApplied:dep||null,method,cashGiven:cashGiven||null,cashChange:cashChange||null,refPhoto:_refPhotoData||null,time:now.toISOString(),staff:currentUser.name,installmentInfo:instMeta||null,internalInstallment:internalInstInfo||null});
+  S.transactions.push({id:txid,client:cn,clientId:selClient?.id||null,items:JSON.parse(JSON.stringify(cart)),sub,disc,discType,tip,vat,vatOn,total:finalTotal,originalAmount:payFeeAmt>0?originalAmount:null,payFee:payFeeAmt||null,feePct:payFeePct||null,feeTerm:payFeeTerm||null,depositApplied:dep||null,method,cashGiven:cashGiven||null,cashChange:cashChange||null,refPhoto:_refPhotoData||null,time:now.toISOString(),staff:currentUser.name,installmentInfo:instMeta||null,internalInstallment:internalInstInfo||null,scpwd:scpwdEnabled?{type:scpwdType,idNum:scpwdId,discAmt:scpwdDiscAmt}:null,orNumber});
   window.lastTx=S.transactions[S.transactions.length-1];
   window._lastPaidClientId = selClient?.id||null;
   window._lastTxId = txid;
   const _rcptPkgPlan=_pendingInstallmentPlan;
   const _rcptClientSnap=selClient?S.clients.find(c=>c.id===selClient.id):null;
-  sync('transactions'); sync('products'); if(selClient)sync('clients');
+  sync('transactions'); sync('products'); if(selClient)sync('clients'); if(S.settings?.orCounter)sync('settings');
   if(_pendingInstallmentPlan&&selClient){_createInstallmentRecord(selClient.id,_pendingInstallmentPlan,txid);_pendingInstallmentPlan=null;}
   if(internalInstInfo&&selClient){
     const cl=S.clients.find(c=>c.id===selClient.id);
@@ -4481,7 +4584,14 @@ function confirmPay(){
       depositApplied:dep||null,totalCharged:finalTotal,
       remainingBalance:_rcptRemBal,nextPaymentDate:_rcptNextDue,
       packageInfo:_rcptPkgInfo||null,
-      installmentInfo:instMeta||null,internalInstallment:internalInstInfo||null
+      installmentInfo:instMeta||null,internalInstallment:internalInstInfo||null,
+      scpwd:scpwdEnabled?{type:scpwdType,idNum:scpwdId,discAmt:scpwdDiscAmt}:null,
+      orNumber,
+      businessName:S.settings?.clinicName||'GlowBar Beauty Clinic',
+      businessAddress:S.settings?.businessAddress||'',
+      tin:S.settings?.tin||'',
+      birPermit:S.settings?.birPermit||'',
+      lguPermit:S.settings?.lguPermit||''
     };
     if(useCloud) db.ref('gb/receipts/'+_rcptId).set(_rcptData).catch(()=>{});
     window._lastReceiptData=_rcptData;
@@ -4516,6 +4626,9 @@ function clearCart(){
   if(_el('internalInstWrap')) _el('internalInstWrap').style.display='none';
   if(_el('cashWrap')) _el('cashWrap').style.display='none';
   if(_el('refCaptureWrap')) _el('refCaptureWrap').style.display='none';
+  if(_el('scpwdToggle')) _el('scpwdToggle').checked=false;
+  if(_el('scpwdFields')) _el('scpwdFields').style.display='none';
+  if(_el('scpwdIdNum')) _el('scpwdIdNum').value='';
   document.querySelectorAll('.pay-m').forEach(b=>b.classList.remove('sel'));
   try{resetRefPhotoUI();}catch(e){}
   try{updateDepositDisplay();}catch(e){}
@@ -5388,6 +5501,12 @@ function openClinicSettings(){
     const btn=document.getElementById('ptDay'+i);
     if(btn) btn.classList.toggle('active',ptDays.includes(i));
   }
+  document.getElementById('csTin').value=cfg.tin||'';
+  document.getElementById('csBirPermit').value=cfg.birPermit||'';
+  document.getElementById('csLguPermit').value=cfg.lguPermit||'';
+  document.getElementById('csBusinessAddress').value=cfg.businessAddress||'';
+  document.getElementById('csOrStart').value=String(cfg.orStart||1);
+  document.getElementById('csTimeoutMins').value=String(cfg.timeoutMins||10);
   openM('clinicSettingsModal');
 }
 
@@ -5403,7 +5522,9 @@ function saveClinicSettings(){
   if(openTime>=closeTime){showToast('Closing time must be after opening time','err');return;}
   const ptWorkDays=[];
   for(let i=0;i<7;i++){const btn=document.getElementById('ptDay'+i);if(btn&&btn.classList.contains('active'))ptWorkDays.push(i);}
+  const orStartNew=parseInt(document.getElementById('csOrStart').value)||1;
   S.settings={
+    ...(S.settings||{}),
     clinicName:document.getElementById('csClinicName').value.trim()||'GlowBar Beauty Clinic',
     openDays,
     openTime,
@@ -5418,6 +5539,13 @@ function saveClinicSettings(){
       startTime:document.getElementById('csPtStart').value||'09:00',
       endTime:document.getElementById('csPtEnd').value||'17:00',
     },
+    tin:document.getElementById('csTin').value.trim(),
+    birPermit:document.getElementById('csBirPermit').value.trim(),
+    lguPermit:document.getElementById('csLguPermit').value.trim(),
+    businessAddress:document.getElementById('csBusinessAddress').value.trim(),
+    orStart:orStartNew,
+    orCounter:S.settings?.orCounter||orStartNew,
+    timeoutMins:parseInt(document.getElementById('csTimeoutMins').value)||10,
   };
   sync('settings');
   closeM('clinicSettingsModal');
@@ -5669,7 +5797,17 @@ function saveAppt(){
 
 // ══ CLIENTS ══
 function renderClientsTable(){
-  document.getElementById('clientsBody').innerHTML=S.clients.map(c=>`
+  const PAGE=20;
+  const q=(_clientSearch||'').toLowerCase().trim();
+  const filtered=q?S.clients.filter(c=>
+    (c.name||'').toLowerCase().includes(q)||
+    (c.phone||'').includes(q)||
+    (c.email||'').toLowerCase().includes(q)
+  ):S.clients;
+  const totalPages=Math.ceil(filtered.length/PAGE)||1;
+  if(_clientPage>=totalPages) _clientPage=Math.max(0,totalPages-1);
+  const page=filtered.slice(_clientPage*PAGE,(_clientPage+1)*PAGE);
+  document.getElementById('clientsBody').innerHTML=page.map(c=>`
     <tr>
       <td><div style="display:flex;align-items:center;gap:9px;"><div style="width:32px;height:32px;border-radius:50%;background:${c.color};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#fff;">${initials(c.name)}</div><div><div style="font-size:13px;font-weight:500;">${c.name}${c.vip?' ✨':''}</div><div style="font-size:10px;color:var(--ink3);">${c.email||'—'}</div></div></div></td>
       <td><div style="font-size:12px;">${c.phone}</div><div style="font-size:10px;color:var(--ink3);">${c.messenger||'—'}</div></td>
@@ -5684,6 +5822,8 @@ function renderClientsTable(){
         ${c.skinAnalysis?`<button class="btn btn-sm" style="background:rgba(201,168,76,0.12);border:1px solid rgba(201,168,76,0.3);color:var(--gold-dk);font-size:11px;" onclick="viewSkinAnalysis(${c.id})">🔬 Analysis</button>`:''}
       </div></td>
     </tr>`).join('');
+  const pEl=document.getElementById('clientsPagination');
+  if(pEl) pEl.innerHTML=_buildPager(totalPages,_clientPage,'goClientPage',filtered.length);
 }
 function openAddClient(){
   editUserId=null;
@@ -6537,7 +6677,9 @@ function editUser(id){
   const u=S.users.find(x=>x.id===id);if(!u)return;
   editUserId=id;
   document.getElementById('auName').value=u.name;
-  document.getElementById('auPin').value=u.pin||'';
+  const _auPinEl=document.getElementById('auPin');
+  _auPinEl.value=u.pinHashed?'':( u.pin||'');
+  _auPinEl.placeholder=u.pinHashed?'Leave blank to keep current PIN':'••••';
   document.getElementById('auSpecialty').value=u.specialty||'';
   document.getElementById('auDailyRate').value=u.dailyRate||700;
   document.getElementById('auRole').value=u.role;
@@ -6599,18 +6741,29 @@ function updateShiftPreview(){
   const fmt=t=>{const[h,m]=t.split(':');const hr=+h;return `${hr>12?hr-12:hr||12}:${m} ${hr>=12?'PM':'AM'}`;};
   el.innerHTML=`<span style="color:var(--success);font-weight:600;">✓</span> Works <strong>${days.join(', ')}</strong> · ${fmt(start)} – ${fmt(end)}`;
 }
-function saveUser(){
+async function saveUser(){
   const name=document.getElementById('auName').value.trim();
   if(!name){showToast('Name required','err');return;}
   const perms=ALL_PERMS.filter(p=>document.getElementById('perm-'+p)?.checked);
   const empStatus=document.getElementById('auEmpStatus')?.value||'regular';
   const startDate=document.getElementById('auStartDate')?.value||'';
+  // PIN hashing — hash if a new PIN was entered; keep existing if blank on edit
+  const rawPin=document.getElementById('auPin').value;
+  let pinVal,pinHashed=false;
+  if(rawPin){
+    try{pinVal=await hashPin(rawPin);pinHashed=true;}catch(e){pinVal=rawPin;}
+  } else if(editUserId!==null&&editUserId!==undefined){
+    const _exUser=S.users.find(x=>x.id===editUserId);
+    pinVal=_exUser?.pin||'';pinHashed=_exUser?.pinHashed||false;
+  } else {
+    showToast('PIN is required for new staff','err');return;
+  }
   const shiftDays=getShiftDays();
   const shiftStart=document.getElementById('auShiftStart')?.value||'09:00';
   const shiftEnd=document.getElementById('auShiftEnd')?.value||'18:00';
   const data={
     name,role:editUserId===0?'owner':document.getElementById('auRole').value,
-    pin:document.getElementById('auPin').value,
+    pin:pinVal,pinHashed,
     specialty:document.getElementById('auSpecialty').value.trim(),
     perms,color:COLORS[Math.floor(Math.random()*COLORS.length)],
     empStatus,startDate,shiftDays,shiftStart,shiftEnd,
@@ -7039,6 +7192,18 @@ function renderRptSales(txns){
 
   // Transaction list
   const sorted=[...txns].sort((a,b)=>new Date(b.time)-new Date(a.time));
+  // Secondary search filter (on top of date-range filter)
+  const txQ=(_txSearch||'').toLowerCase().trim();
+  const filteredTx=txQ?sorted.filter(t=>
+    (t.client||'').toLowerCase().includes(txQ)||
+    (t.id||'').toLowerCase().includes(txQ)||
+    (t.staff||'').toLowerCase().includes(txQ)||
+    (t.items||[]).some(i=>(i.name||'').toLowerCase().includes(txQ))
+  ):sorted;
+  const TX_PAGE=20;
+  const txTotalPages=Math.ceil(filteredTx.length/TX_PAGE)||1;
+  if(_txPage>=txTotalPages) _txPage=Math.max(0,txTotalPages-1);
+  const pageTx=filteredTx.slice(_txPage*TX_PAGE,(_txPage+1)*TX_PAGE);
   const isAdmin=currentUser&&(currentUser.role==='owner'||currentUser.role==='admin');
   // Show archive button for admins
   const archiveBtn=document.getElementById('txArchiveBtn');
@@ -7046,15 +7211,18 @@ function renderRptSales(txns){
   // Reset selection on re-render
   _selectedTxIds=new Set();
   updateTxDeleteBar();
-  const sortedIds=sorted.map(t=>String(t.id));
-  document.getElementById('rptTxnList').innerHTML=sorted.length?`
+  // Update pagination div
+  const txPagEl=document.getElementById('txPagination');
+  if(txPagEl){txPagEl.style.display=txTotalPages>1?'block':'none';txPagEl.innerHTML=_buildPager(txTotalPages,_txPage,'goTxPage',filteredTx.length);}
+  const sortedIds=pageTx.map(t=>String(t.id));
+  document.getElementById('rptTxnList').innerHTML=pageTx.length?`
     <table class="inv-table" style="width:100%;">
       <thead><tr>
         ${isAdmin?`<th style="width:36px;padding:8px 8px;"><input type="checkbox" id="txSelectAll" title="Select all" onchange="toggleSelectAllTx(this.checked,'${sortedIds.join(',')}')" style="cursor:pointer;width:14px;height:14px;accent-color:var(--gold-dk);"></th>`:''}
         <th>Date & Time</th><th>Client</th><th>Services</th><th>Method</th><th>Staff</th><th>Discount</th><th>Original</th><th>Fee</th><th>Total</th>
         ${isAdmin?'<th></th>':''}
       </tr></thead>
-      <tbody>${sorted.map(t=>{
+      <tbody>${pageTx.map(t=>{
         const isRefund=t.type==='refund';
         const isRefunded=t.refunded;
         const hasFee=t.payFee>0;
@@ -7073,7 +7241,7 @@ function renderRptSales(txns){
         <td style="font-weight:600;font-size:13px;color:${isRefund?'var(--danger)':''};">${isRefund?'-':''} ${fmtPrice(Math.abs(t.total))}</td>
         ${isAdmin?`<td style="white-space:nowrap;">${!isRefund&&!isRefunded?`<button class="btn btn-outline btn-sm" onclick="openRefund('${t.id}')" style="font-size:11px;color:var(--danger);border-color:var(--danger);">↩ Refund</button>`:isRefunded?'<span style="font-size:10px;color:var(--danger);">Refunded</span>':''}</td>`:''}
       </tr>`;}).join('')}</tbody>
-    </table>`:'<div style="padding:30px;text-align:center;color:var(--ink3);">No transactions this period</div>';
+    </table>`:'<div style="padding:30px;text-align:center;color:var(--ink3);">No transactions found</div>';
 }
 
 let _selectedTxIds=new Set();
