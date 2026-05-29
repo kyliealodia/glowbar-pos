@@ -125,6 +125,17 @@ html{height:-webkit-fill-available;}
   /* ── NOTICE ── */
   .notice{background:var(--gold-lt);border:1px solid rgba(201,168,76,0.3);border-radius:10px;padding:12px 14px;font-size:12px;color:var(--ink2);margin-bottom:16px;line-height:1.6;}
 
+  /* ── CATEGORY TABS ── */
+  .cat-tabs{display:flex;gap:0;overflow-x:auto;margin:-28px -28px 20px;padding:0 12px;border-bottom:2px solid var(--cream2);scrollbar-width:none;}
+  .cat-tabs::-webkit-scrollbar{display:none;}
+  .cat-tab{flex-shrink:0;padding:11px 14px;font-size:11px;font-weight:600;color:var(--ink3);cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s;font-family:'DM Sans',sans-serif;white-space:nowrap;letter-spacing:0.3px;}
+  .cat-tab:hover{color:var(--gold-dk);}
+  .cat-tab.active{color:var(--gold-dk);border-bottom-color:var(--gold);}
+  .subcat-hdr{font-size:10px;color:var(--ink4);text-transform:uppercase;letter-spacing:1px;padding:12px 0 6px;font-weight:600;border-top:1px solid var(--cream2);margin-top:12px;}
+  .subcat-hdr:first-child{border-top:none;margin-top:0;padding-top:0;}
+  .date-btn.closed{background:#fff0f0;color:var(--danger);opacity:0.55;cursor:not-allowed;}
+  .date-btn.far{opacity:0.25;cursor:not-allowed;}
+
   @media(max-width:480px){
     .svc-grid{grid-template-columns:1fr;}
     .slots-grid{grid-template-columns:repeat(3,1fr);}
@@ -203,9 +214,52 @@ let DATA = { products:[], packages:[], users:[], bookings:[], settings:{
   breakEnd:'',
   partTimer:{name:'',workDays:[],startTime:'09:00',endTime:'17:00'}
 }};
-let booking = { services:[], service:'', serviceId:null, servicePrice:0, duration:60, staff:'', staffColor:'', date:'', time:'', name:'', phone:'', email:'', notes:'', groupSize:1 };
+let booking = { services:[], service:'', serviceId:null, servicePrice:0, duration:60, staff:'', staffColor:'', aesthetician:'', nailTech:'', date:'', time:'', name:'', phone:'', email:'', notes:'', groupSize:1 };
 let calYear, calMonth;
+let activeSvcCat = null; // currently active category tab id
 const TIMES = ['09:00','09:30','10:00','10:30','11:00','11:30','12:00','12:30','13:00','13:30','14:00','14:30','15:00','15:30','16:00','16:30','17:00','17:30','18:00'];
+
+// ── CATEGORY TAB DEFINITIONS ──
+const CATEGORY_TABS = [
+  {id:'waxing',   label:'Hair Waxing',         icon:'✂',
+    test:p=>{ const c=(p.cat||'').toLowerCase(),n=(p.name||'').toLowerCase();
+      return (c.includes('wax')||n.includes('wax')||n.includes('brazilian')||n.includes('bikini')||n.includes('upper lip')&&!n.includes('diode'))&&!n.includes('foot spa'); }},
+  {id:'diode',   label:'Diode Hair Removal',   icon:'💡',
+    test:p=>{ const s=(p.subcat||'').toLowerCase(),c=(p.cat||'').toLowerCase(),n=(p.name||'').toLowerCase();
+      return s.includes('diode')||c.includes('diode')||n.includes('diode'); }},
+  {id:'rejuv',   label:'Skin Rejuvenation',    icon:'✨',
+    test:p=>{ const s=(p.subcat||'').toLowerCase(),n=(p.name||'').toLowerCase();
+      return s.includes('rejuven')||n.includes('rejuven')||n.includes('rejuve'); }},
+  {id:'tattoo',  label:'Tattoo Laser',         icon:'🖋',
+    test:p=>{ const c=(p.cat||'').toLowerCase(),n=(p.name||'').toLowerCase();
+      return c.includes('ink')||c.includes('clear')||n.includes('tattoo')||n.includes('wart'); }},
+  {id:'exilis',  label:'Exilis',               icon:'⚡',
+    test:p=>{ const c=(p.cat||'').toLowerCase(),n=(p.name||'').toLowerCase();
+      return c.includes('exilis')||n.includes('exilis')||c.includes('body contour'); }},
+  {id:'pico',    label:'Pico Laser',           icon:'🔬',
+    test:p=>{ const s=(p.subcat||'').toLowerCase(),c=(p.cat||'').toLowerCase(),n=(p.name||'').toLowerCase();
+      return s.includes('pico')||c.includes('pico')||n.includes('pico')||n.includes('carbon')||n.includes('black doll')||n.includes('melasma')||n.includes('scar'); }},
+  {id:'nails',   label:'Nails',                icon:'💅',
+    test:p=>{ const c=(p.cat||'').toLowerCase(),s=(p.subcat||'').toLowerCase(),n=(p.name||'').toLowerCase();
+      return (c.includes('nail')||s.includes('manicure')||s.includes('pedicure')||s.includes('extension')||s.includes('nail art')||n.includes('mani')||n.includes('pedi')||n.includes('gel mani')||n.includes('nail')||n.includes('polygel')||n.includes('softgel'))&&!n.includes('foot spa'); }},
+  {id:'footspa', label:'Foot Spa',             icon:'🦶',
+    test:p=>{ const n=(p.name||'').toLowerCase(); return n.includes('foot spa')||n.includes('hand spa'); }},
+  {id:'facial',  label:'Facial',               icon:'🌸',
+    test:p=>{ const c=(p.cat||'').toLowerCase(),s=(p.subcat||'').toLowerCase(),n=(p.name||'').toLowerCase();
+      return c.includes('facial')||s.includes('facial')||n.includes('facial')||n.includes('hydra'); }},
+];
+
+function getCatTabId(p){
+  const tab=CATEGORY_TABS.find(t=>t.test(p));
+  return tab?tab.id:('other_'+(p.cat||'Other'));
+}
+
+function isComboBooking(){
+  const types=booking.services.map(s=>getSvcMeta(s.name,'').type);
+  const hasNail=types.includes('nail');
+  const hasMachineFacial=types.some(t=>t==='laser'||t==='facial');
+  return hasNail&&hasMachineFacial;
+}
 
 function fmtPrice(n){ return '₱'+(n||0).toLocaleString('en-PH'); }
 function initials(n){ return (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase(); }
@@ -417,8 +471,11 @@ async function loadData(){
 // ── STEP 1: SERVICE ──
 function showStep1(){
   setStep(1);
-  const services = DATA.products.filter(p=>p.inPOS!==false);
-  const cats = [...new Set(services.map(p=>p.cat))];
+  // Filter to bookable services only
+  const services = DATA.products.filter(p=>
+    p.inPOS!==false && p.active!==false && p.available!==false && p.unavailable!==true
+  );
+
   let html = `<div class="card">
     <div class="card-title">Choose a Service</div>
     <div class="card-sub">Select the treatment you'd like to book.</div>`;
@@ -430,62 +487,107 @@ function showStep1(){
       <div style="font-size:13px;color:var(--ink3);">Our service menu is being set up. Please contact us directly to book your appointment.</div>
     </div>`;
   } else {
-    // Selected services summary bar
-    html += `<div id="selectedSvcBar" style="display:${booking.services.length?'block':'none'};background:var(--gold-lt);border:1.5px solid var(--gold);border-radius:12px;padding:12px 16px;margin-bottom:16px;">
-      <div style="font-size:10px;font-weight:700;color:var(--gold-dk);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">✓ Selected Services</div>
-      <div id="selectedSvcList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;">${booking.services.map(s=>`
-        <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;">
-          <span style="color:var(--ink);">${s.name}</span>
-          <div style="display:flex;align-items:center;gap:10px;">
-            <span style="font-weight:600;color:var(--gold-dk);">${fmtPrice(s.price)}</span>
-            <button onclick="removeService('${s.id}')" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;padding:0 4px;">✕</button>
-          </div>
-        </div>`).join('')}
-      </div>
-      <div style="display:flex;justify-content:space-between;border-top:1px solid rgba(201,168,76,0.3);padding-top:8px;">
-        <span style="font-size:13px;font-weight:600;color:var(--ink);">Total</span>
-        <span style="font-size:15px;font-weight:700;color:var(--gold-dk);">${fmtPrice(booking.services.reduce((s,x)=>s+x.price,0))}</span>
-      </div>
-    </div>`;
-
-    cats.forEach(cat=>{
-      const items=services.filter(p=>p.cat===cat);
-      html += `<div style="margin-bottom:20px;">
-        <div style="font-size:10px;color:var(--ink4);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;font-weight:600;">${cat}</div>
-        <div class="svc-grid">`;
-      items.forEach(p=>{
-        const sel=booking.services.some(s=>s.id===p.id)?'sel':'';
-        html += `<button class="svc-btn ${sel}" onclick="selectService('${p.id}','${p.name.replace(/'/g,"\\'")}',${p.price},${p.durationMins||60})">
-          ${sel?'<span style="float:right;color:var(--gold-dk);font-size:14px;">✓</span>':''}
-          <span class="svc-name">${p.name}</span>
-          <span class="svc-price">${fmtPrice(p.price)}</span>
-        </button>`;
-      });
-      html += `</div></div>`;
+    // Build tab map: tabId -> list of services
+    const tabMap = {};
+    services.forEach(p=>{
+      const tid=getCatTabId(p);
+      if(!tabMap[tid]) tabMap[tid]=[];
+      tabMap[tid].push(p);
     });
 
-    // Packages
-    const pkgs = DATA.packages.filter(p=>p.active!==false);
-    if(pkgs.length){
-      html += `<div style="margin-bottom:20px;">
-        <div style="font-size:10px;color:var(--ink4);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;font-weight:600;">Packages</div>
-        <div class="svc-grid">`;
+    // Build tabs in preferred order + any extras
+    const pkgs=DATA.packages.filter(p=>p.active!==false);
+    const orderedTabs=[];
+    CATEGORY_TABS.forEach(t=>{ if(tabMap[t.id]) orderedTabs.push({...t,services:tabMap[t.id]}); });
+    // Extra cats not in CATEGORY_TABS
+    Object.keys(tabMap).forEach(id=>{
+      if(!CATEGORY_TABS.find(t=>t.id===id)){
+        const label=id.startsWith('other_')?id.slice(6):id;
+        orderedTabs.push({id,label,icon:'◆',services:tabMap[id]});
+      }
+    });
+    if(pkgs.length) orderedTabs.push({id:'packages',label:'Packages',icon:'📦',services:[]});
+
+    // Default active tab
+    if(!activeSvcCat||!orderedTabs.find(t=>t.id===activeSvcCat)) activeSvcCat=orderedTabs[0]?.id||null;
+
+    // Tab bar
+    html+=`<div class="cat-tabs">`;
+    orderedTabs.forEach(t=>{
+      html+=`<button class="cat-tab${activeSvcCat===t.id?' active':''}" onclick="selectCat('${t.id}')">${t.icon} ${t.label}</button>`;
+    });
+    html+=`</div>`;
+
+    // Selected services summary bar
+    if(booking.services.length){
+      html+=`<div style="background:var(--gold-lt);border:1.5px solid var(--gold);border-radius:12px;padding:12px 16px;margin-bottom:16px;">
+        <div style="font-size:10px;font-weight:700;color:var(--gold-dk);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">✓ Selected</div>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;">${booking.services.map(s=>`
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;">
+            <span style="color:var(--ink);">${s.name}</span>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span style="font-weight:600;color:var(--gold-dk);">${fmtPrice(s.price)}</span>
+              <button onclick="removeService('${s.id}')" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;padding:0 4px;">✕</button>
+            </div>
+          </div>`).join('')}
+        </div>
+        <div style="display:flex;justify-content:space-between;border-top:1px solid rgba(201,168,76,0.3);padding-top:8px;">
+          <span style="font-size:13px;font-weight:600;color:var(--ink);">Total</span>
+          <span style="font-size:15px;font-weight:700;color:var(--gold-dk);">${fmtPrice(booking.services.reduce((s,x)=>s+x.price,0))}</span>
+        </div>
+      </div>`;
+    }
+
+    // Active tab content
+    if(activeSvcCat==='packages'){
+      html+=`<div class="svc-grid">`;
       pkgs.forEach(p=>{
         const pkgId='pkg_'+p.id;
         const sel=booking.services.some(s=>s.id===pkgId)?'sel':'';
-        html += `<button class="svc-btn ${sel}" onclick="selectService('${pkgId}','${p.name.replace(/'/g,"\\'")} (Package)',${p.price})">
+        html+=`<button class="svc-btn ${sel}" onclick="selectService('${pkgId}','${p.name.replace(/'/g,"\\'")} (Package)',${p.price})">
           ${sel?'<span style="float:right;color:var(--gold-dk);font-size:14px;">✓</span>':''}
           <span class="svc-name">${p.name}</span>
           <span class="svc-price">${fmtPrice(p.price)} · ${p.sessions} sessions</span>
         </button>`;
       });
-      html += `</div></div>`;
+      html+=`</div>`;
+    } else {
+      const activeTab=orderedTabs.find(t=>t.id===activeSvcCat);
+      if(activeTab){
+        // Group by subcat within active tab
+        const subcatMap={};
+        activeTab.services.forEach(p=>{
+          const sc=p.subcat||'';
+          if(!subcatMap[sc]) subcatMap[sc]=[];
+          subcatMap[sc].push(p);
+        });
+        const subcats=Object.keys(subcatMap);
+        const useSubcats=subcats.length>1||(subcats.length===1&&subcats[0]);
+        subcats.forEach((sc,si)=>{
+          if(useSubcats&&sc) html+=`<div class="subcat-hdr">${sc}</div>`;
+          html+=`<div class="svc-grid" style="${si>0?'margin-top:8px;':''}">`;
+          subcatMap[sc].forEach(p=>{
+            const sel=booking.services.some(s=>s.id===p.id)?'sel':'';
+            html+=`<button class="svc-btn ${sel}" onclick="selectService('${p.id}','${p.name.replace(/'/g,"\\'")}',${p.price},${p.durationMins||60})">
+              ${sel?'<span style="float:right;color:var(--gold-dk);font-size:14px;">✓</span>':''}
+              <span class="svc-name">${p.name}</span>
+              <span class="svc-price">${fmtPrice(p.price)}</span>
+            </button>`;
+          });
+          html+=`</div>`;
+        });
+      }
     }
   }
 
-  html += `<button class="btn-gold" onclick="goStep2()" ${booking.services.length?'':'disabled'} id="step1next">Next — Choose Date & Time →</button>
+  html+=`<button class="btn-gold" onclick="goStep2()" ${booking.services.length?'':'disabled'} id="step1next" style="margin-top:20px;">Next — Choose Date & Time →</button>
   </div>`;
   show(html);
+}
+
+function selectCat(tabId){
+  activeSvcCat=tabId;
+  showStep1();
 }
 
 function selectService(id, name, price, durationMins){
@@ -539,27 +641,71 @@ function renderStep2(){
     <div class="slots-grid" id="slotsGrid"></div>
   </div>
 
-  <div class="card" id="staffCard" style="${booking.date&&booking.time?'':'display:none'}">
-    <div class="card-title">Choose Your Provider <span style="font-size:13px;color:var(--ink4);font-weight:400;">(optional)</span></div>
-    <div class="card-sub">Pick a specific staff member or leave as No Preference.</div>
-    <div class="staff-grid">
-      <button class="staff-btn ${!booking.staff?'sel':''}" onclick="selectStaff('','','')" >
+  <div class="card" id="staffCard" style="${booking.date&&booking.time?'':'display:none'}">`;
+
+  const combo=isComboBooking();
+  if(combo){
+    // Dual staff pickers — aesthetician + nail tech
+    const aestheticians=staff.filter(u=>{ const sp=(u.specialty||u.role||'').toLowerCase(); return sp.includes('aesthet')||sp.includes('facial')||sp.includes('laser')||sp.includes('skin')||(!sp.includes('nail')&&!sp.includes('nail tech')); });
+    const nailTechs=staff.filter(u=>{ const sp=(u.specialty||u.role||'').toLowerCase(); return sp.includes('nail'); });
+    html+=`<div class="card-title">Choose Your Providers <span style="font-size:13px;color:var(--ink4);font-weight:400;">(optional)</span></div>
+    <div class="card-sub">Since you have both facial/laser and nail services, you can pick providers separately.</div>
+    <div style="font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px;">Preferred Aesthetician</div>
+    <div class="staff-grid" style="margin-bottom:16px;">
+      <button class="staff-btn ${!booking.aesthetician?'sel':''}" onclick="selectStaff('aesthetician','','','')">
         <div class="staff-av" style="background:#C4B49A;">⭐</div>
         <div class="staff-name">No Preference</div>
         <div class="staff-role">Any available</div>
       </button>`;
+    (aestheticians.length?aestheticians:staff).forEach((u,i)=>{
+      const col=u.color||COLORS[i%COLORS.length];
+      const sel=booking.aesthetician===u.name?'sel':'';
+      html+=`<button class="staff-btn ${sel}" onclick="selectStaff('aesthetician','${u.name.replace(/'/g,"\\'")}','${col}','${u.specialty||u.role}')">
+        <div class="staff-av" style="background:${col};">${initials(u.name)}</div>
+        <div class="staff-name">${u.name}</div>
+        <div class="staff-role">${u.specialty||u.role}</div>
+      </button>`;
+    });
+    html+=`</div>
+    <div style="font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px;">Preferred Nail Tech</div>
+    <div class="staff-grid">
+      <button class="staff-btn ${!booking.nailTech?'sel':''}" onclick="selectStaff('nailtech','','','')">
+        <div class="staff-av" style="background:#C4B49A;">⭐</div>
+        <div class="staff-name">No Preference</div>
+        <div class="staff-role">Any available</div>
+      </button>`;
+    (nailTechs.length?nailTechs:staff).forEach((u,i)=>{
+      const col=u.color||COLORS[i%COLORS.length];
+      const sel=booking.nailTech===u.name?'sel':'';
+      html+=`<button class="staff-btn ${sel}" onclick="selectStaff('nailtech','${u.name.replace(/'/g,"\\'")}','${col}','${u.specialty||u.role}')">
+        <div class="staff-av" style="background:${col};">${initials(u.name)}</div>
+        <div class="staff-name">${u.name}</div>
+        <div class="staff-role">${u.specialty||u.role}</div>
+      </button>`;
+    });
+    html+=`</div>`;
+  } else {
+    html+=`<div class="card-title">Choose Your Provider <span style="font-size:13px;color:var(--ink4);font-weight:400;">(optional)</span></div>
+    <div class="card-sub">Pick a specific staff member or leave as No Preference.</div>
+    <div class="staff-grid">
+      <button class="staff-btn ${!booking.staff?'sel':''}" onclick="selectStaff('single','','','')">
+        <div class="staff-av" style="background:#C4B49A;">⭐</div>
+        <div class="staff-name">No Preference</div>
+        <div class="staff-role">Any available</div>
+      </button>`;
+    staff.forEach((u,i)=>{
+      const col=u.color||COLORS[i%COLORS.length];
+      const sel=booking.staff===u.name?'sel':'';
+      html+=`<button class="staff-btn ${sel}" onclick="selectStaff('single','${u.name.replace(/'/g,"\\'")}','${col}','${u.specialty||u.role}')">
+        <div class="staff-av" style="background:${col};">${initials(u.name)}</div>
+        <div class="staff-name">${u.name}</div>
+        <div class="staff-role">${u.specialty||u.role}</div>
+      </button>`;
+    });
+    html+=`</div>`;
+  }
 
-  staff.forEach((u,i)=>{
-    const col=u.color||COLORS[i%COLORS.length];
-    const sel=booking.staff===u.name?'sel':'';
-    html+=`<button class="staff-btn ${sel}" onclick="selectStaff('${u.name.replace(/'/g,"\\'")}','${col}','${u.specialty||u.role}')">
-      <div class="staff-av" style="background:${col};">${initials(u.name)}</div>
-      <div class="staff-name">${u.name}</div>
-      <div class="staff-role">${u.specialty||u.role}</div>
-    </button>`;
-  });
-
-  html += `</div></div>
+  html+=`</div>
   <button class="btn-gold" onclick="goStep3()" ${booking.date&&booking.time?'':'disabled'} id="step2next">Next — Your Details →</button>
   <button class="btn-outline" onclick="showStep1()">← Back</button>`;
 
@@ -588,17 +734,24 @@ function renderCal(){
   const today=new Date(); today.setHours(0,0,0,0);
   const cfg=DATA.settings||{};
   const openDays=cfg.openDays||[1,2,3,4,5,6];
+  const closedDates=cfg.closedDates||[]; // ['YYYY-MM-DD',...]
+  const bookingWindowDays=cfg.bookingWindowDays||365;
+  const maxDate=new Date(today); maxDate.setDate(maxDate.getDate()+bookingWindowDays);
   for(let i=0;i<firstDay;i++) html+=`<button class="date-btn empty"> </button>`;
   for(let i=1;i<=daysInMonth;i++){
     const dt=new Date(calYear,calMonth,i);
     const ds=dt.toISOString().split('T')[0];
     const isPast=dt<today;
-    const isClosed=!openDays.includes(dt.getDay());
+    const isTooFar=dt>maxDate;
+    const isWeekdayClosed=!openDays.includes(dt.getDay());
+    const isClosedDate=closedDates.includes(ds);
     const isTod=dt.toDateString()===today.toDateString();
     const isSel=booking.date===ds;
-    const disabled=isPast||isClosed;
+    const disabled=isPast||isTooFar||isWeekdayClosed||isClosedDate;
     const clickFn=disabled?'':`pickDate('${ds}')`;
-    html+=`<button class="date-btn ${disabled?'past':''} ${isTod?'today':''} ${isSel?'sel':''}" onclick="${clickFn}" title="${isClosed?'Closed':'Available'}">${i}${isClosed?'<br><span style=\'font-size:7px;color:#B84040;\'>✕</span>':''}</button>`;
+    let cls=`date-btn${isPast||isTooFar?' past':isClosedDate?' closed':isWeekdayClosed?' past':''}${isTod?' today':''}${isSel?' sel':''}`;
+    let title=isClosedDate?'Closed — Holiday/Rest day':isWeekdayClosed?'Closed':isTooFar?'Outside booking window':'Available';
+    html+=`<button class="${cls}" onclick="${clickFn}" title="${title}">${i}${isClosedDate?'<br><span style=\'font-size:7px;color:#B84040;\'>✕</span>':isWeekdayClosed?'<br><span style=\'font-size:7px;color:#B84040;\'>✕</span>':''}</button>`;
   }
   grid.innerHTML=html;
 }
@@ -746,9 +899,20 @@ function selectTime(t){
   if(btn) btn.removeAttribute('disabled');
 }
 
-function selectStaff(name, color, role){
-  booking.staff=name; booking.staffColor=color;
-  document.querySelectorAll('.staff-btn').forEach(b=>b.classList.remove('sel'));
+function selectStaff(type, name, color, role){
+  if(type==='aesthetician'){
+    booking.aesthetician=name; booking.staff=name; booking.staffColor=color;
+    // Only deselect buttons in the aesthetician group (first staff-grid)
+    const grids=document.querySelectorAll('.staff-grid');
+    if(grids[0]) grids[0].querySelectorAll('.staff-btn').forEach(b=>b.classList.remove('sel'));
+  } else if(type==='nailtech'){
+    booking.nailTech=name;
+    const grids=document.querySelectorAll('.staff-grid');
+    if(grids[1]) grids[1].querySelectorAll('.staff-btn').forEach(b=>b.classList.remove('sel'));
+  } else {
+    booking.staff=name; booking.staffColor=color; booking.aesthetician=''; booking.nailTech='';
+    document.querySelectorAll('.staff-btn').forEach(b=>b.classList.remove('sel'));
+  }
   event.currentTarget.classList.add('sel');
 }
 
@@ -774,7 +938,7 @@ function goStep3(){
       </div>
     </div>
     <div class="form-group"><label class="form-label">Special Requests / Notes</label><textarea class="form-textarea" id="bkNotes" placeholder="Allergies, preferences, questions…" oninput="booking.notes=this.value">${booking.notes}</textarea></div>
-    <div class="notice">📅 You're booking <strong>${booking.services.map(s=>s.name).join(', ')}</strong> on <strong>${dateStr}</strong> at <strong>${booking.time}</strong>${booking.staff?' with <strong>'+booking.staff+'</strong>':''}.</div>
+    <div class="notice">📅 You're booking <strong>${booking.services.map(s=>s.name).join(', ')}</strong> on <strong>${dateStr}</strong> at <strong>${booking.time}</strong>${isComboBooking()?(booking.aesthetician||booking.nailTech?' — Aesthetician: <strong>'+(booking.aesthetician||'Any')+'</strong>, Nail Tech: <strong>'+(booking.nailTech||'Any')+'</strong>':''):booking.staff?' with <strong>'+booking.staff+'</strong>':''}.</div>
     <button class="btn-gold" onclick="goStep4()" ${booking.name&&booking.phone?'':'disabled'} id="step3next">Review Booking →</button>
     <button class="btn-outline" onclick="goStep2()">← Back</button>
   </div>`);
@@ -802,7 +966,10 @@ function goStep4(){
     <div class="summary-row"><span class="summary-lbl">Date</span><span class="summary-val">${dateStr}</span></div>
     <div class="summary-row"><span class="summary-lbl">Time</span><span class="summary-val">${booking.time}${booking.duration?' ('+booking.duration+' min)':''}</span></div>
     ${booking.groupSize>1?`<div class="summary-row"><span class="summary-lbl">Group</span><span class="summary-val">👥 ${booking.groupSize} clients</span></div>`:''}
-    <div class="summary-row"><span class="summary-lbl">Provider</span><span class="summary-val">${booking.staff||'No preference'}</span></div>
+    ${isComboBooking()?
+      `<div class="summary-row"><span class="summary-lbl">Aesthetician</span><span class="summary-val">${booking.aesthetician||'No preference'}</span></div>
+       <div class="summary-row"><span class="summary-lbl">Nail Tech</span><span class="summary-val">${booking.nailTech||'No preference'}</span></div>`
+      :`<div class="summary-row"><span class="summary-lbl">Provider</span><span class="summary-val">${booking.staff||'No preference'}</span></div>`}
     <div class="summary-row"><span class="summary-lbl">Name</span><span class="summary-val">${booking.name}</span></div>
     <div class="summary-row"><span class="summary-lbl">Phone</span><span class="summary-val">${booking.phone}</span></div>
     ${booking.email?`<div class="summary-row"><span class="summary-lbl">Email</span><span class="summary-val">${booking.email}</span></div>`:''}
@@ -823,6 +990,7 @@ async function submitBooking(){
 
   const ref='BK'+Date.now().toString().slice(-8);
   const svcMeta=getSvcMeta(booking.service||'');
+  const combo=isComboBooking();
   const appt={
     id:Date.now(),
     client:booking.name,
@@ -832,6 +1000,8 @@ async function submitBooking(){
     services:booking.services,
     totalPrice:booking.servicePrice,
     staff:booking.staff||'',
+    aesthetician:combo?(booking.aesthetician||''):undefined,
+    nailTech:combo?(booking.nailTech||''):undefined,
     date:booking.date,
     time:booking.time,
     duration:booking.duration||60,
@@ -881,7 +1051,10 @@ function showSuccess(ref){
       <div class="summary-row" style="text-align:left;"><span class="summary-lbl">Total</span><span class="summary-val" style="color:var(--gold-dk);font-weight:600;">${fmtPrice(booking.servicePrice)}</span></div>
       <div class="summary-row" style="text-align:left;"><span class="summary-lbl">Date</span><span class="summary-val">${dateStr}</span></div>
       <div class="summary-row" style="text-align:left;"><span class="summary-lbl">Time</span><span class="summary-val">${booking.time}</span></div>
-      ${booking.staff?`<div class="summary-row" style="text-align:left;"><span class="summary-lbl">Provider</span><span class="summary-val">${booking.staff}</span></div>`:''}
+      ${isComboBooking()
+        ?`${booking.aesthetician?`<div class="summary-row" style="text-align:left;"><span class="summary-lbl">Aesthetician</span><span class="summary-val">${booking.aesthetician}</span></div>`:''}
+          ${booking.nailTech?`<div class="summary-row" style="text-align:left;"><span class="summary-lbl">Nail Tech</span><span class="summary-val">${booking.nailTech}</span></div>`:''}`
+        :booking.staff?`<div class="summary-row" style="text-align:left;"><span class="summary-lbl">Provider</span><span class="summary-val">${booking.staff}</span></div>`:''}
       <button class="btn-gold" style="margin-top:24px;" onclick="location.reload()">Book Another Appointment</button>
     </div>
   </div>`);
