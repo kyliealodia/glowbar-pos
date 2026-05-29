@@ -896,7 +896,14 @@ html{height:-webkit-fill-available;}
             <div class="card-body" id="rptFeeSummary"></div>
           </div>
           <div class="card">
-            <div class="card-hdr"><h3>Transaction History</h3></div>
+            <div class="card-hdr" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+              <h3>Transaction History</h3>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <span id="txSelCount" style="display:none;font-size:12px;color:var(--ink3);"></span>
+                <button id="txDeleteBtn" style="display:none;background:var(--danger);color:#fff;border:none;border-radius:8px;padding:5px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:'Jost',sans-serif;" onclick="openDeleteTxConfirm()">🗑 Delete Selected</button>
+                <button id="txArchiveBtn" class="btn btn-outline btn-sm" onclick="openTxArchive()" style="display:none;font-size:11px;">📦 Deleted Archive</button>
+              </div>
+            </div>
             <div id="rptTxnList" style="overflow-x:auto;"></div>
           </div>
         </div>
@@ -2963,6 +2970,7 @@ let S = {
     {id:4,name:'Suite B',occupied:false,session:null},
   ],
   transactions:[],
+  deletedTransactions:[],
   messages:[],
   loginLogs:[],
   machines:[
@@ -3031,7 +3039,7 @@ async function pushAllToFirebase(){
   document.getElementById('syncLbl').textContent='Syncing…';
 
   // Push small keys first
-  const smallKeys=['settings','users','rooms','clients','bookings','transactions','loginLogs'];
+  const smallKeys=['settings','users','rooms','clients','bookings','transactions','deletedTransactions','loginLogs'];
   for(const key of smallKeys){
     try{ await db.ref('gb/'+key).set(S[key]||[]); }
     catch(e){ console.warn('Failed:',key,e); }
@@ -3084,7 +3092,7 @@ window.addEventListener('DOMContentLoaded',()=>{
       return defaultVal;
     }
 
-    const onceKeys=['users','products','packages','rooms','transactions','messages','loginLogs','machines','sops','capital','settings'];
+    const onceKeys=['users','products','packages','rooms','transactions','deletedTransactions','messages','loginLogs','machines','sops','capital','settings'];
     let loaded=0;
 
     onceKeys.forEach(key=>{
@@ -6924,15 +6932,28 @@ function renderRptSales(txns){
   // Transaction list
   const sorted=[...txns].sort((a,b)=>new Date(b.time)-new Date(a.time));
   const isAdmin=currentUser&&(currentUser.role==='owner'||currentUser.role==='admin');
+  // Show archive button for admins
+  const archiveBtn=document.getElementById('txArchiveBtn');
+  if(archiveBtn) archiveBtn.style.display=isAdmin?'':'none';
+  // Reset selection on re-render
+  _selectedTxIds=new Set();
+  updateTxDeleteBar();
+  const sortedIds=sorted.map(t=>String(t.id));
   document.getElementById('rptTxnList').innerHTML=sorted.length?`
     <table class="inv-table" style="width:100%;">
-      <thead><tr><th>Date & Time</th><th>Client</th><th>Services</th><th>Method</th><th>Staff</th><th>Discount</th><th>Original</th><th>Fee</th><th>Total</th>${isAdmin?'<th></th>':''}</tr></thead>
+      <thead><tr>
+        ${isAdmin?`<th style="width:36px;padding:8px 8px;"><input type="checkbox" id="txSelectAll" title="Select all" onchange="toggleSelectAllTx(this.checked,'${sortedIds.join(',')}')" style="cursor:pointer;width:14px;height:14px;accent-color:var(--gold-dk);"></th>`:''}
+        <th>Date & Time</th><th>Client</th><th>Services</th><th>Method</th><th>Staff</th><th>Discount</th><th>Original</th><th>Fee</th><th>Total</th>
+        ${isAdmin?'<th></th>':''}
+      </tr></thead>
       <tbody>${sorted.map(t=>{
         const isRefund=t.type==='refund';
         const isRefunded=t.refunded;
         const hasFee=t.payFee>0;
         const methodLabel=(t.method||'cash').replace('-',' ')+(hasFee&&t.feeTerm?' ('+t.feeTerm+'mo)':'');
-        return `<tr style="${isRefund?'opacity:0.6;':''}${isRefunded?'background:#fff8f8;':''}">
+        const rowBg=isRefund?'opacity:0.6;':isRefunded?'background:#fff8f8;':'';
+        return `<tr style="${rowBg}">
+        ${isAdmin?`<td style="padding:8px 8px;"><input type="checkbox" class="tx-row-cb" data-id="${t.id}" onchange="toggleTxSelect('${t.id}')" style="cursor:pointer;width:14px;height:14px;accent-color:var(--gold-dk);"></td>`:''}
         <td style="font-size:11px;">${new Date(t.time).toLocaleDateString('en-PH',{month:'short',day:'numeric'})}<br><span style="color:var(--ink3);">${new Date(t.time).toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'})}</span></td>
         <td style="font-size:12px;font-weight:500;">${t.client}${isRefund?'<br><span style="font-size:10px;color:var(--danger);">↩ REFUND</span>':''}</td>
         <td style="font-size:11px;color:var(--ink3);max-width:160px;">${isRefund?`<em>Refund: ${t.refundReason||''}</em>${t.originalTxId?`<br><span style="font-size:10px;color:var(--ink4);">Orig: ${t.originalTxId}</span>`:''}`:(t.items||[]).map(i=>i.name).join(', ')}${!isRefund&&t.depositApplied>0?`<br><span style="font-size:10px;color:var(--success);">💰 Dep -${fmtPrice(t.depositApplied)}</span>`:''}</td>
@@ -6942,9 +6963,85 @@ function renderRptSales(txns){
         <td style="font-size:12px;">${hasFee?fmtPrice(t.originalAmount||t.total-t.payFee):'—'}</td>
         <td style="font-size:12px;color:var(--warn);">${hasFee?'+'+fmtPrice(t.payFee):'—'}</td>
         <td style="font-weight:600;font-size:13px;color:${isRefund?'var(--danger)':''};">${isRefund?'-':''} ${fmtPrice(Math.abs(t.total))}</td>
-        ${isAdmin?`<td>${!isRefund&&!isRefunded?`<button class="btn btn-outline btn-sm" onclick="openRefund('${t.id}')" style="font-size:11px;color:var(--danger);border-color:var(--danger);">↩ Refund</button>`:isRefunded?'<span style="font-size:10px;color:var(--danger);">Refunded</span>':''}</td>`:''}
+        ${isAdmin?`<td style="white-space:nowrap;">${!isRefund&&!isRefunded?`<button class="btn btn-outline btn-sm" onclick="openRefund('${t.id}')" style="font-size:11px;color:var(--danger);border-color:var(--danger);">↩ Refund</button>`:isRefunded?'<span style="font-size:10px;color:var(--danger);">Refunded</span>':''}</td>`:''}
       </tr>`;}).join('')}</tbody>
     </table>`:'<div style="padding:30px;text-align:center;color:var(--ink3);">No transactions this period</div>';
+}
+
+let _selectedTxIds=new Set();
+
+function toggleTxSelect(id){
+  const sid=String(id);
+  if(_selectedTxIds.has(sid)) _selectedTxIds.delete(sid);
+  else _selectedTxIds.add(sid);
+  updateTxDeleteBar();
+  const allCbs=document.querySelectorAll('.tx-row-cb');
+  const selectAllCb=document.getElementById('txSelectAll');
+  if(selectAllCb){
+    selectAllCb.indeterminate=_selectedTxIds.size>0&&_selectedTxIds.size<allCbs.length;
+    selectAllCb.checked=allCbs.length>0&&_selectedTxIds.size===allCbs.length;
+  }
+}
+
+function toggleSelectAllTx(checked,idsStr){
+  _selectedTxIds=new Set();
+  if(checked) idsStr.split(',').filter(Boolean).forEach(id=>_selectedTxIds.add(id));
+  document.querySelectorAll('.tx-row-cb').forEach(cb=>{cb.checked=checked;});
+  updateTxDeleteBar();
+}
+
+function updateTxDeleteBar(){
+  const count=_selectedTxIds.size;
+  const countEl=document.getElementById('txSelCount');
+  const deleteBtn=document.getElementById('txDeleteBtn');
+  if(countEl){countEl.textContent=count+' selected';countEl.style.display=count>0?'inline':'none';}
+  if(deleteBtn) deleteBtn.style.display=count>0?'inline-block':'none';
+}
+
+function openDeleteTxConfirm(){
+  if(!_selectedTxIds.size) return;
+  document.getElementById('deleteTxCount').textContent=_selectedTxIds.size;
+  openM('deleteTxModal');
+}
+
+async function confirmDeleteTx(){
+  const ids=[..._selectedTxIds];
+  const now=new Date().toISOString();
+  const deletedBy=currentUser?.name||'Admin';
+  if(!S.deletedTransactions) S.deletedTransactions=[];
+  ids.forEach(id=>{
+    const tx=S.transactions.find(t=>String(t.id)===id);
+    if(tx) S.deletedTransactions.push({...tx,deletedAt:now,deletedBy});
+  });
+  S.transactions=S.transactions.filter(t=>!ids.includes(String(t.id)));
+  sync('transactions');sync('deletedTransactions');
+  _selectedTxIds=new Set();
+  updateTxDeleteBar();
+  closeM('deleteTxModal');
+  showToast(ids.length+' transaction'+(ids.length>1?'s':'')+' deleted','ok');
+  renderReports();renderDashboard();
+}
+
+function openTxArchive(){renderTxArchive();openM('txArchiveModal');}
+
+function renderTxArchive(){
+  const archive=(S.deletedTransactions||[]).sort((a,b)=>new Date(b.deletedAt)-new Date(a.deletedAt));
+  const el=document.getElementById('txArchiveContent');
+  if(!el) return;
+  if(!archive.length){el.innerHTML='<div style="padding:30px;text-align:center;color:var(--ink3);">No deleted transactions yet.</div>';return;}
+  el.innerHTML=`<table class="inv-table" style="width:100%;">
+    <thead><tr><th>Deleted At</th><th>Deleted By</th><th>Orig. Date</th><th>Client</th><th>Services</th><th>Method</th><th>Total</th><th>Ref</th></tr></thead>
+    <tbody>${archive.map(t=>`<tr style="opacity:0.8;">
+      <td style="font-size:11px;">${new Date(t.deletedAt).toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'numeric'})}<br><span style="color:var(--ink3);">${new Date(t.deletedAt).toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'})}</span></td>
+      <td style="font-size:11px;color:var(--danger);">${t.deletedBy||'—'}</td>
+      <td style="font-size:11px;">${new Date(t.time).toLocaleDateString('en-PH',{month:'short',day:'numeric'})}</td>
+      <td style="font-size:12px;font-weight:500;">${t.client}</td>
+      <td style="font-size:11px;color:var(--ink3);max-width:160px;">${(t.items||[]).map(i=>i.name).join(', ')}</td>
+      <td style="font-size:11px;text-transform:capitalize;">${t.method||'cash'}</td>
+      <td style="font-weight:600;font-size:13px;">${fmtPrice(Math.abs(t.total))}</td>
+      <td style="font-size:10px;color:var(--ink4);">${t.id}</td>
+    </tr>`).join('')}</tbody>
+  </table>`;
 }
 
 function renderRptExpense(txns){
@@ -10515,6 +10612,35 @@ function _buildSignedView(client, formKey, consent){
       <button class="btn btn-outline" onclick="closeM('clearDataModal')">Cancel</button>
       <button class="btn btn-outline" id="cdReviewBtn" onclick="showClearConfirm()" style="color:var(--danger);border-color:var(--danger);">Review →</button>
       <button class="btn" id="cdExecBtn" onclick="executeClearData()" style="display:none;background:var(--danger);color:#fff;">🗑 Delete Permanently</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Transactions Confirmation Modal -->
+<div class="overlay hidden" id="deleteTxModal">
+  <div class="modal modal-sm">
+    <div class="modal-hdr"><div class="modal-title">🗑 Delete Transactions</div><div class="modal-x" onclick="closeM('deleteTxModal')">✕</div></div>
+    <div style="padding:20px 24px;">
+      <div style="font-size:16px;font-weight:600;color:var(--ink);margin-bottom:10px;">Are you sure?</div>
+      <div style="font-size:13px;color:var(--ink3);margin-bottom:20px;line-height:1.6;">
+        You are about to permanently delete <strong id="deleteTxCount" style="color:var(--danger);"></strong> transaction(s) from the active records.<br><br>
+        A copy will be saved in the <strong>Deleted Archive</strong> for admin review.
+      </div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-outline" onclick="closeM('deleteTxModal')" style="flex:1;">Cancel</button>
+        <button class="btn" style="flex:1;background:var(--danger);color:#fff;border:none;border-radius:10px;padding:11px;font-weight:600;cursor:pointer;font-family:'Jost',sans-serif;" onclick="confirmDeleteTx()">Delete</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Deleted Transactions Archive Modal -->
+<div class="overlay hidden" id="txArchiveModal">
+  <div class="modal modal-lg" style="max-width:900px;">
+    <div class="modal-hdr"><div class="modal-title">📦 Deleted Transactions Archive</div><div class="modal-x" onclick="closeM('txArchiveModal')">✕</div></div>
+    <div style="padding:0 0 16px;">
+      <div style="padding:12px 24px;font-size:12px;color:var(--ink3);background:var(--cream2);border-bottom:1px solid var(--border);">Admin-only log of all deleted transactions. These records cannot be restored to active sales but are kept here for audit purposes.</div>
+      <div id="txArchiveContent" style="overflow-x:auto;max-height:65vh;overflow-y:auto;"></div>
     </div>
   </div>
 </div>
