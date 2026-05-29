@@ -109,7 +109,18 @@ window.pushServicesToPOS = async function(){
     });
 
     await set(posRef, updated);
-    console.log('GlowBar Tracker: pushed', updated.length, 'services to POS gb/products');
+
+    // Also write gb/serviceNames so Booking portal gets it immediately
+    const serviceNames = updated.map(p => ({
+      id: p.id,
+      name: p.name,
+      cat: p.cat,
+      price: p.price,
+      durationMins: p.durationMins || 60
+    }));
+    await set(ref(db, 'gb/serviceNames'), serviceNames);
+
+    console.log('GlowBar Tracker: pushed', updated.length, 'services to gb/products & gb/serviceNames');
   } catch(e) {
     console.error('pushServicesToPOS error:', e);
   }
