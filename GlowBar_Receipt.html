@@ -51,6 +51,16 @@ body{background:#f5f0eb;min-height:100vh;font-family:'Jost',sans-serif;color:#2a
 .footer-note{text-align:center;font-size:10px;color:#8a7a6a;margin-top:18px;line-height:1.6;letter-spacing:.3px;}
 .loading{text-align:center;padding:60px 20px;color:#8a7a6a;font-size:14px;}
 .error-box{text-align:center;padding:60px 20px;color:#c0392b;font-size:14px;}
+@media(max-width:480px){
+  body{padding:0;}
+  .receipt-wrap{border-radius:0;max-width:100%;min-height:100vh;}
+  .receipt-body{padding:20px 18px 16px;}
+  .brand h1{font-size:24px;}
+  .row{font-size:12px;}
+  .svc-item{font-size:12px;}
+  .total-row{font-size:15px;}
+  .print-btn{border-radius:0;position:sticky;bottom:0;}
+}
 @media print{
   body{background:#fff;padding:0;}
   .receipt-wrap{box-shadow:none;border-radius:0;max-width:100%;}

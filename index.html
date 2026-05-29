@@ -158,7 +158,42 @@ html{height:-webkit-fill-available;}
   /* Tables scroll */
   .card{overflow-x:auto;}
   .inv-table{min-width:600px;}
+  /* Clear the fixed bottom nav */
+  .page{padding-bottom:70px!important;}
+  #page-pos{padding-bottom:0!important;}
+  /* Payment method grid — 2 columns on mobile */
+  .pay-grid{grid-template-columns:repeat(2,1fr)!important;}
+  /* Touch-friendly font sizes */
+  body,input,select,textarea{font-size:14px;}
+  /* Dashboard grid single column */
+  .dash-grid{grid-template-columns:1fr!important;}
+  /* Reports grid cards single column */
+  #rptPanelSales>div:first-child,#rptPanelExpense>div:first-child,#rptPanelRevenue>div:first-child{grid-template-columns:1fr!important;}
+  /* Show mobile bottom nav */
+  .mobile-bottom-nav{display:flex!important;}
+  /* Topbar compact */
+  .topbar{padding:0 12px!important;}
+  .tb-badge{display:none;}
+  /* Hide topbar date on very small screens */
+  .tb-date{font-size:11px;}
 }
+
+/* ══ TABLET (769px – 1024px) ══ */
+@media(min-width:769px) and (max-width:1024px){
+  .sidebar{width:185px;}
+  .svc-grid{grid-template-columns:repeat(3,1fr)!important;}
+  .pos-wrap{grid-template-columns:1fr 280px!important;}
+  .dash-grid{grid-template-columns:1fr!important;}
+  .inv-table{min-width:500px;}
+}
+
+/* ══ MOBILE BOTTOM NAV ══ */
+.mobile-bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;height:56px;background:#fff;border-top:1.5px solid var(--border2);z-index:160;align-items:stretch;padding-bottom:env(safe-area-inset-bottom);}
+.mb-nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;color:var(--ink3);transition:color .15s;padding:4px 0;-webkit-tap-highlight-color:transparent;touch-action:manipulation;min-height:44px;}
+.mb-nav-item.active{color:var(--gold-dk);}
+.mb-nav-ico{font-size:20px;line-height:1;}
+.mb-nav-lbl{font-size:9px;font-weight:600;letter-spacing:0.3px;text-transform:uppercase;}
+
 /* ══ KIOSK ══ */
 .kiosk-step-ind{font-size:11px;font-weight:500;color:var(--ink3);padding:5px 10px;border-radius:20px;border:1px solid var(--border2);background:#fff;white-space:nowrap;}
 .kiosk-step-ind.active{background:#FFF3E0;color:var(--gold-dk);border-color:var(--gold);}
@@ -519,6 +554,14 @@ html{height:-webkit-fill-available;}
 <div id="mainApp">
   <div class="app-wrap">
     <div id="sbOverlay" onclick="closeSidebarMobile()"></div>
+    <!-- Mobile Bottom Navigation -->
+    <nav class="mobile-bottom-nav" id="mobileBottomNav">
+      <div class="mb-nav-item active" id="mbn-dashboard" onclick="goPage('dashboard')"><span class="mb-nav-ico">📊</span><span class="mb-nav-lbl">Dashboard</span></div>
+      <div class="mb-nav-item" id="mbn-pos" onclick="goPage('pos')"><span class="mb-nav-ico">🛍️</span><span class="mb-nav-lbl">POS</span></div>
+      <div class="mb-nav-item" id="mbn-calendar" onclick="goPage('calendar')"><span class="mb-nav-ico">📅</span><span class="mb-nav-lbl">Calendar</span></div>
+      <div class="mb-nav-item" id="mbn-clients" onclick="goPage('clients')"><span class="mb-nav-ico">👤</span><span class="mb-nav-lbl">Clients</span></div>
+      <div class="mb-nav-item" id="mbn-more" onclick="toggleSidebar()"><span class="mb-nav-ico">☰</span><span class="mb-nav-lbl">More</span></div>
+    </nav>
     <!-- Sidebar -->
     <div class="sidebar" id="sidebar">
       <div class="sb-logo">
@@ -3797,8 +3840,10 @@ function goPage(name){
   if(restricted[name]&&!perms.includes(restricted[name])&&!isOwner){showToast('Access denied','err');return;}
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.querySelectorAll('.mb-nav-item').forEach(n=>n.classList.remove('active'));
   document.getElementById('page-'+name)?.classList.add('active');
   document.getElementById('nav-'+name)?.classList.add('active');
+  document.getElementById('mbn-'+name)?.classList.add('active');
   document.getElementById('topTitle').textContent=pageTitles[name]||name;
   if(name==='dashboard')renderDashboard();
   if(name==='pos'){initPosMobile();renderCatTabs();renderSvcs();renderCart();}

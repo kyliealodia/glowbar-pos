@@ -137,11 +137,21 @@ html{height:-webkit-fill-available;}
   .date-btn.closed{background:#fff0f0;color:var(--danger);opacity:0.55;cursor:not-allowed;}
   .date-btn.far{opacity:0.25;cursor:not-allowed;}
 
+  /* ── Tablet ── */
+  @media(max-width:768px){
+    .container{padding:16px 12px 48px;}
+    .slot-btn{min-height:44px;padding:8px 4px;}
+    .cal-nav-btn{width:40px;height:40px;}
+    .form-row{grid-template-columns:1fr;}
+    input,select,textarea{font-size:16px;}
+  }
+  /* ── Mobile ── */
   @media(max-width:480px){
     .svc-grid{grid-template-columns:1fr;}
     .slots-grid{grid-template-columns:repeat(3,1fr);}
     .staff-grid{grid-template-columns:repeat(2,1fr);}
     .form-row{grid-template-columns:1fr;}
+    .hero-title{font-size:clamp(32px,9vw,48px);}
   }
 </style>
 <meta name="apple-mobile-web-app-capable" content="yes">
