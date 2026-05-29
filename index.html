@@ -590,6 +590,8 @@ html{height:-webkit-fill-available;}
           <div class="metric"><div class="metric-lbl">Active Sessions</div><div class="metric-val" id="mSess">0</div><div class="metric-sub">rooms occupied</div></div>
           <div class="metric"><div class="metric-lbl">Appointments</div><div class="metric-val" id="mAppts">0</div><div class="metric-sub">today</div></div>
           <div class="metric"><div class="metric-lbl">Low Stock</div><div class="metric-val" id="mLow" style="color:var(--warn)">0</div><div class="metric-sub" style="color:var(--ink3)">items</div></div>
+          <div class="metric"><div class="metric-lbl">Total Referrals</div><div class="metric-val" id="mRefCount" style="color:var(--gold-dk)">0</div><div class="metric-sub" id="mRefSub">0 pending</div></div>
+          <div class="metric"><div class="metric-lbl">Credits Given</div><div class="metric-val" id="mRefCredits" style="color:var(--success)">₱0</div><div class="metric-sub" id="mRefCreditSub">0 active</div></div>
         </div>
         <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
           <button class="btn btn-outline btn-sm" onclick="openEOD()" style="font-size:12px;">📊 End of Day Summary</button>
@@ -1600,9 +1602,14 @@ html{height:-webkit-fill-available;}
 
     <!-- Referral Credit -->
     <div id="refCreditWrap" style="display:none;margin-top:14px;padding:12px 14px;background:var(--cream2);border-radius:12px;border:1.5px solid var(--gold);">
-      <div style="display:flex;align-items:center;justify-content:space-between;">
-        <div><div style="font-size:10px;font-weight:700;color:var(--gold-dk);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">🤝 Referral Credit Available</div><div style="font-size:13px;" id="refCreditAmtTxt"></div></div>
-        <button class="btn btn-gold btn-sm" onclick="applyReferralCredit()">Apply</button>
+      <div style="font-size:10px;font-weight:700;color:var(--gold-dk);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">🤝 Referral Credit</div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <div style="font-size:12px;color:var(--ink2);">Available: <strong id="refCreditAmtTxt"></strong></div>
+        <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
+          <span style="font-size:13px;color:var(--ink2);font-weight:500;">₱</span>
+          <input class="form-input" type="number" id="refCreditApplyAmt" min="1" step="50" placeholder="amount" style="width:80px;font-size:13px;padding:5px 8px;">
+          <button class="btn btn-gold btn-sm" onclick="applyReferralCredit()">Apply</button>
+        </div>
       </div>
     </div>
 
@@ -2584,7 +2591,7 @@ html{height:-webkit-fill-available;}
       <div id="cpReferralWrap">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
           <div style="font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;">🤝 Referral Records</div>
-          <button class="btn btn-outline btn-sm" onclick="openLogReferral(window._cpClientId)">+ Log Referral</button>
+          <button class="btn btn-outline btn-sm" onclick="openLogReferralFrom(window._cpClientId)">+ Log Referral</button>
         </div>
         <div id="cpReferralCredit" style="display:none;background:var(--cream2);border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:13px;"></div>
         <div id="cpReferrals" style="display:flex;flex-direction:column;gap:8px;"></div>
@@ -4178,7 +4185,7 @@ function confirmPay(){
       if(cl.referralCredit>0&&disc>0){
         let creditUsed=Math.min(cl.referralCredit,disc);
         cl.referralCredit=Math.max(0,cl.referralCredit-creditUsed);
-        if(cl.referrals){cl.referrals.forEach(r=>{if(r.status==='active'&&creditUsed>0){r.status='used';creditUsed-=r.credit;}});}
+        if(cl.referrals){cl.referrals.forEach(r=>{if((r.status==='credited'||r.status==='active')&&creditUsed>0){r.status='used';creditUsed-=r.credit;}});}
       }
     }
   }
@@ -6400,6 +6407,15 @@ function renderDashboard(){
   if(document.getElementById('mAppts'))document.getElementById('mAppts').textContent=todayBk.length;
   const lowStockCount=S.products.filter(p=>p.stock<=p.lowAt).length;
   if(document.getElementById('mLow'))document.getElementById('mLow').textContent=lowStockCount;
+  // Referral stats
+  const allReferrals=S.clients.flatMap(c=>c.referrals||[]);
+  const pendingRef=allReferrals.filter(r=>r.status==='pending').length;
+  const totalCreditsGiven=allReferrals.filter(r=>r.status==='credited'||r.status==='used').reduce((s,r)=>s+r.credit,0);
+  const activeCredits=S.clients.reduce((s,c)=>s+(c.referralCredit||0),0);
+  if(document.getElementById('mRefCount'))document.getElementById('mRefCount').textContent=allReferrals.length;
+  if(document.getElementById('mRefSub'))document.getElementById('mRefSub').textContent=pendingRef+' pending';
+  if(document.getElementById('mRefCredits'))document.getElementById('mRefCredits').textContent=fmtPrice(totalCreditsGiven);
+  if(document.getElementById('mRefCreditSub'))document.getElementById('mRefCreditSub').textContent=fmtPrice(activeCredits)+' available';
   const tc=document.getElementById('dashTxns');
   if(tc)tc.innerHTML=todayTxns.length?[...todayTxns].reverse().slice(0,6).map(t=>`
     <div style="padding:9px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;">
@@ -7977,14 +7993,25 @@ function viewClientProfile(id){
   } else cpRefCredit.style.display='none';
   if(referrals.length){
     cpRefsEmpty.style.display='none';
-    cpRefs.innerHTML=referrals.map(r=>`
-      <div style="background:#fff;border:1.5px solid var(--border2);border-radius:10px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;">
-        <div>
-          <div style="font-size:13px;font-weight:500;">Referred: ${r.referredName}</div>
-          <div style="font-size:11px;color:var(--ink3);">📅 ${r.date} · Credit: ${fmtPrice(r.credit)}</div>
+    cpRefs.innerHTML=referrals.map(r=>{
+      let pillClass,pillLabel,extraBtn='';
+      if(r.status==='used'){pillClass='pill-gray';pillLabel='Used';}
+      else if(r.status==='credited'){pillClass='pill-green';pillLabel='Credited';}
+      else{pillClass='pill-amber';pillLabel='Pending';
+        if(currentUser&&(currentUser.role==='owner'||currentUser.role==='admin'))
+          extraBtn=`<button class="btn btn-outline btn-sm" onclick="creditPendingReferral(${c.id},${r.id})" style="font-size:10px;color:var(--gold-dk);border-color:var(--gold);">+ Credit Now</button>`;
+      }
+      return `<div style="background:#fff;border:1.5px solid var(--border2);border-radius:10px;padding:12px 14px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+          <div>
+            <div style="font-size:13px;font-weight:500;">${r.referredName}</div>
+            <div style="font-size:11px;color:var(--ink3);margin-top:2px;">📅 ${r.date}${r.credit>0?' · Credit: '+fmtPrice(r.credit):'· No credit set'}</div>
+          </div>
+          <span class="pill ${pillClass}" style="flex-shrink:0;">${pillLabel}</span>
         </div>
-        <span class="pill ${r.status==='used'?'pill-gray':'pill-green'}">${r.status==='used'?'Used':'Active'}</span>
-      </div>`).join('');
+        ${extraBtn?`<div style="margin-top:8px;">${extraBtn}</div>`:''}
+      </div>`;
+    }).join('');
   } else {
     cpRefsEmpty.style.display='block';
     cpRefs.innerHTML='';
@@ -9689,52 +9716,125 @@ function updateDepBalanceHint(){
 
 // ══ REFERRALS ══
 let _logReferralClientId=null;
-function openLogReferral(clientId){
-  _logReferralClientId=clientId;
-  const sel=document.getElementById('lrReferredBy');
-  sel.innerHTML='<option value="">Select referring client…</option>'+
-    S.clients.filter(c=>c.id!==clientId).map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+
+function _populateLrDropdowns(excludeId){
+  const all=S.clients.filter(c=>c.id!==excludeId);
+  const refByEl=document.getElementById('lrReferredBy');
+  const newClEl=document.getElementById('lrNewClientId');
+  refByEl.innerHTML='<option value="">Select client…</option>'+all.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+  newClEl.innerHTML='<option value="">Select existing client…</option><option value="__new__">— Not in system yet (enter name) —</option>'+all.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+}
+
+// Called from new client's profile — pre-fills the new client side
+function openLogReferral(newClientId){
+  _logReferralClientId=newClientId;
+  _populateLrDropdowns(null);
+  document.getElementById('lrReferredBy').value='';
+  document.getElementById('lrNewClientId').value=newClientId||'';
+  document.getElementById('lrNewClientName').style.display='none';
+  document.getElementById('lrNewClientName').value='';
   document.getElementById('lrCredit').value=200;
   document.getElementById('lrDate').value=td();
   openM('logReferralModal');
 }
+
+// Called from referrer's profile — pre-fills the referrer side
+function openLogReferralFrom(referrerId){
+  _logReferralClientId=null;
+  _populateLrDropdowns(null);
+  document.getElementById('lrReferredBy').value=referrerId||'';
+  document.getElementById('lrNewClientId').value='';
+  document.getElementById('lrNewClientName').style.display='none';
+  document.getElementById('lrNewClientName').value='';
+  document.getElementById('lrCredit').value=200;
+  document.getElementById('lrDate').value=td();
+  openM('logReferralModal');
+}
+
+function toggleLrNewName(){
+  const sel=document.getElementById('lrNewClientId');
+  const inp=document.getElementById('lrNewClientName');
+  inp.style.display=sel.value==='__new__'?'block':'none';
+}
+
 function saveReferral(){
   const referrerId=parseInt(document.getElementById('lrReferredBy').value);
-  if(!referrerId){showToast('Select a referring client','err');return;}
+  if(!referrerId){showToast('Select the referring client','err');return;}
+  const newClientSelVal=document.getElementById('lrNewClientId').value;
+  const newClientName=document.getElementById('lrNewClientName').value.trim();
+  if(!newClientSelVal){showToast('Select or name the new client','err');return;}
+  if(newClientSelVal==='__new__'&&!newClientName){showToast('Enter the new client\'s name','err');return;}
   const credit=parseFloat(document.getElementById('lrCredit').value)||0;
   const date=document.getElementById('lrDate').value||td();
   const referrer=S.clients.find(c=>c.id===referrerId);
-  const referred=S.clients.find(c=>c.id===_logReferralClientId);
-  if(!referrer||!referred)return;
+  if(!referrer)return;
+  let referredId=null,referredName='';
+  if(newClientSelVal==='__new__'){
+    referredName=newClientName;
+  } else {
+    const referred=S.clients.find(c=>c.id===parseInt(newClientSelVal));
+    if(!referred){showToast('Client not found','err');return;}
+    referredId=referred.id;referredName=referred.name;
+    if(!referred.referredBy){referred.referredBy=referrer.name;referred.referredById=referrer.id;}
+  }
   if(!referrer.referrals)referrer.referrals=[];
-  referrer.referrals.push({id:Date.now(),referredClientId:referred.id,referredName:referred.name,date,credit,status:'active'});
-  referrer.referralCredit=(referrer.referralCredit||0)+credit;
-  if(!referred.referredBy){referred.referredBy=referrer.name;referred.referredById=referrer.id;}
+  const status=credit>0?'credited':'pending';
+  referrer.referrals.push({id:Date.now(),referredClientId:referredId,referredName,date,credit,status});
+  if(credit>0)referrer.referralCredit=(referrer.referralCredit||0)+credit;
   sync('clients');closeM('logReferralModal');
-  viewClientProfile(_logReferralClientId);
-  showToast('Referral logged — '+fmtPrice(credit)+' credit added to '+referrer.name,'ok');
+  const reloadId=_logReferralClientId||referrerId;
+  viewClientProfile(reloadId);
+  showToast(credit>0?'Referral logged — '+fmtPrice(credit)+' credit added to '+referrer.name:'Referral logged as pending — no credit yet','ok');
 }
+
+function creditPendingReferral(referrerId,refId){
+  const referrer=S.clients.find(c=>c.id===referrerId);
+  const ref=referrer?.referrals?.find(r=>r.id===refId);
+  if(!ref||ref.status!=='pending'){showToast('Nothing to credit','err');return;}
+  const amtStr=prompt('Credit amount to add (₱):','200');
+  if(!amtStr)return;
+  const amt=parseFloat(amtStr)||0;
+  if(amt<=0){showToast('Enter a valid amount','err');return;}
+  ref.credit=amt;ref.status='credited';
+  referrer.referralCredit=(referrer.referralCredit||0)+amt;
+  sync('clients');
+  viewClientProfile(referrerId);
+  showToast(fmtPrice(amt)+' credit added to '+referrer.name,'ok');
+}
+
 function applyReferralCredit(){
   if(!selClient)return;
   const c=S.clients.find(x=>x.id===selClient.id);
-  const credit=c?.referralCredit||0;
-  if(!credit){showToast('No referral credit available','err');return;}
+  const available=c?.referralCredit||0;
+  if(!available){showToast('No referral credit available','err');return;}
+  const inputEl=document.getElementById('refCreditApplyAmt');
+  const requested=parseFloat(inputEl?.value)||available;
+  const toApply=Math.min(requested,available);
+  if(toApply<=0){showToast('Enter an amount to apply','err');return;}
   setDiscType('amt');
   const discEl=document.getElementById('discInp');
-  discEl.value=((parseFloat(discEl.value)||0)+credit).toFixed(2);
+  discEl.value=((parseFloat(discEl.value)||0)+toApply).toFixed(2);
   recalc();
+  // Deduct from balance immediately (will sync on payment)
+  c.referralCredit=Math.max(0,available-toApply);
+  // Mark referral records as used (FIFO)
+  let rem=toApply;
+  if(c.referrals)c.referrals.forEach(r=>{if(r.status==='credited'&&rem>0){r.status='used';rem-=r.credit;}});
   document.getElementById('refCreditWrap').style.display='none';
-  showToast('₱'+credit.toLocaleString()+' referral credit applied','ok');
+  showToast(fmtPrice(toApply)+' referral credit applied','ok');
 }
+
 function updateReferralRow(){
   const row=document.getElementById('refCreditWrap');
   const amtEl=document.getElementById('refCreditAmtTxt');
+  const inputEl=document.getElementById('refCreditApplyAmt');
   if(!row||!amtEl)return;
   if(selClient){
     const c=S.clients.find(x=>x.id===selClient.id);
     const credit=c?.referralCredit||0;
     if(credit>0){
-      amtEl.textContent=fmtPrice(credit)+' available';
+      amtEl.textContent=fmtPrice(credit);
+      if(inputEl){inputEl.value=credit;inputEl.max=credit;}
       row.style.display='block';
       return;
     }
@@ -10176,10 +10276,15 @@ function _buildSignedView(client, formKey, consent){
   <div class="modal modal-md">
     <div class="modal-hdr"><div class="modal-title">🤝 Log Referral</div><div class="modal-x" onclick="closeM('logReferralModal')">✕</div></div>
     <div class="modal-body" style="display:flex;flex-direction:column;gap:14px;">
-      <div style="font-size:12px;color:var(--ink3);background:var(--cream2);border-radius:10px;padding:10px 12px;">This client was brought in by another client. Select the referrer and set the credit/discount they will receive on their next visit.</div>
-      <div class="form-group"><label class="form-label">Referred By (existing client) *</label><select class="form-select" id="lrReferredBy"><option value="">Select referring client…</option></select></div>
+      <div style="font-size:12px;color:var(--ink3);background:var(--cream2);border-radius:10px;padding:10px 12px;">Record which existing client referred a new client. The referrer earns a discount credit applied on their next visit.</div>
+      <div class="form-group"><label class="form-label">Referrer — who made the referral *</label><select class="form-select" id="lrReferredBy"><option value="">Select client…</option></select></div>
+      <div class="form-group">
+        <label class="form-label">New Client — who was brought in *</label>
+        <select class="form-select" id="lrNewClientId" onchange="toggleLrNewName()"><option value="">Select existing client…</option><option value="__new__">— Not in system yet (enter name) —</option></select>
+        <input class="form-input" type="text" id="lrNewClientName" placeholder="New client's name" style="display:none;margin-top:6px;">
+      </div>
       <div class="form-row">
-        <div class="form-group"><label class="form-label">Credit for Referrer (₱)</label><input class="form-input" type="number" id="lrCredit" value="200" min="0" step="50"></div>
+        <div class="form-group"><label class="form-label">Credit for Referrer (₱)</label><input class="form-input" type="number" id="lrCredit" value="200" min="0" step="50"><div style="font-size:10px;color:var(--ink4);margin-top:3px;">Set to 0 to mark as Pending until credited manually.</div></div>
         <div class="form-group"><label class="form-label">Date</label><input class="form-input" type="date" id="lrDate"></div>
       </div>
     </div>
