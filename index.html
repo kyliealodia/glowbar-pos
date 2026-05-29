@@ -3422,14 +3422,24 @@ function confirmClock(){
   }
   const selfieData=document.getElementById('clockSnapImg').src;
   const action=_clockAction;
+  const now=new Date();
+  let lateStatus=null;
+  if(action==='clockin'){
+    const openTime=S.settings?.openTime||'09:00';
+    const[oh,om]=openTime.split(':').map(Number);
+    const openMins=oh*60+om;
+    const clockMins=now.getHours()*60+now.getMinutes();
+    lateStatus=clockMins>openMins+15?'late':'ontime';
+  }
   const logEntry={
     id:Date.now(),
     userId:currentUser.id,
     name:currentUser.name,
     role:currentUser.role,
     action,
-    time:new Date().toISOString(),
-    selfie:selfieData
+    time:now.toISOString(),
+    selfie:selfieData,
+    ...(lateStatus&&{lateStatus})
   };
   S.loginLogs.push(logEntry);
   sync('loginLogs');
@@ -6780,7 +6790,7 @@ else if(attRange==='month'&&filterDate) logs=logs.filter(l=>l.time.startsWith(fi
       <td><span class="pill pill-gray" style="font-size:10px;">${cap(log.role||'—')}</span></td>
       <td style="color:${actionColor};font-size:12px;font-weight:500;">${actionLabel}</td>
       <td style="font-size:12px;color:var(--ink2);">${dateStr}</td>
-      <td style="font-size:13px;font-weight:500;">${timeStr}</td>
+      <td style="font-size:13px;font-weight:500;">${timeStr}${isClockin&&log.lateStatus?`<br><span style="font-size:10px;font-weight:600;color:${log.lateStatus==='late'?'var(--danger)':'var(--success)'};">${log.lateStatus==='late'?'⚠ Late':'✓ On Time'}</span>`:''}</td>
       <td style="font-size:12px;color:var(--ink3);">${duration}</td>
 <td><button onclick="event.stopPropagation();editAttLog('${log.id}')" style="font-size:11px;padding:3px 8px;border:1px solid var(--border);border-radius:6px;background:var(--cream);cursor:pointer;margin-right:4px;">✏ Edit</button><button onclick="event.stopPropagation();deleteAttLog('${log.id}')" style="font-size:11px;padding:3px 8px;border:1px solid var(--danger);border-radius:6px;background:var(--cream);color:var(--danger);cursor:pointer;">🗑 Delete</button></td>
     </tr>`;
