@@ -845,6 +845,7 @@ html{height:-webkit-fill-available;}
             </div>
             <button class="btn btn-outline btn-sm" onclick="exportReport()">⬇ Export CSV</button>
             <button class="btn btn-outline btn-sm" onclick="printReport()">🖨 Print</button>
+            <button class="btn btn-outline btn-sm" id="clearDataBtn" onclick="openClearData()" style="display:none;color:var(--danger);border-color:var(--danger);">🗑 Clear Data</button>
           </div>
         </div>
 
@@ -1564,9 +1565,22 @@ html{height:-webkit-fill-available;}
     <!-- Link to appointment — shown if client has appointments today -->
     <div id="linkApptWrap" style="display:none;margin-top:14px;padding:12px 14px;background:var(--cream2);border-radius:12px;border:1.5px solid var(--border2);">
       <div style="font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">📋 Link to Appointment</div>
-      <select class="form-select" id="linkApptSelect" style="font-size:13px;">
+      <select class="form-select" id="linkApptSelect" style="font-size:13px;" onchange="updateDepositDisplay()">
         <option value="">No appointment — walk-in</option>
       </select>
+    </div>
+
+    <div id="depositRow" style="display:none;margin-top:10px;padding:10px 14px;background:var(--cream2);border-radius:10px;border:1.5px solid var(--success);align-items:center;justify-content:space-between;">
+      <div style="font-size:12px;font-weight:600;color:var(--success);">💰 Deposit already paid</div>
+      <div style="font-size:14px;font-weight:700;color:var(--success);" id="depositRowAmt"></div>
+    </div>
+
+    <!-- Referral Credit -->
+    <div id="refCreditWrap" style="display:none;margin-top:14px;padding:12px 14px;background:var(--cream2);border-radius:12px;border:1.5px solid var(--gold);">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div><div style="font-size:10px;font-weight:700;color:var(--gold-dk);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">🤝 Referral Credit Available</div><div style="font-size:13px;" id="refCreditAmtTxt"></div></div>
+        <button class="btn btn-gold btn-sm" onclick="applyReferralCredit()">Apply</button>
+      </div>
     </div>
 
     <!-- Cash amount received — shown only for Cash -->
@@ -2024,6 +2038,7 @@ html{height:-webkit-fill-available;}
         <div class="form-group"><label class="form-label">Duration (mins)</label><input class="form-input" type="number" id="apDuration" value="60" min="15" step="15"></div>
         <div class="form-group"><label class="form-label">Group Size <span style="color:var(--ink4);font-size:10px;">(clients together)</span></label><input class="form-input" type="number" id="apGroupSize" value="1" min="1" max="10"></div>
       </div>
+      <div class="form-group"><label class="form-label">Deposit Amount <span style="color:var(--ink4);font-size:10px;">(optional — partial payment)</span></label><input class="form-input" type="number" id="apDeposit" value="0" min="0" step="50" placeholder="0"><div id="apDepositBalance" style="font-size:11px;color:var(--ink3);margin-top:4px;display:none;"></div></div>
       <div class="form-group"><label class="form-label">Notes / Concerns</label><textarea class="form-textarea" id="apNotes" placeholder="Client concerns, contraindications…"></textarea></div>
       <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--cream2);border-radius:9px;border:1px solid var(--border);">
         <input type="checkbox" id="apSendReminder" checked style="width:16px;height:16px;accent-color:var(--gold);">
@@ -2521,6 +2536,17 @@ html{height:-webkit-fill-available;}
         </div>
         <div id="cpPhotosGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;"></div>
         <div id="cpPhotosEmpty" style="font-size:12px;color:var(--ink4);padding:10px 0;text-align:center;background:var(--cream2);border-radius:10px;">No photos yet — tap + Add Photo to upload before/after images.</div>
+      </div>
+
+      <!-- Referral Records -->
+      <div id="cpReferralWrap">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <div style="font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;">🤝 Referral Records</div>
+          <button class="btn btn-outline btn-sm" onclick="openLogReferral(window._cpClientId)">+ Log Referral</button>
+        </div>
+        <div id="cpReferralCredit" style="display:none;background:var(--cream2);border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:13px;"></div>
+        <div id="cpReferrals" style="display:flex;flex-direction:column;gap:8px;"></div>
+        <div id="cpReferralsEmpty" style="font-size:12px;color:var(--ink4);padding:10px 0;text-align:center;">No referrals logged yet.</div>
       </div>
 
       <!-- Treatment History -->
@@ -3252,6 +3278,7 @@ function doLogin(){
   initApp();
   // Check if already clocked in today
   updateClockButtons();
+  updateAdminTools();
   showToast('Welcome, '+currentUser.name.split(' ')[0]+'! ✨','ok');
 }
 
@@ -3814,6 +3841,9 @@ function openPayment(){
   if(refWrap) refWrap.style.display='none';
   _refPhotoData=null;
   populateLinkAppt();
+  window._linkedDepositAmt=0;
+  updateReferralRow();
+  updateDepositDisplay();
   openM('payModal');
 }
 function selPay(el){
@@ -3968,6 +3998,8 @@ function confirmPay(){
   const vatOn=document.getElementById('vatToggle')?.checked;
   const vat=vatOn?afterDisc*0.12:0;
   const total=afterDisc+tip+vat;
+  const dep=window._linkedDepositAmt||0;
+  const finalTotal=Math.max(0,total-dep);
   const cn=selClient?selClient.name:'Walk-in Client';
   const txid='TXN'+Date.now().toString().slice(-6);
   const now=new Date();
@@ -4001,11 +4033,20 @@ function confirmPay(){
   });
   if(selClient){
     const cl=S.clients.find(c=>c.id===selClient.id);
-    if(cl){cl.visits++;cl.totalSpent+=total;}
+    if(cl){
+      cl.visits++;
+      cl.totalSpent+=finalTotal;
+      // Deduct referral credit if discount was applied
+      if(cl.referralCredit>0&&disc>0){
+        let creditUsed=Math.min(cl.referralCredit,disc);
+        cl.referralCredit=Math.max(0,cl.referralCredit-creditUsed);
+        if(cl.referrals){cl.referrals.forEach(r=>{if(r.status==='active'&&creditUsed>0){r.status='used';creditUsed-=r.credit;}});}
+      }
+    }
   }
   const cashGiven=method==='cash'?(parseFloat(document.getElementById('cashGiven').value)||0):0;
-  const cashChange=method==='cash'?Math.max(0,cashGiven-total):0;
-  S.transactions.push({id:txid,client:cn,clientId:selClient?.id||null,items:JSON.parse(JSON.stringify(cart)),sub,disc,discType,tip,vat,vatOn,total,method,cashGiven:cashGiven||null,cashChange:cashChange||null,refPhoto:_refPhotoData||null,time:now.toISOString(),staff:currentUser.name});
+  const cashChange=method==='cash'?Math.max(0,cashGiven-finalTotal):0;
+  S.transactions.push({id:txid,client:cn,clientId:selClient?.id||null,items:JSON.parse(JSON.stringify(cart)),sub,disc,discType,tip,vat,vatOn,total:finalTotal,depositApplied:dep||null,method,cashGiven:cashGiven||null,cashChange:cashChange||null,refPhoto:_refPhotoData||null,time:now.toISOString(),staff:currentUser.name});
   window.lastTx=S.transactions[S.transactions.length-1];
   window._lastPaidClientId = selClient?.id||null;
   window._lastTxId = txid;
@@ -4025,6 +4066,7 @@ function confirmPay(){
   const wrap=document.getElementById('refCaptureWrap');
   if(wrap) wrap.style.display='none';
   closeM('payModal');
+  window._linkedDepositAmt=0;
   // Build receipt
   document.getElementById('receiptContent').innerHTML=`
     <div style="text-align:center;margin-bottom:12px;"><div style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:500;">GlowBar</div><div style="font-size:10px;color:var(--ink3);letter-spacing:1px;text-transform:uppercase;">Beauty · Confidence · Glow</div><div style="font-size:10px;color:var(--ink3);margin-top:3px;">${now.toLocaleString('en-PH')} · Ref: ${txid}</div></div>
@@ -4036,7 +4078,8 @@ function confirmPay(){
     ${disc>0?`<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--success);margin-bottom:3px;"><span>Discount</span><span>-${fmtPrice(disc)}</span></div>`:''}
     ${tip>0?`<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink2);margin-bottom:3px;"><span>Tip 🫶</span><span>+${fmtPrice(tip)}</span></div>`:''}
     ${vatOn?`<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink2);margin-bottom:3px;"><span>VAT (12%)</span><span>${fmtPrice(vat)}</span></div>`:''}
-    <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:600;border-top:1px solid var(--cream3);padding-top:8px;margin-top:4px;"><span>TOTAL</span><span>${fmtPrice(total)}</span></div>
+    ${dep>0?`<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--success);margin-bottom:3px;"><span>💰 Deposit Applied</span><span>-${fmtPrice(dep)}</span></div>`:''}
+    <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:600;border-top:1px solid var(--cream3);padding-top:8px;margin-top:4px;"><span>TOTAL</span><span>${fmtPrice(finalTotal)}</span></div>
     <div style="text-align:center;margin-top:12px;padding:10px;background:rgba(74,140,92,0.08);border-radius:10px;color:var(--success);font-weight:600;font-size:13px;">✓ PAID via ${method.toUpperCase()}</div>
     ${method==='cash'&&cashGiven>0?`<div style="margin-top:10px;padding:10px 12px;background:var(--cream2);border-radius:10px;">
       <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--ink2);margin-bottom:4px;"><span>Cash Received</span><span style="font-weight:600;">${fmtPrice(cashGiven)}</span></div>
@@ -4063,7 +4106,7 @@ function confirmPay(){
   ['0','50','100','Custom'].forEach(v=>{const el=document.getElementById('tip'+v);if(el)el.classList.remove('active');});
   document.getElementById('tip0')?.classList.add('active');
   renderCart(); renderSvcs(); renderDashboard();
-  showToast('Payment confirmed! '+fmtPrice(total),'ok');
+  showToast('Payment confirmed! '+fmtPrice(finalTotal),'ok');
 }
 function printR(){const c=document.getElementById('receiptContent').innerHTML;const w=window.open('','_blank','width=380,height=560');w.document.write('<html><head><title>GlowBar Receipt</title><style>body{font-family:sans-serif;padding:18px;font-size:12px;}</style></head><body>'+c+'</body></html>');w.document.close();w.print();}
 
@@ -4197,7 +4240,7 @@ function populateLinkAppt(){
   if(!appts.length){wrap.style.display='none';return;}
   wrap.style.display='block';
   sel.innerHTML='<option value="">No appointment — walk-in</option>'+
-    appts.map(b=>`<option value="${b.id}">${b.time} — ${b.client} (${b.service.slice(0,30)})</option>`).join('');
+    appts.map(b=>`<option value="${b.id}">${b.time} — ${b.client} (${b.service.slice(0,25)})${b.depositAmt?` · Deposit: ₱${b.depositAmt}`:''}</option>`).join('');
 }
 
 // ══ END OF DAY ══
@@ -4634,6 +4677,7 @@ function showDayAppts(ds){
       <div class="appt-client">${b.client}${b.groupSize>1?' <span style="font-size:10px;color:var(--gold);">👥 ×'+b.groupSize+'</span>':''}</div>
       <div class="appt-svc">${b.service}${alertDot}</div>
       <div class="appt-staff">👤 ${b.staff||'Unassigned'}</div>
+      ${b.depositAmt>0?`<div style="font-size:11px;color:var(--success);">💰 Deposit: ${fmtPrice(b.depositAmt)}</div>`:''}
     </div>`;
   }).join(''):'<div style="color:var(--ink3);font-size:12px;text-align:center;padding:12px;">No appointments</div>';
   if(document.getElementById('qbDate'))document.getElementById('qbDate').value=ds;
@@ -4650,6 +4694,7 @@ function openApptDetail(id){
   document.getElementById('apTime').value=b.time;
   document.getElementById('apDuration').value=b.duration||60;
   if(document.getElementById('apGroupSize'))document.getElementById('apGroupSize').value=b.groupSize||1;
+  if(document.getElementById('apDeposit'))document.getElementById('apDeposit').value=b.depositAmt||0;
   document.getElementById('apNotes').value=b.notes||'';
   openM('apptModal');
 }
@@ -5102,6 +5147,8 @@ function openNewAppt(){
   document.getElementById('apTime').value='10:00';
   document.getElementById('apDuration').value=60;
   if(document.getElementById('apGroupSize'))document.getElementById('apGroupSize').value=1;
+  if(document.getElementById('apDeposit'))document.getElementById('apDeposit').value=0;
+  const depBal=document.getElementById('apDepositBalance');if(depBal)depBal.style.display='none';
   openM('apptModal');
 }
 function saveAppt(){
@@ -5116,6 +5163,7 @@ function saveAppt(){
   }
   const duration=parseInt(document.getElementById('apDuration').value)||60;
   const groupSize=parseInt(document.getElementById('apGroupSize')?.value)||1;
+  const depositAmt=parseFloat(document.getElementById('apDeposit')?.value)||0;
   // Check slot availability (exclude current booking if editing)
   if(!isSlotAvailable(date,time,service,duration,editApptId,groupSize)){
     const meta=getSvcMeta(service);
@@ -5123,7 +5171,7 @@ function saveAppt(){
     const next=getNextAvailableSlot(date,toMins(time),service,duration,groupSize);
     showToast(`Slot fully booked (cap ${cap})${next?' — next available: '+next:''}`.trim(),'err');return;
   }
-  const appt={client,service,staff:document.getElementById('apStaff').value||'',date,time,duration,groupSize,status:'pending',notes:document.getElementById('apNotes').value.trim(),reminder:document.getElementById('apSendReminder').checked};
+  const appt={client,service,staff:document.getElementById('apStaff').value||'',date,time,duration,groupSize,depositAmt,status:'pending',notes:document.getElementById('apNotes').value.trim(),reminder:document.getElementById('apSendReminder').checked};
   if(editApptId){const i=S.bookings.findIndex(x=>String(x.id)===String(editApptId));if(i>=0)S.bookings[i]={...S.bookings[i],...appt};}
   else S.bookings.push({id:Date.now(),...appt});
   closeM('apptModal');sync('bookings');renderBookings();renderCalendar();renderDashboard();
@@ -6407,18 +6455,23 @@ function renderRptSales(txns){
 
   // Transaction list
   const sorted=[...txns].sort((a,b)=>new Date(b.time)-new Date(a.time));
+  const isAdmin=currentUser&&(currentUser.role==='owner'||currentUser.role==='admin');
   document.getElementById('rptTxnList').innerHTML=sorted.length?`
     <table class="inv-table" style="width:100%;">
-      <thead><tr><th>Date & Time</th><th>Client</th><th>Services</th><th>Method</th><th>Staff</th><th>Discount</th><th>Total</th></tr></thead>
-      <tbody>${sorted.map(t=>`<tr>
+      <thead><tr><th>Date & Time</th><th>Client</th><th>Services</th><th>Method</th><th>Staff</th><th>Discount</th><th>Total</th>${isAdmin?'<th></th>':''}</tr></thead>
+      <tbody>${sorted.map(t=>{
+        const isRefund=t.type==='refund';
+        const isRefunded=t.refunded;
+        return `<tr style="${isRefund?'opacity:0.6;':''}${isRefunded?'background:#fff8f8;':''}">
         <td style="font-size:11px;">${new Date(t.time).toLocaleDateString('en-PH',{month:'short',day:'numeric'})}<br><span style="color:var(--ink3);">${new Date(t.time).toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'})}</span></td>
-        <td style="font-size:12px;font-weight:500;">${t.client}</td>
-        <td style="font-size:11px;color:var(--ink3);max-width:180px;">${(t.items||[]).map(i=>i.name).join(', ')}</td>
+        <td style="font-size:12px;font-weight:500;">${t.client}${isRefund?'<br><span style="font-size:10px;color:var(--danger);">↩ REFUND</span>':''}</td>
+        <td style="font-size:11px;color:var(--ink3);max-width:180px;">${isRefund?`<em>Refund: ${t.refundReason||''}</em>`:(t.items||[]).map(i=>i.name).join(', ')}</td>
         <td style="font-size:11px;text-transform:capitalize;">${t.method||'cash'}</td>
         <td style="font-size:11px;">${t.staff||'—'}</td>
         <td style="font-size:12px;color:var(--danger);">${t.disc>0?'-'+fmtPrice(t.disc):'—'}</td>
-        <td style="font-weight:600;font-size:13px;">${fmtPrice(t.total)}</td>
-      </tr>`).join('')}</tbody>
+        <td style="font-weight:600;font-size:13px;color:${isRefund?'var(--danger)':''};">${isRefund?'-':''} ${fmtPrice(Math.abs(t.total))}</td>
+        ${isAdmin?`<td>${!isRefund&&!isRefunded?`<button class="btn btn-outline btn-sm" onclick="openRefund('${t.id}')" style="font-size:11px;color:var(--danger);border-color:var(--danger);">↩ Refund</button>`:isRefunded?'<span style="font-size:10px;color:var(--danger);">Refunded</span>':''}</td>`:''}
+      </tr>`;}).join('')}</tbody>
     </table>`:'<div style="padding:30px;text-align:center;color:var(--ink3);">No transactions this period</div>';
 }
 
@@ -7667,6 +7720,8 @@ function viewClientProfile(id){
             <span style="font-size:11px;font-weight:500;color:${methodColor};">${(t.method||'cash').toUpperCase()}</span>
             ${t.disc>0?`<span style="font-size:11px;color:var(--danger);">Disc -${fmtPrice(t.disc)}</span>`:''}
           </div>
+          ${t.refunded?`<span style="font-size:11px;color:var(--danger);">↩ Refunded -${fmtPrice(t.refundAmt||0)}</span>`:''}
+          ${currentUser&&(currentUser.role==='owner'||currentUser.role==='admin')&&!t.refunded&&!t.type?`<button class="btn btn-outline btn-sm" onclick="openRefund('${t.id}')" style="font-size:11px;color:var(--danger);border-color:var(--danger);margin-top:6px;">↩ Refund</button>`:''}
           ${(t.items||[]).some(i=>i.addons&&i.addons.length)?`<div style="font-size:11px;color:var(--ink4);margin-top:4px;">Add-ons: ${(t.items||[]).flatMap(i=>i.addons||[]).map(a=>a.name).join(', ')}</div>`:''}
           ${t.refPhoto?`<div style="margin-top:6px;"><img src="${t.refPhoto}" style="height:48px;border-radius:6px;border:1px solid var(--border2);cursor:pointer;" onclick="viewSelfie('${t.refPhoto}','Payment proof — ${t.id}')" title="Tap to view payment screenshot"></div>`:''}
         </div>
@@ -7715,6 +7770,32 @@ function viewClientProfile(id){
   // Photos
   window._cpClientId=id;
   renderClientPhotos(c);
+
+  // Referral records
+  const refCredit=c.referralCredit||0;
+  const referrals=c.referrals||[];
+  const cpRefCredit=document.getElementById('cpReferralCredit');
+  const cpRefs=document.getElementById('cpReferrals');
+  const cpRefsEmpty=document.getElementById('cpReferralsEmpty');
+  if(refCredit>0){
+    cpRefCredit.style.display='block';
+    cpRefCredit.innerHTML=`🤝 Available Credit: <strong style="color:var(--success);">${fmtPrice(refCredit)}</strong> — can be applied as discount on next visit`;
+  } else cpRefCredit.style.display='none';
+  if(referrals.length){
+    cpRefsEmpty.style.display='none';
+    cpRefs.innerHTML=referrals.map(r=>`
+      <div style="background:#fff;border:1.5px solid var(--border2);border-radius:10px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-size:13px;font-weight:500;">Referred: ${r.referredName}</div>
+          <div style="font-size:11px;color:var(--ink3);">📅 ${r.date} · Credit: ${fmtPrice(r.credit)}</div>
+        </div>
+        <span class="pill ${r.status==='used'?'pill-gray':'pill-green'}">${r.status==='used'?'Used':'Active'}</span>
+      </div>`).join('');
+  } else {
+    cpRefsEmpty.style.display='block';
+    cpRefs.innerHTML='';
+  }
+  if(c.referredBy){const ri=cpRefCredit.innerHTML;cpRefCredit.style.display='block';cpRefCredit.innerHTML=(ri?ri+'<br>':'')+`<span style="font-size:11px;color:var(--ink3);">Referred by: ${c.referredBy}</span>`;}
 
   openM('clientProfileModal');
 }
@@ -8997,6 +9078,227 @@ function updateOnlineStatus(){
 }
 window.addEventListener('online', updateOnlineStatus);
 window.addEventListener('offline', updateOnlineStatus);
+
+// ══ ADMIN TOOLS ══
+function updateAdminTools(){
+  const isAdmin=currentUser&&(currentUser.role==='owner'||currentUser.role==='admin');
+  const btn=document.getElementById('clearDataBtn');
+  if(btn) btn.style.display=isAdmin?'':'none';
+}
+
+// ══ CLEAR DATA ══
+function openClearData(){
+  if(!currentUser||!(currentUser.role==='owner'||currentUser.role==='admin'))return;
+  const txCount=S.transactions.filter(t=>!t.type).length;
+  const bkCount=S.bookings.length;
+  const clCount=S.clients.length;
+  const refCount=S.clients.reduce((s,c)=>s+(c.referrals?.length||0),0);
+  document.getElementById('cdTxCount').textContent=txCount+' record'+(txCount!==1?'s':'');
+  document.getElementById('cdBkCount').textContent=bkCount+' record'+(bkCount!==1?'s':'');
+  document.getElementById('cdClCount').textContent=clCount+' record'+(clCount!==1?'s':'');
+  document.getElementById('cdRefCount').textContent=refCount+' record'+(refCount!==1?'s':'');
+  ['cdClearTx','cdClearBk','cdClearCl','cdClearRef','cdClearAll'].forEach(id=>{const el=document.getElementById(id);if(el)el.checked=false;});
+  document.getElementById('cdConfirmWrap').style.display='none';
+  document.getElementById('cdConfirmInput').value='';
+  document.getElementById('cdReviewBtn').style.display='';
+  document.getElementById('cdExecBtn').style.display='none';
+  openM('clearDataModal');
+}
+function toggleClearAll(el){
+  const all=el.checked;
+  ['cdClearTx','cdClearBk','cdClearCl','cdClearRef'].forEach(id=>{const cb=document.getElementById(id);if(cb)cb.checked=all;});
+}
+function showClearConfirm(){
+  const any=['cdClearTx','cdClearBk','cdClearCl','cdClearRef'].some(id=>document.getElementById(id)?.checked);
+  if(!any){showToast('Select at least one data type to clear','err');return;}
+  document.getElementById('cdConfirmWrap').style.display='block';
+  document.getElementById('cdReviewBtn').style.display='none';
+  document.getElementById('cdExecBtn').style.display='';
+}
+function executeClearData(){
+  if(document.getElementById('cdConfirmInput').value.trim().toUpperCase()!=='DELETE'){
+    showToast('Type DELETE to confirm','err');return;
+  }
+  const doTx=document.getElementById('cdClearTx')?.checked;
+  const doBk=document.getElementById('cdClearBk')?.checked;
+  const doCl=document.getElementById('cdClearCl')?.checked;
+  const doRef=document.getElementById('cdClearRef')?.checked;
+  if(doTx){S.transactions=[];sync('transactions');}
+  if(doBk){S.bookings=[];sync('bookings');}
+  if(doCl){S.clients=[];sync('clients');}
+  if(doRef){S.clients.forEach(c=>{c.referrals=[];c.referralCredit=0;});sync('clients');}
+  closeM('clearDataModal');
+  renderDashboard();renderBookings();renderCalendar();renderClientsTable();renderReports();
+  showToast('Selected data cleared ✓','ok');
+}
+
+// ══ REFUNDS ══
+let _refundTxId=null;
+function openRefund(txId){
+  const tx=S.transactions.find(t=>t.id==txId);
+  if(!tx){showToast('Transaction not found','err');return;}
+  if(tx.refunded){showToast('Already refunded','err');return;}
+  _refundTxId=txId;
+  document.getElementById('rfTxRef').textContent=tx.id;
+  document.getElementById('rfTxClient').textContent=tx.client;
+  document.getElementById('rfTxTotal').textContent=fmtPrice(tx.total);
+  document.getElementById('rfTxDate').textContent=new Date(tx.time).toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'numeric'});
+  document.getElementById('rfAmt').value=tx.total;
+  document.getElementById('rfReason').value='';
+  openM('refundModal');
+}
+function processRefund(){
+  const tx=S.transactions.find(t=>t.id==_refundTxId);
+  if(!tx)return;
+  const reason=document.getElementById('rfReason').value.trim();
+  if(!reason){showToast('Enter a reason for the refund','err');return;}
+  const amt=parseFloat(document.getElementById('rfAmt').value)||0;
+  if(amt<=0||amt>tx.total){showToast('Invalid refund amount','err');return;}
+  tx.refunded=true;tx.refundAmt=amt;tx.refundReason=reason;
+  tx.refundedAt=new Date().toISOString();tx.refundedBy=currentUser.name;
+  S.transactions.push({id:'RFD'+Date.now().toString().slice(-6),type:'refund',originalTxId:tx.id,client:tx.client,clientId:tx.clientId,total:-amt,refundAmt:amt,refundReason:reason,method:tx.method,time:new Date().toISOString(),staff:currentUser.name,items:[]});
+  if(tx.clientId){const cl=S.clients.find(c=>c.id===tx.clientId);if(cl){cl.totalSpent=Math.max(0,(cl.totalSpent||0)-amt);}}
+  sync('transactions');sync('clients');
+  closeM('refundModal');renderReports();renderDashboard();
+  showToast('Refund of '+fmtPrice(amt)+' processed ✓','ok');
+}
+
+// ══ DEPOSIT DISPLAY ══
+function updateDepositDisplay(){
+  const sel=document.getElementById('linkApptSelect');
+  const apptId=sel?.value;
+  const appt=apptId?S.bookings.find(b=>String(b.id)===String(apptId)):null;
+  const dep=appt?.depositAmt||0;
+  window._linkedDepositAmt=dep;
+  const depRow=document.getElementById('depositRow');
+  if(depRow){
+    depRow.style.display=dep>0?'flex':'none';
+    const depAmt=document.getElementById('depositRowAmt');
+    if(depAmt) depAmt.textContent=fmtPrice(dep);
+  }
+}
+
+// ══ REFERRALS ══
+let _logReferralClientId=null;
+function openLogReferral(clientId){
+  _logReferralClientId=clientId;
+  const sel=document.getElementById('lrReferredBy');
+  sel.innerHTML='<option value="">Select referring client…</option>'+
+    S.clients.filter(c=>c.id!==clientId).map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+  document.getElementById('lrCredit').value=200;
+  document.getElementById('lrDate').value=td();
+  openM('logReferralModal');
+}
+function saveReferral(){
+  const referrerId=parseInt(document.getElementById('lrReferredBy').value);
+  if(!referrerId){showToast('Select a referring client','err');return;}
+  const credit=parseFloat(document.getElementById('lrCredit').value)||0;
+  const date=document.getElementById('lrDate').value||td();
+  const referrer=S.clients.find(c=>c.id===referrerId);
+  const referred=S.clients.find(c=>c.id===_logReferralClientId);
+  if(!referrer||!referred)return;
+  if(!referrer.referrals)referrer.referrals=[];
+  referrer.referrals.push({id:Date.now(),referredClientId:referred.id,referredName:referred.name,date,credit,status:'active'});
+  referrer.referralCredit=(referrer.referralCredit||0)+credit;
+  if(!referred.referredBy){referred.referredBy=referrer.name;referred.referredById=referrer.id;}
+  sync('clients');closeM('logReferralModal');
+  viewClientProfile(_logReferralClientId);
+  showToast('Referral logged — '+fmtPrice(credit)+' credit added to '+referrer.name,'ok');
+}
+function applyReferralCredit(){
+  if(!selClient)return;
+  const c=S.clients.find(x=>x.id===selClient.id);
+  const credit=c?.referralCredit||0;
+  if(!credit){showToast('No referral credit available','err');return;}
+  setDiscType('amt');
+  const discEl=document.getElementById('discInp');
+  discEl.value=((parseFloat(discEl.value)||0)+credit).toFixed(2);
+  recalc();
+  document.getElementById('refCreditWrap').style.display='none';
+  showToast('₱'+credit.toLocaleString()+' referral credit applied','ok');
+}
+function updateReferralRow(){
+  const row=document.getElementById('refCreditWrap');
+  const amtEl=document.getElementById('refCreditAmtTxt');
+  if(!row||!amtEl)return;
+  if(selClient){
+    const c=S.clients.find(x=>x.id===selClient.id);
+    const credit=c?.referralCredit||0;
+    if(credit>0){
+      amtEl.textContent=fmtPrice(credit)+' available';
+      row.style.display='block';
+      return;
+    }
+  }
+  row.style.display='none';
+}
 </script>
+
+<!-- Clear Data Modal -->
+<div class="overlay hidden" id="clearDataModal">
+  <div class="modal modal-md">
+    <div class="modal-hdr"><div class="modal-title">🗑 Clear Data</div><div class="modal-x" onclick="closeM('clearDataModal')">✕</div></div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:14px;">
+      <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:10px;padding:12px;font-size:12px;color:#856404;">⚠️ <strong>Warning:</strong> Deleted data cannot be recovered. Select only what you want to permanently remove.</div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 12px;background:var(--cream2);border-radius:10px;"><input type="checkbox" id="cdClearTx" style="width:16px;height:16px;accent-color:var(--danger);"><div><div style="font-size:13px;font-weight:500;">Sales Transactions</div><div style="font-size:11px;color:var(--ink3);" id="cdTxCount">0 records</div></div></label>
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 12px;background:var(--cream2);border-radius:10px;"><input type="checkbox" id="cdClearBk" style="width:16px;height:16px;accent-color:var(--danger);"><div><div style="font-size:13px;font-weight:500;">Appointments</div><div style="font-size:11px;color:var(--ink3);" id="cdBkCount">0 records</div></div></label>
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 12px;background:var(--cream2);border-radius:10px;"><input type="checkbox" id="cdClearCl" style="width:16px;height:16px;accent-color:var(--danger);"><div><div style="font-size:13px;font-weight:500;">Client Records</div><div style="font-size:11px;color:var(--ink3);" id="cdClCount">0 records</div></div></label>
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 12px;background:var(--cream2);border-radius:10px;"><input type="checkbox" id="cdClearRef" style="width:16px;height:16px;accent-color:var(--danger);"><div><div style="font-size:13px;font-weight:500;">Referral Records &amp; Credits</div><div style="font-size:11px;color:var(--ink3);" id="cdRefCount">0 records</div></div></label>
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 12px;background:#fff0f0;border:1px solid rgba(220,53,69,0.3);border-radius:10px;"><input type="checkbox" id="cdClearAll" onchange="toggleClearAll(this)" style="width:16px;height:16px;accent-color:var(--danger);"><div><div style="font-size:13px;font-weight:500;color:var(--danger);">All of the Above</div><div style="font-size:11px;color:var(--ink3);">Selects all options above</div></div></label>
+      </div>
+      <div id="cdConfirmWrap" style="display:none;background:#fff0f0;border:1px solid rgba(220,53,69,0.4);border-radius:10px;padding:14px;">
+        <div style="font-size:13px;font-weight:600;color:var(--danger);margin-bottom:6px;">⚠️ This cannot be undone. Type DELETE to confirm.</div>
+        <input class="form-input" type="text" id="cdConfirmInput" placeholder="Type DELETE">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeM('clearDataModal')">Cancel</button>
+      <button class="btn btn-outline" id="cdReviewBtn" onclick="showClearConfirm()" style="color:var(--danger);border-color:var(--danger);">Review →</button>
+      <button class="btn" id="cdExecBtn" onclick="executeClearData()" style="display:none;background:var(--danger);color:#fff;">🗑 Delete Permanently</button>
+    </div>
+  </div>
+</div>
+
+<!-- Refund Modal -->
+<div class="overlay hidden" id="refundModal">
+  <div class="modal modal-md">
+    <div class="modal-hdr"><div class="modal-title">↩ Process Refund</div><div class="modal-x" onclick="closeM('refundModal')">✕</div></div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:14px;">
+      <div style="background:var(--cream2);border-radius:10px;padding:14px;font-size:13px;display:flex;flex-direction:column;gap:6px;">
+        <div style="display:flex;justify-content:space-between;"><span style="color:var(--ink3);">Ref</span><span id="rfTxRef" style="font-weight:600;font-size:11px;"></span></div>
+        <div style="display:flex;justify-content:space-between;"><span style="color:var(--ink3);">Client</span><span id="rfTxClient"></span></div>
+        <div style="display:flex;justify-content:space-between;"><span style="color:var(--ink3);">Date</span><span id="rfTxDate"></span></div>
+        <div style="display:flex;justify-content:space-between;"><span style="color:var(--ink3);">Original Total</span><span id="rfTxTotal" style="font-weight:700;color:var(--gold-dk);"></span></div>
+      </div>
+      <div class="form-group"><label class="form-label">Refund Amount (₱) *</label><input class="form-input" type="number" id="rfAmt" min="0" step="1" placeholder="0.00"></div>
+      <div class="form-group"><label class="form-label">Reason for Refund *</label><textarea class="form-textarea" id="rfReason" placeholder="e.g. Client dissatisfied, service not completed, duplicate charge…" style="min-height:80px;"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeM('refundModal')">Cancel</button>
+      <button class="btn" onclick="processRefund()" style="background:var(--danger);color:#fff;">↩ Process Refund</button>
+    </div>
+  </div>
+</div>
+
+<!-- Log Referral Modal -->
+<div class="overlay hidden" id="logReferralModal">
+  <div class="modal modal-md">
+    <div class="modal-hdr"><div class="modal-title">🤝 Log Referral</div><div class="modal-x" onclick="closeM('logReferralModal')">✕</div></div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:14px;">
+      <div style="font-size:12px;color:var(--ink3);background:var(--cream2);border-radius:10px;padding:10px 12px;">This client was brought in by another client. Select the referrer and set the credit/discount they will receive on their next visit.</div>
+      <div class="form-group"><label class="form-label">Referred By (existing client) *</label><select class="form-select" id="lrReferredBy"><option value="">Select referring client…</option></select></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Credit for Referrer (₱)</label><input class="form-input" type="number" id="lrCredit" value="200" min="0" step="50"></div>
+        <div class="form-group"><label class="form-label">Date</label><input class="form-input" type="date" id="lrDate"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeM('logReferralModal')">Cancel</button>
+      <button class="btn btn-gold" onclick="saveReferral()">✓ Save Referral</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
