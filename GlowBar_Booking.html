@@ -193,9 +193,10 @@ let DATA = { products:[], packages:[], users:[], bookings:[], settings:{
   slotDuration:60,
   maxStaff:2,
   breakStart:'',
-  breakEnd:''
+  breakEnd:'',
+  partTimer:{name:'',workDays:[],startTime:'09:00',endTime:'17:00'}
 }};
-let booking = { services:[], service:'', serviceId:null, servicePrice:0, staff:'', staffColor:'', date:'', time:'', name:'', phone:'', email:'', notes:'' };
+let booking = { services:[], service:'', serviceId:null, servicePrice:0, duration:60, staff:'', staffColor:'', date:'', time:'', name:'', phone:'', email:'', notes:'', groupSize:1 };
 let calYear, calMonth;
 const TIMES = ['09:00','09:30','10:00','10:30','11:00','11:30','12:00','12:30','13:00','13:30','14:00','14:30','15:00','15:30','16:00','16:30','17:00','17:30','18:00'];
 
@@ -376,7 +377,7 @@ function showStep1(){
         <div class="svc-grid">`;
       items.forEach(p=>{
         const sel=booking.services.some(s=>s.id===p.id)?'sel':'';
-        html += `<button class="svc-btn ${sel}" onclick="selectService(${p.id},'${p.name.replace(/'/g,"\\'")}',${p.price})">
+        html += `<button class="svc-btn ${sel}" onclick="selectService(${p.id},'${p.name.replace(/'/g,"\\'")}',${p.price},${p.durationMins||60})">
           ${sel?'<span style="float:right;color:var(--gold-dk);font-size:14px;">✓</span>':''}
           <span class="svc-name">${p.name}</span>
           <span class="svc-price">${fmtPrice(p.price)}</span>
@@ -409,19 +410,17 @@ function showStep1(){
   show(html);
 }
 
-function selectService(id, name, price){
-  // Toggle — if already selected, remove it; otherwise add it
+function selectService(id, name, price, durationMins){
   const idx=booking.services.findIndex(s=>s.id===id);
   if(idx>=0){
     booking.services.splice(idx,1);
   } else {
-    booking.services.push({id,name,price});
+    booking.services.push({id,name,price,durationMins:durationMins||60});
   }
-  // Keep legacy single-service fields in sync for compatibility
   booking.service=booking.services.map(s=>s.name).join(', ');
   booking.servicePrice=booking.services.reduce((t,s)=>t+s.price,0);
   booking.serviceId=booking.services.length===1?booking.services[0].id:null;
-  // Re-render step 1 to update selected state
+  booking.duration=Math.max(booking.services.reduce((t,s)=>t+(s.durationMins||60),0),30);
   showStep1();
 }
 
@@ -429,6 +428,7 @@ function removeService(id){
   booking.services=booking.services.filter(s=>s.id!==id);
   booking.service=booking.services.map(s=>s.name).join(', ');
   booking.servicePrice=booking.services.reduce((t,s)=>t+s.price,0);
+  booking.duration=Math.max(booking.services.reduce((t,s)=>t+(s.durationMins||60),0),30);
   showStep1();
 }
 
@@ -542,14 +542,51 @@ function pickDate(ds){
   if(btn) btn.setAttribute('disabled','');
 }
 
+function toMins(t){ var p=(t||'00:00').split(':'); return parseInt(p[0])*60+parseInt(p[1]); }
+
+function getSvcMeta(svcName,svcCat){
+  var n=(svcName||'').toLowerCase(), c=(svcCat||'').toLowerCase();
+  if(c.indexOf('body contouring')>=0||c.indexOf('exilis')>=0||c.indexOf('pico')>=0||c.indexOf('diode')>=0||
+     c.indexOf('laser')>=0||c.indexOf('glow skin')>=0||c.indexOf('glow ink')>=0||c.indexOf('glow clear')>=0||
+     n.indexOf('exilis')>=0||n.indexOf('diode')>=0||n.indexOf('laser')>=0||n.indexOf('carbon')>=0||
+     n.indexOf('tattoo')>=0||n.indexOf('wart')>=0||n.indexOf('pico')>=0||n.indexOf('melasma')>=0||n.indexOf('scar')>=0)
+    return{type:'laser',buffer:15};
+  if(c.indexOf('facial')>=0||n.indexOf('facial')>=0||n.indexOf('hydra')>=0)
+    return{type:'facial',buffer:15};
+  if(c.indexOf('nail')>=0||n.indexOf('mani')>=0||n.indexOf('pedi')>=0||n.indexOf('nail art')>=0||
+     n.indexOf('extension')>=0||n.indexOf('polygel')>=0||n.indexOf('softgel')>=0)
+    return{type:'nail',buffer:10};
+  if(c.indexOf('wax')>=0||c.indexOf('hair wax')>=0||n.indexOf('wax')>=0||n.indexOf('brazilian')>=0||n.indexOf('bikini')>=0)
+    return{type:'wax',buffer:10};
+  return{type:'standard',buffer:10};
+}
+
+function getDataTypeCap(type,dateStr){
+  var cfg=DATA.settings||{};
+  var maxStaff=cfg.maxStaff||2;
+  if(type==='laser'||type==='facial') return 1;
+  if(type==='nail'){
+    var pt=cfg.partTimer||{};
+    if(!pt.name) return maxStaff;
+    var day=new Date((dateStr||'2000-01-01')+'T12:00').getDay();
+    return (pt.workDays||[]).indexOf(day)>=0 ? maxStaff+1 : maxStaff;
+  }
+  return maxStaff;
+}
+
 function renderSlots(date){
   var cfg=DATA.settings||{};
   var openTime=cfg.openTime||'09:00';
   var closeTime=cfg.closeTime||'19:00';
   var slotDur=parseInt(cfg.slotDuration)||60;
-  var maxStaff=cfg.maxStaff||2;
   var breakStart=cfg.breakStart||'';
   var breakEnd=cfg.breakEnd||'';
+
+  var svcName=booking.service||'';
+  var svcDur=booking.duration||60;
+  var meta=getSvcMeta(svcName);
+  var cap=getDataTypeCap(meta.type,date);
+
   var slots=[];
   var parts=openTime.split(':');
   var h=parseInt(parts[0]),m=parseInt(parts[1]);
@@ -561,24 +598,53 @@ function renderSlots(date){
     if(!inBreak) slots.push(t);
     m+=slotDur; if(m>=60){h+=Math.floor(m/60);m=m%60;}
   }
-  var booked={};
-  DATA.bookings.filter(function(b){return b.date===date&&b.status!=='cancelled'&&b.status!=='no-show';}).forEach(function(b){booked[b.time]=(booked[b.time]||0)+1;});
+
   var grid=document.getElementById('slotsGrid');
-  if(!grid)return;
+  if(!grid) return;
   if(!slots.length){grid.innerHTML='<div style="padding:20px;text-align:center;color:#9C8C78;">No available slots for this day.</div>';return;}
+
+  function countOverlap(slotTime){
+    var newStart=toMins(slotTime);
+    var newEnd=newStart+svcDur+meta.buffer;
+    return DATA.bookings.reduce(function(sum,b){
+      if(b.date!==date||b.status==='cancelled'||b.status==='no-show') return sum;
+      var bMeta=getSvcMeta(b.service||'');
+      if(bMeta.type!==meta.type) return sum;
+      var bStart=toMins(b.time||'00:00');
+      var bEnd=bStart+(b.duration||60)+bMeta.buffer;
+      if(newStart<bEnd&&newEnd>bStart) return sum+(b.groupSize||1);
+      return sum;
+    },0);
+  }
+
+  var isSingleResource=meta.type==='laser'||meta.type==='facial';
+  var firstFullIdx=-1;
+
   var html='';
-  slots.forEach(function(t){
-    var cnt=booked[t]||0;
-    var isFull=cnt>=maxStaff;
+  slots.forEach(function(t,idx){
+    var active=countOverlap(t);
+    var isFull=active>=cap;
     var isSel=booking.time===t;
-    var spotsLeft=maxStaff-cnt;
+    var spotsLeft=cap-active;
     var cls='slot-btn'+(isFull?' taken':'')+(isSel?' sel':'');
-    var sub=isFull?'Full':(cnt>0?spotsLeft+' left':'');
-    var subHtml=sub?('<br><span style="font-size:9px;opacity:.8;">'+sub+'</span>'):'';
+    var sub=isFull?'Full':(active>0?spotsLeft+' left':'');
+    var subHtml=sub?'<br><span style="font-size:9px;opacity:.8;">'+sub+'</span>':'';
     var onclick=isFull?'':'selectTime(\''+t+'\')';
+    if(isFull&&isSingleResource&&firstFullIdx<0) firstFullIdx=idx;
     html+='<button class="'+cls+'" onclick="'+onclick+'">'+t+subHtml+'</button>';
   });
-  grid.innerHTML=html;
+
+  // For machine/facial bed: show "next available" banner if any slot is full
+  var nextNote='';
+  if(isSingleResource&&firstFullIdx>=0){
+    var nextAvail=null;
+    for(var i=0;i<slots.length;i++){
+      if(countOverlap(slots[i])<cap){nextAvail=slots[i];break;}
+    }
+    if(nextAvail) nextNote='<div style="font-size:11px;color:#b45309;background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;margin-bottom:8px;">⚡ Machine/bed in use for some slots — next open slot: <strong>'+nextAvail+'</strong></div>';
+  }
+
+  grid.innerHTML=nextNote+html;
 }
 
 function selectTime(t){
@@ -610,6 +676,13 @@ function goStep3(){
       <div class="form-group"><label class="form-label">Phone Number *</label><input class="form-input" id="bkPhone" type="tel" placeholder="09xx xxx xxxx" value="${booking.phone}" oninput="booking.phone=this.value;updateStep3Btn()"></div>
       <div class="form-group"><label class="form-label">Email (optional)</label><input class="form-input" id="bkEmail" type="email" placeholder="your@email.com" value="${booking.email}" oninput="booking.email=this.value"></div>
     </div>
+    <div class="form-group">
+      <label class="form-label">Group Booking <span style="font-size:10px;color:#9C8C78;">(how many clients together?)</span></label>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <input class="form-input" type="number" id="bkGroupSize" min="1" max="10" value="${booking.groupSize||1}" style="width:80px;" oninput="booking.groupSize=parseInt(this.value)||1">
+        <span style="font-size:12px;color:#9C8C78;">client${booking.groupSize>1?'s':''} — leave 1 for solo</span>
+      </div>
+    </div>
     <div class="form-group"><label class="form-label">Special Requests / Notes</label><textarea class="form-textarea" id="bkNotes" placeholder="Allergies, preferences, questions…" oninput="booking.notes=this.value">${booking.notes}</textarea></div>
     <div class="notice">📅 You're booking <strong>${booking.services.map(s=>s.name).join(', ')}</strong> on <strong>${dateStr}</strong> at <strong>${booking.time}</strong>${booking.staff?' with <strong>'+booking.staff+'</strong>':''}.</div>
     <button class="btn-gold" onclick="goStep4()" ${booking.name&&booking.phone?'':'disabled'} id="step3next">Review Booking →</button>
@@ -637,7 +710,8 @@ function goStep4(){
     <div class="summary-row"><span class="summary-lbl">Service${booking.services.length>1?'s':''}</span><span class="summary-val">${booking.services.map(s=>`${s.name} — ${fmtPrice(s.price)}`).join('<br>')}</span></div>
     <div class="summary-row"><span class="summary-lbl">Total</span><span class="summary-val" style="color:var(--gold-dk);font-weight:600;">${fmtPrice(booking.servicePrice)}</span></div>
     <div class="summary-row"><span class="summary-lbl">Date</span><span class="summary-val">${dateStr}</span></div>
-    <div class="summary-row"><span class="summary-lbl">Time</span><span class="summary-val">${booking.time}</span></div>
+    <div class="summary-row"><span class="summary-lbl">Time</span><span class="summary-val">${booking.time}${booking.duration?' ('+booking.duration+' min)':''}</span></div>
+    ${booking.groupSize>1?`<div class="summary-row"><span class="summary-lbl">Group</span><span class="summary-val">👥 ${booking.groupSize} clients</span></div>`:''}
     <div class="summary-row"><span class="summary-lbl">Provider</span><span class="summary-val">${booking.staff||'No preference'}</span></div>
     <div class="summary-row"><span class="summary-lbl">Name</span><span class="summary-val">${booking.name}</span></div>
     <div class="summary-row"><span class="summary-lbl">Phone</span><span class="summary-val">${booking.phone}</span></div>
@@ -658,6 +732,7 @@ async function submitBooking(){
   const timeout=setTimeout(()=>showSuccess(ref),8000);
 
   const ref='BK'+Date.now().toString().slice(-8);
+  const svcMeta=getSvcMeta(booking.service||'');
   const appt={
     id:Date.now(),
     client:booking.name,
@@ -669,13 +744,14 @@ async function submitBooking(){
     staff:booking.staff||'',
     date:booking.date,
     time:booking.time,
-    duration:60,
+    duration:booking.duration||60,
+    serviceType:svcMeta.type,
+    groupSize:booking.groupSize||1,
     source:'online',
     status:'pending',
     notes:booking.notes||'',
     reminder:true,
     ref,
-    source:'online',
     createdAt:new Date().toISOString()
   };
   try{

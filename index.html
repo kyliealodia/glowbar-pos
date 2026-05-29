@@ -1961,6 +1961,24 @@ html{height:-webkit-fill-available;}
       <div style="background:var(--cream2);border-radius:10px;padding:12px 14px;font-size:12px;color:var(--ink2);line-height:1.8;">
         💡 <strong>Overbooking prevention:</strong> If Max is set to <strong>2</strong>, any time slot with 2 active appointments will be blocked — staff and online clients cannot book a 3rd.
       </div>
+      <div style="border-top:1px solid var(--border);padding-top:16px;">
+        <div class="form-label" style="margin-bottom:8px;">Part-Timer Schedule <span style="color:var(--ink4);font-size:10px;">(nail services — adds +1 slot on work days)</span></div>
+        <div class="form-group"><label class="form-label" style="font-size:11px;">Name <span style="color:var(--ink4);">(leave blank if no part-timer)</span></label><input class="form-input" id="csPtName" placeholder="e.g. Anna"></div>
+        <div class="form-label" style="font-size:11px;margin:10px 0 6px;">Work Days</div>
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;">
+          <button class="day-toggle" id="ptDay0" data-day="0" onclick="togglePtDay(this)">Sun</button>
+          <button class="day-toggle" id="ptDay1" data-day="1" onclick="togglePtDay(this)">Mon</button>
+          <button class="day-toggle" id="ptDay2" data-day="2" onclick="togglePtDay(this)">Tue</button>
+          <button class="day-toggle" id="ptDay3" data-day="3" onclick="togglePtDay(this)">Wed</button>
+          <button class="day-toggle" id="ptDay4" data-day="4" onclick="togglePtDay(this)">Thu</button>
+          <button class="day-toggle" id="ptDay5" data-day="5" onclick="togglePtDay(this)">Fri</button>
+          <button class="day-toggle" id="ptDay6" data-day="6" onclick="togglePtDay(this)">Sat</button>
+        </div>
+        <div class="form-row" style="margin-top:10px;">
+          <div class="form-group"><label class="form-label" style="font-size:11px;">Start Time</label><input class="form-input" type="time" id="csPtStart" value="09:00"></div>
+          <div class="form-group"><label class="form-label" style="font-size:11px;">End Time</label><input class="form-input" type="time" id="csPtEnd" value="17:00"></div>
+        </div>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeM('clinicSettingsModal')">Cancel</button>
@@ -1995,14 +2013,17 @@ html{height:-webkit-fill-available;}
     <div class="modal-body">
       <div class="form-group"><label class="form-label">Client *</label><input class="form-input" id="apClient" placeholder="Client name…" list="clientsDL"></div>
       <div class="form-row">
-        <div class="form-group"><label class="form-label">Service *</label><select class="form-select" id="apService"></select></div>
+        <div class="form-group"><label class="form-label">Service *</label><select class="form-select" id="apService" onchange="autoFillDuration()"></select></div>
         <div class="form-group"><label class="form-label">Staff</label><select class="form-select" id="apStaff"></select></div>
       </div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Date *</label><input class="form-input" type="date" id="apDate"></div>
         <div class="form-group"><label class="form-label">Time *</label><input class="form-input" type="time" id="apTime" value="10:00"></div>
       </div>
-      <div class="form-group"><label class="form-label">Duration (mins)</label><input class="form-input" type="number" id="apDuration" value="60" min="15" step="15"></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Duration (mins)</label><input class="form-input" type="number" id="apDuration" value="60" min="15" step="15"></div>
+        <div class="form-group"><label class="form-label">Group Size <span style="color:var(--ink4);font-size:10px;">(clients together)</span></label><input class="form-input" type="number" id="apGroupSize" value="1" min="1" max="10"></div>
+      </div>
       <div class="form-group"><label class="form-label">Notes / Concerns</label><textarea class="form-textarea" id="apNotes" placeholder="Client concerns, contraindications…"></textarea></div>
       <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--cream2);border-radius:9px;border:1px solid var(--border);">
         <input type="checkbox" id="apSendReminder" checked style="width:16px;height:16px;accent-color:var(--gold);">
@@ -2770,10 +2791,11 @@ let S = {
     openTime:'09:00',               // Opening time
     closeTime:'19:00',              // Closing time
     slotDuration:60,                // Minutes per appointment slot
-    maxStaff:2,                     // Max concurrent appointments (= number of staff)
+    maxStaff:2,                     // Max concurrent appointments (= number of full-time staff)
     clinicName:'GlowBar Beauty Clinic',
     breakStart:'',                  // Optional lunch break start e.g. '13:00'
     breakEnd:'',                    // Optional lunch break end e.g. '14:00'
+    partTimer:{name:'',workDays:[],startTime:'09:00',endTime:'17:00'},
   }
 };
 
@@ -2813,7 +2835,7 @@ function sync(key){
     if(key==='products'){
       const serviceNames=S.products
         .filter(p=>p.inPOS!==false)
-        .map(p=>({id:p.id,name:p.name,cat:p.cat,price:p.price}));
+        .map(p=>({id:p.id,name:p.name,cat:p.cat,price:p.price,durationMins:p.durationMins||60}));
       db.ref('gb/serviceNames').set(serviceNames).catch(()=>{});
     }
     return;
@@ -2836,7 +2858,7 @@ async function pushAllToFirebase(){
   try{
     const serviceNames=S.products
       .filter(p=>p.inPOS!==false&&p.cat!=='Add-ons')
-      .map(p=>({id:p.id,name:p.name,cat:p.cat,price:p.price}));
+      .map(p=>({id:p.id,name:p.name,cat:p.cat,price:p.price,durationMins:p.durationMins||60}));
     await db.ref('gb/serviceNames').set(serviceNames);
   }catch(e){ console.warn('serviceNames failed',e); }
 
@@ -4584,11 +4606,12 @@ function renderCalendar(){
     // Check if any slot is full
     const slots=getAvailableSlots(ds);
     const allFull=slots.length>0&&slots.every(s=>!s.available);
-    const evHtml=dayBks.slice(0,3).map(b=>`<div class="cal-event-dot ${b.status}" onclick="event.stopPropagation();openApptDetail(${b.id})" title="${b.client} — ${b.service}">${b.time} ${b.client.split(' ')[0]}</div>`).join('');
+    const evHtml=dayBks.slice(0,3).map(b=>`<div class="cal-event-dot ${b.status}" onclick="event.stopPropagation();openApptDetail(${b.id})" title="${b.client} — ${b.service}${b.staff?' ('+b.staff+')':''}">${b.time} ${b.client.split(' ')[0]}${b.staff?' · '+b.staff.split(' ')[0]:''}</div>`).join('');
     const more=dayBks.length>3?`<div style="font-size:9px;color:var(--ink3);">+${dayBks.length-3} more</div>`:'';
     const closedBadge=isClosed?'<div style="font-size:8px;color:var(--danger);font-weight:600;letter-spacing:.5px;">CLOSED</div>':'';
     const fullBadge=!isClosed&&allFull?'<div style="font-size:8px;color:var(--warn);font-weight:600;letter-spacing:.5px;">FULL</div>':'';
-    html+=`<div class="cal-day${isToday?' today':''}${isSel?' selected':''}${isClosed?' cal-closed':''}" onclick="calSelectDate('${ds}')"><span class="cal-day-num">${d}</span>${closedBadge}${fullBadge}<div class="cal-events">${evHtml}${more}</div></div>`;
+    const nailBadge=!isClosed&&getNailCapAlert(ds)?'<div style="font-size:8px;color:#e97316;font-weight:600;letter-spacing:.5px;">⚠ NAIL</div>':'';
+    html+=`<div class="cal-day${isToday?' today':''}${isSel?' selected':''}${isClosed?' cal-closed':''}" onclick="calSelectDate('${ds}')"><span class="cal-day-num">${d}</span>${closedBadge}${fullBadge}${nailBadge}<div class="cal-events">${evHtml}${more}</div></div>`;
   }
   const remaining=42-first-daysInMonth;for(let d=1;d<=remaining;d++)html+=`<div class="cal-day other-month"><span class="cal-day-num">${d}</span></div>`;
   g.innerHTML=html;
@@ -4600,15 +4623,19 @@ function showDayAppts(ds){
   document.getElementById('calSelDate').textContent=fmtDate(ds);
   const bks=S.bookings.filter(b=>b.date===ds).sort((a,b)=>a.time.localeCompare(b.time));
   const el=document.getElementById('dayAppts');
-  el.innerHTML=bks.length?bks.map(b=>`
-    <div class="appt-card" onclick="openApptDetail(${b.id})">
+  const nailAlert=getNailCapAlert(ds);
+  el.innerHTML=bks.length?bks.map(b=>{
+    const bMeta=getSvcMeta(b.service||'');
+    const alertDot=nailAlert&&bMeta.type==='nail'?'<span style="color:#e97316;font-size:11px;margin-left:4px;">⚠</span>':'';
+    return `<div class="appt-card" onclick="openApptDetail(${b.id})">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
-        <span class="appt-time">${b.time}</span><span class="pill pill-${b.status==='confirmed'?'green':b.status==='pending'?'amber':b.status==='completed'?'gray':'red'}">${cap(b.status)}</span>
+        <span class="appt-time">${b.time}${b.duration?' ('+b.duration+'m)':''}</span><span class="pill pill-${b.status==='confirmed'?'green':b.status==='pending'?'amber':b.status==='completed'?'gray':'red'}">${cap(b.status)}</span>
       </div>
-      <div class="appt-client">${b.client}</div>
-      <div class="appt-svc">${b.service}</div>
+      <div class="appt-client">${b.client}${b.groupSize>1?' <span style="font-size:10px;color:var(--gold);">👥 ×'+b.groupSize+'</span>':''}</div>
+      <div class="appt-svc">${b.service}${alertDot}</div>
       <div class="appt-staff">👤 ${b.staff||'Unassigned'}</div>
-    </div>`).join(''):'<div style="color:var(--ink3);font-size:12px;text-align:center;padding:12px;">No appointments</div>';
+    </div>`;
+  }).join(''):'<div style="color:var(--ink3);font-size:12px;text-align:center;padding:12px;">No appointments</div>';
   if(document.getElementById('qbDate'))document.getElementById('qbDate').value=ds;
 }
 function openApptDetail(id){
@@ -4622,6 +4649,7 @@ function openApptDetail(id){
   document.getElementById('apDate').value=b.date;
   document.getElementById('apTime').value=b.time;
   document.getElementById('apDuration').value=b.duration||60;
+  if(document.getElementById('apGroupSize'))document.getElementById('apGroupSize').value=b.groupSize||1;
   document.getElementById('apNotes').value=b.notes||'';
   openM('apptModal');
 }
@@ -4632,11 +4660,15 @@ function quickBook(){
   const time=document.getElementById('qbTime').value;
   if(!client||!service||!date||!time){showToast('Fill required fields','err');return;}
   if(!isClinicOpen(date)){showToast('Clinic is closed on that day','err');return;}
-  if(!isSlotAvailable(date,time)){
-    const max=S.settings?.maxStaff||2;
-    showToast(`Slot fully booked — max ${max} at this time`,'err');return;
+  const prod=S.products.find(p=>p.name===service);
+  const dur=prod?.durationMins||60;
+  if(!isSlotAvailable(date,time,service,dur)){
+    const meta=getSvcMeta(service);
+    const cap=getTypeCap(meta.type,date);
+    const next=getNextAvailableSlot(date,toMins(time),service,dur);
+    showToast(`Slot fully booked (cap ${cap})${next?' — next: '+next:''}`.trim(),'err');return;
   }
-  const newBk={id:Date.now(),client,service,staff:document.getElementById('qbStaff').value||'',date,time,duration:60,status:'pending',notes:'',reminder:false};
+  const newBk={id:Date.now(),client,service,staff:document.getElementById('qbStaff').value||'',date,time,duration:dur,status:'pending',notes:'',reminder:false,groupSize:1};
   S.bookings.push(newBk);
   sync('bookings');renderCalendar();renderBookings();renderDashboard();
   showToast('Appointment booked for '+client,'ok');
@@ -4829,26 +4861,36 @@ function openClinicSettings(){
   document.getElementById('csBreakEnd').value=cfg.breakEnd||'';
   document.getElementById('csSlotDuration').value=String(cfg.slotDuration||60);
   document.getElementById('csMaxStaff').value=String(cfg.maxStaff||2);
-  // Set day toggles
+  // Open-day toggles (only the 7 main buttons, not part-timer buttons)
   const openDays=cfg.openDays||[1,2,3,4,5,6];
-  document.querySelectorAll('.day-toggle').forEach(btn=>{
-    const day=parseInt(btn.dataset.day);
-    btn.classList.toggle('active',openDays.includes(day));
+  document.querySelectorAll('#clinicSettingsModal .day-toggle:not([id^="ptDay"])').forEach(btn=>{
+    btn.classList.toggle('active',openDays.includes(parseInt(btn.dataset.day)));
   });
+  // Part-timer fields
+  const pt=cfg.partTimer||{};
+  document.getElementById('csPtName').value=pt.name||'';
+  document.getElementById('csPtStart').value=pt.startTime||'09:00';
+  document.getElementById('csPtEnd').value=pt.endTime||'17:00';
+  const ptDays=pt.workDays||[];
+  for(let i=0;i<7;i++){
+    const btn=document.getElementById('ptDay'+i);
+    if(btn) btn.classList.toggle('active',ptDays.includes(i));
+  }
   openM('clinicSettingsModal');
 }
 
-function toggleDay(btn){
-  btn.classList.toggle('active');
-}
+function toggleDay(btn){ btn.classList.toggle('active'); }
+function togglePtDay(btn){ btn.classList.toggle('active'); }
 
 function saveClinicSettings(){
   const openDays=[];
-  document.querySelectorAll('.day-toggle.active').forEach(btn=>openDays.push(parseInt(btn.dataset.day)));
+  document.querySelectorAll('#clinicSettingsModal .day-toggle:not([id^="ptDay"]).active').forEach(btn=>openDays.push(parseInt(btn.dataset.day)));
   if(!openDays.length){showToast('Please select at least one open day','err');return;}
   const openTime=document.getElementById('csOpenTime').value;
   const closeTime=document.getElementById('csCloseTime').value;
   if(openTime>=closeTime){showToast('Closing time must be after opening time','err');return;}
+  const ptWorkDays=[];
+  for(let i=0;i<7;i++){const btn=document.getElementById('ptDay'+i);if(btn&&btn.classList.contains('active'))ptWorkDays.push(i);}
   S.settings={
     clinicName:document.getElementById('csClinicName').value.trim()||'GlowBar Beauty Clinic',
     openDays,
@@ -4858,6 +4900,12 @@ function saveClinicSettings(){
     breakEnd:document.getElementById('csBreakEnd').value||'',
     slotDuration:parseInt(document.getElementById('csSlotDuration').value)||60,
     maxStaff:parseInt(document.getElementById('csMaxStaff').value)||2,
+    partTimer:{
+      name:document.getElementById('csPtName').value.trim(),
+      workDays:ptWorkDays,
+      startTime:document.getElementById('csPtStart').value||'09:00',
+      endTime:document.getElementById('csPtEnd').value||'17:00',
+    },
   };
   sync('settings');
   closeM('clinicSettingsModal');
@@ -4872,22 +4920,96 @@ function isClinicOpen(dateStr){
   return (S.settings.openDays||[1,2,3,4,5,6]).includes(day);
 }
 
-function isSlotAvailable(dateStr, timeStr, excludeId=null){
+function toMins(t){ const[h,m]=(t||'00:00').split(':').map(Number);return h*60+m; }
+
+function getSvcMeta(svcName,svcCat){
+  const n=(svcName||'').toLowerCase(),c=(svcCat||'').toLowerCase();
+  if(c.includes('body contouring')||c.includes('exilis')||c.includes('pico')||c.includes('diode')||
+     c.includes('laser')||c.includes('glow skin')||c.includes('glow ink')||c.includes('glow clear')||
+     n.includes('exilis')||n.includes('diode')||n.includes('laser')||n.includes('carbon')||
+     n.includes('tattoo')||n.includes('wart')||n.includes('pico')||n.includes('melasma')||n.includes('scar'))
+    return{type:'laser',buffer:15};
+  if(c.includes('facial')||n.includes('facial')||n.includes('hydra'))
+    return{type:'facial',buffer:15};
+  if(c.includes('nail')||n.includes('mani')||n.includes('pedi')||n.includes('nail art')||
+     n.includes('extension')||n.includes('polygel')||n.includes('softgel'))
+    return{type:'nail',buffer:10};
+  if(c.includes('wax')||c.includes('hair wax')||n.includes('wax')||n.includes('brazilian')||n.includes('bikini'))
+    return{type:'wax',buffer:10};
+  return{type:'standard',buffer:10};
+}
+
+function getTypeCap(type,dateStr){
+  const cfg=S.settings||{};
+  const maxStaff=cfg.maxStaff||2;
+  if(type==='laser'||type==='facial') return 1;
+  if(type==='nail'){
+    const pt=cfg.partTimer||{};
+    if(!pt.name) return maxStaff;
+    const day=new Date((dateStr||td())+'T12:00').getDay();
+    return (pt.workDays||[]).includes(day)? maxStaff+1 : maxStaff;
+  }
+  return maxStaff;
+}
+
+function getNailCapAlert(dateStr){
+  const cfg=S.settings||{};
+  const pt=cfg.partTimer||{};
+  if(!pt.name) return false;
+  const day=new Date(dateStr+'T12:00').getDay();
+  if((pt.workDays||[]).includes(day)) return false;
+  const cap=cfg.maxStaff||2;
+  const nailBks=S.bookings.filter(b=>
+    b.date===dateStr&&b.status!=='cancelled'&&b.status!=='no-show'&&
+    getSvcMeta(b.service||'').type==='nail'
+  );
+  return nailBks.length>=cap;
+}
+
+function isSlotAvailable(dateStr,timeStr,svcName='',svcDur=60,excludeId=null){
   const cfg=S.settings||{openTime:'09:00',closeTime:'19:00',maxStaff:2,breakStart:'',breakEnd:''};
   if(!isClinicOpen(dateStr)) return false;
   if(timeStr<cfg.openTime||timeStr>=cfg.closeTime) return false;
   if(cfg.breakStart&&cfg.breakEnd&&timeStr>=cfg.breakStart&&timeStr<cfg.breakEnd) return false;
-  const active=S.bookings.filter(b=>
-    b.date===dateStr &&
-    b.time===timeStr &&
-    b.status!=='cancelled' &&
-    b.status!=='no-show' &&
-    String(b.id)!==String(excludeId)
-  ).length;
-  return active<(cfg.maxStaff||2);
+  const meta=getSvcMeta(svcName);
+  const newStart=toMins(timeStr);
+  const newEnd=newStart+svcDur+meta.buffer;
+  const cap=getTypeCap(meta.type,dateStr);
+  const active=S.bookings.reduce((sum,b)=>{
+    if(b.date!==dateStr) return sum;
+    if(b.status==='cancelled'||b.status==='no-show') return sum;
+    if(String(b.id)===String(excludeId)) return sum;
+    const bMeta=getSvcMeta(b.service||'');
+    if(bMeta.type!==meta.type) return sum;
+    const bStart=toMins(b.time||'00:00');
+    const bEnd=bStart+(b.duration||60)+bMeta.buffer;
+    if(newStart<bEnd&&newEnd>bStart) return sum+(b.groupSize||1);
+    return sum;
+  },0);
+  return active<cap;
 }
 
-function getAvailableSlots(dateStr){
+function getNextAvailableSlot(dateStr,afterMins,svcName,svcDur){
+  const cfg=S.settings||{closeTime:'19:00'};
+  const closeTotal=toMins(cfg.closeTime||'19:00');
+  let t=afterMins+30;
+  while(t<closeTotal){
+    const h=Math.floor(t/60),m=t%60;
+    const tStr=String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');
+    if(isSlotAvailable(dateStr,tStr,svcName,svcDur)) return tStr;
+    t+=30;
+  }
+  return null;
+}
+
+function autoFillDuration(){
+  const svcName=document.getElementById('apService')?.value||'';
+  const prod=S.products.find(p=>p.name===svcName);
+  const durEl=document.getElementById('apDuration');
+  if(prod&&prod.durationMins&&durEl) durEl.value=prod.durationMins;
+}
+
+function getAvailableSlots(dateStr,svcName='',svcDur=60){
   const cfg=S.settings||{openTime:'09:00',closeTime:'19:00',slotDuration:60};
   if(!isClinicOpen(dateStr)) return [];
   const slots=[];
@@ -4897,9 +5019,8 @@ function getAvailableSlots(dateStr){
   const dur=parseInt(cfg.slotDuration)||60;
   while(h*60+m<closeTotal){
     const slotStr=String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');
-    // Skip break
     const inBreak=cfg.breakStart&&cfg.breakEnd&&slotStr>=cfg.breakStart&&slotStr<cfg.breakEnd;
-    if(!inBreak) slots.push({time:slotStr,available:isSlotAvailable(dateStr,slotStr)});
+    if(!inBreak) slots.push({time:slotStr,available:isSlotAvailable(dateStr,slotStr,svcName,svcDur)});
     m+=dur; if(m>=60){h+=Math.floor(m/60);m=m%60;}
   }
   return slots;
@@ -4980,6 +5101,7 @@ function openNewAppt(){
   document.getElementById('apDate').value=calSelDate||td();
   document.getElementById('apTime').value='10:00';
   document.getElementById('apDuration').value=60;
+  if(document.getElementById('apGroupSize'))document.getElementById('apGroupSize').value=1;
   openM('apptModal');
 }
 function saveAppt(){
@@ -4992,12 +5114,16 @@ function saveAppt(){
   if(!isClinicOpen(date)){
     showToast('Clinic is closed on that day — check Clinic Settings','err');return;
   }
+  const duration=parseInt(document.getElementById('apDuration').value)||60;
+  const groupSize=parseInt(document.getElementById('apGroupSize')?.value)||1;
   // Check slot availability (exclude current booking if editing)
-  if(!isSlotAvailable(date,time,editApptId)){
-    const max=S.settings?.maxStaff||2;
-    showToast(`This slot is fully booked — max ${max} appointment${max!==1?'s':''} at this time`,'err');return;
+  if(!isSlotAvailable(date,time,service,duration,editApptId)){
+    const meta=getSvcMeta(service);
+    const cap=getTypeCap(meta.type,date);
+    const next=getNextAvailableSlot(date,toMins(time),service,duration);
+    showToast(`Slot fully booked (cap ${cap})${next?' — next available: '+next:''}`.trim(),'err');return;
   }
-  const appt={client,service,staff:document.getElementById('apStaff').value||'',date,time,duration:parseInt(document.getElementById('apDuration').value)||60,status:'pending',notes:document.getElementById('apNotes').value.trim(),reminder:document.getElementById('apSendReminder').checked};
+  const appt={client,service,staff:document.getElementById('apStaff').value||'',date,time,duration,groupSize,status:'pending',notes:document.getElementById('apNotes').value.trim(),reminder:document.getElementById('apSendReminder').checked};
   if(editApptId){const i=S.bookings.findIndex(x=>String(x.id)===String(editApptId));if(i>=0)S.bookings[i]={...S.bookings[i],...appt};}
   else S.bookings.push({id:Date.now(),...appt});
   closeM('apptModal');sync('bookings');renderBookings();renderCalendar();renderDashboard();
