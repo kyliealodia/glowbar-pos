@@ -714,6 +714,7 @@ html{height:-webkit-fill-available;}
                 <button class="btn btn-outline btn-sm" style="width:100%;font-size:11px;" onclick="openLoyalty()">✨ Redeem Loyalty Points (<span id="loyaltyPtsAvail">0</span> pts available)</button>
               </div>
               <button class="btn btn-gold btn-lg" id="chargeBtn" onclick="openPayment()" disabled style="margin-top:10px;">Charge</button>
+              <button class="btn btn-outline btn-sm" id="queueBtn" onclick="openWalkInQueue()" style="margin-top:6px;width:100%;font-size:12px;">🚶 Walk-in Queue <span id="queueCount" style="background:var(--gold);color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:4px;display:none;">0</span></button>
             </div>
           </div>
         </div>
@@ -879,6 +880,13 @@ html{height:-webkit-fill-available;}
       <div class="page" id="page-users">
         <div class="sec-hdr"><h2 class="sec-title">Users & Access Control</h2><button class="btn btn-gold btn-sm" onclick="openAddUser()">+ Add User</button></div>
         <div class="users-grid" id="usersGrid"></div>
+        <!-- Cash Advance Administration -->
+        <div style="margin-top:20px;background:#fff;border-radius:var(--radius-lg);border:1px solid var(--border2);overflow:hidden;">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);">
+            <div style="font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:500;">💸 Cash Advance Requests</div>
+          </div>
+          <div id="cashAdvanceAdminList" style="padding:14px 18px;"></div>
+        </div>
         <div style="margin-top:20px;" class="card card-body" style="padding:18px;">
           <div style="font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:500;margin-bottom:12px;">Role Permissions</div>
           <table class="inv-table">
@@ -1649,6 +1657,47 @@ html{height:-webkit-fill-available;}
       <div class="pay-m" data-m="veritaspay" onclick="selPay(this)"><span class="pay-ico">💼</span><span style="font-size:10px;">VeritasPay</span></div>
     </div>
 
+    <!-- Split Payment Toggle -->
+    <div style="margin-top:8px;display:flex;align-items:center;gap:8px;">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;font-weight:500;color:var(--ink2);">
+        <input type="checkbox" id="splitPayToggle" style="accent-color:var(--gold);width:14px;height:14px;" onchange="toggleSplitPay()"> Split Payment (2 methods)
+      </label>
+    </div>
+    <div id="splitPayWrap" style="display:none;margin-top:10px;padding:12px 14px;background:var(--cream2);border-radius:12px;border:1.5px solid var(--gold);">
+      <div style="font-size:10px;font-weight:700;color:var(--gold-dk);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">✂ Split Payment</div>
+      <div style="font-size:11px;color:var(--ink3);margin-bottom:8px;">First method: <strong id="splitMethod1Label">—</strong></div>
+      <div class="form-row">
+        <div class="form-group">
+          <label style="font-size:10px;color:var(--ink3);display:block;margin-bottom:3px;">Amount (₱) for 1st method</label>
+          <input class="form-input" type="number" id="splitAmt1" min="0" step="0.01" placeholder="0.00" oninput="updateSplitAmt()" style="font-size:14px;font-weight:600;">
+        </div>
+        <div class="form-group">
+          <label style="font-size:10px;color:var(--ink3);display:block;margin-bottom:3px;">2nd Method</label>
+          <select class="form-select" id="splitMethod2" style="font-size:13px;" onchange="updateSplitAmt()">
+            <option value="cash">Cash</option>
+            <option value="gcash">GCash</option>
+            <option value="qrph">QR Ph</option>
+            <option value="card">Card</option>
+          </select>
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--ink2);">Remaining for 2nd method: <strong id="splitAmt2Display" style="color:var(--gold-dk);">₱0.00</strong></div>
+      <div id="splitFeeNote" style="font-size:11px;color:var(--warn);margin-top:5px;"></div>
+    </div>
+
+    <!-- GCash / QR Ph Reference Number & QR Code -->
+    <div id="gcashRefWrap" style="display:none;margin-top:10px;padding:12px 14px;background:var(--cream2);border-radius:12px;border:1.5px solid var(--gold);">
+      <div style="font-size:10px;font-weight:700;color:var(--gold-dk);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">📱 GCash / QR Ph Payment</div>
+      <div id="gcashQrDisplay" style="text-align:center;margin-bottom:10px;display:none;">
+        <img id="gcashQrImg" src="" style="max-width:160px;border-radius:10px;border:1.5px solid var(--border);" alt="GCash QR">
+        <div style="font-size:10px;color:var(--ink3);margin-top:4px;">Scan to pay</div>
+      </div>
+      <div class="form-group">
+        <label style="font-size:11px;color:var(--ink3);display:block;margin-bottom:3px;">Reference Number</label>
+        <input class="form-input" type="text" id="gcashRefNum" placeholder="e.g. 1234567890" style="font-size:13px;">
+      </div>
+    </div>
+
     <!-- Fee breakdown — Card / Bank Installment / VeritasPay -->
     <div id="feeBreakdownWrap" style="display:none;margin-top:14px;padding:12px 14px;background:#FFF8F0;border-radius:12px;border:1.5px solid var(--gold);">
       <div style="font-size:10px;font-weight:700;color:var(--gold-dk);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">💳 Payment Fee</div>
@@ -2167,6 +2216,20 @@ html{height:-webkit-fill-available;}
           <input class="form-input" type="number" id="csTimeoutMins" placeholder="10" min="5" max="120" value="10">
         </div>
       </div>
+      <!-- GCash / QR Ph QR Code -->
+      <div style="border-top:1px solid var(--border);padding-top:16px;">
+        <div class="form-label" style="margin-bottom:8px;">GCash / QR Ph QR Code <span style="font-size:10px;color:var(--ink4);">(shown to clients during payment)</span></div>
+        <div id="csGcashQrPreview" style="display:none;margin-bottom:10px;text-align:center;">
+          <img id="csGcashQrImg" src="" style="max-width:140px;border-radius:10px;border:1.5px solid var(--border);">
+          <div style="font-size:10px;color:var(--ink3);margin-top:4px;">Current QR code</div>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:10px 14px;background:var(--cream2);border-radius:10px;border:1.5px dashed var(--border);">
+          <span style="font-size:12px;color:var(--ink2);">📷 Upload QR code image</span>
+          <input type="file" id="csGcashQrUpload" accept="image/*" style="display:none;" onchange="handleGcashQrUpload(event)">
+        </label>
+        <button class="btn btn-outline btn-sm" style="margin-top:6px;font-size:11px;" onclick="document.getElementById('csGcashQrUpload').click()">Choose Image</button>
+        <button class="btn btn-outline btn-sm" style="margin-top:6px;font-size:11px;color:var(--danger);" onclick="clearGcashQr()">✕ Clear QR</button>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeM('clinicSettingsModal')">Cancel</button>
@@ -2214,12 +2277,58 @@ html{height:-webkit-fill-available;}
       </div>
       <div class="form-group"><label class="form-label">Deposit Amount <span style="color:var(--ink4);font-size:10px;">(optional — partial payment)</span></label><input class="form-input" type="number" id="apDeposit" value="0" min="0" step="50" placeholder="0" oninput="updateDepBalanceHint()"><div id="apDepositBalance" style="font-size:11px;color:var(--success);margin-top:5px;padding:6px 10px;background:#f0fff4;border-radius:7px;display:none;"></div></div>
       <div class="form-group"><label class="form-label">Notes / Concerns</label><textarea class="form-textarea" id="apNotes" placeholder="Client concerns, contraindications…"></textarea></div>
+      <!-- Series Booking -->
+      <div style="background:var(--cream2);border-radius:10px;padding:12px 14px;border:1px solid var(--border);">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:500;">
+          <input type="checkbox" id="apSeries" onchange="toggleSeriesFields()" style="accent-color:var(--gold);width:15px;height:15px;"> Book as a Series
+        </label>
+        <div id="seriesFields" style="display:none;margin-top:10px;">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Number of Sessions</label>
+              <select class="form-select" id="apSeriesCount">
+                <option value="2">2</option><option value="3">3</option><option value="4">4</option>
+                <option value="6" selected>6</option><option value="8">8</option><option value="10">10</option><option value="12">12</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Interval</label>
+              <select class="form-select" id="apSeriesInterval">
+                <option value="7">Weekly (every 7 days)</option>
+                <option value="14">Biweekly (every 14 days)</option>
+                <option value="21">Every 3 weeks</option>
+                <option value="30">Monthly (every 30 days)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
       <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--cream2);border-radius:9px;border:1px solid var(--border);">
         <input type="checkbox" id="apSendReminder" checked style="width:16px;height:16px;accent-color:var(--gold);">
         <label for="apSendReminder" style="font-size:13px;cursor:pointer;">Send appointment reminder (SMS/Email)</label>
       </div>
     </div>
     <div class="modal-footer"><button class="btn btn-outline" onclick="closeM('apptModal')">Cancel</button><button class="btn btn-gold" onclick="saveAppt()">Book Appointment</button></div>
+  </div>
+</div>
+
+<!-- Walk-in Queue Modal -->
+<div class="overlay hidden" id="walkInQueueModal">
+  <div class="modal modal-md">
+    <div class="modal-hdr"><div class="modal-title">🚶 Walk-in Queue</div><div class="modal-x" onclick="closeM('walkInQueueModal')">✕</div></div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:14px;">
+      <div style="background:var(--cream2);border-radius:10px;padding:12px 14px;">
+        <div style="font-size:11px;font-weight:700;color:var(--gold-dk);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Add Walk-in</div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Client Name</label><input class="form-input" id="wqName" placeholder="e.g. Jane Santos"></div>
+          <div class="form-group"><label class="form-label">Desired Service</label><select class="form-select" id="wqService"></select></div>
+        </div>
+        <button class="btn btn-gold btn-sm" style="width:100%;" onclick="addToWalkInQueue()">+ Add to Queue</button>
+      </div>
+      <div id="walkInQueueList"></div>
+      <button class="btn btn-outline btn-sm" style="font-size:11px;" onclick="clearServedQueue()">✓ Clear Served</button>
+    </div>
+    <div class="modal-footer"><button class="btn btn-outline" onclick="closeM('walkInQueueModal')">Close</button></div>
   </div>
 </div>
 
@@ -2431,6 +2540,11 @@ html{height:-webkit-fill-available;}
       </div>
       <div class="form-group"><label class="form-label">Other Deductions (₱) <span style="color:var(--ink3);font-weight:400;">e.g. cash advance, absences</span></label><input class="form-input" type="number" id="scOtherDeduct" placeholder="0" min="0"></div>
       <div class="form-group"><label class="form-label">Other Allowances (₱) <span style="color:var(--ink3);font-weight:400;">e.g. transport, meal, rice</span></label><input class="form-input" type="number" id="scAllowance" placeholder="0" min="0"></div>
+      <!-- Per-Category Commission Rates -->
+      <div>
+        <div style="font-size:11px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;">Per-Category Commission Rates <span style="font-size:10px;font-weight:400;text-transform:none;color:var(--ink4);">(overrides global rate for that category)</span></div>
+        <div id="scCatCommissions" style="display:flex;flex-direction:column;gap:6px;background:var(--cream2);border-radius:10px;padding:12px 14px;"></div>
+      </div>
       <div id="scPreview" style="background:var(--cream2);border-radius:10px;padding:12px 14px;font-size:12px;color:var(--ink2);line-height:2;display:none;"></div>
     </div>
     <div class="modal-footer">
@@ -3055,6 +3169,8 @@ let S = {
     {id:4,name:'Patricia Go',phone:'0920-456-7890',email:'patricia@email.com',messenger:'@patriciago',bday:'1982-05-30',skin:'Combination',visits:20,totalSpent:220000,vip:true,notes:'Prefers Dr. Reyes',color:COLORS[1]},
   ],
   bookings:[],
+  walkInQueue:[],
+  cashAdvances:[],
   rooms:[
     {id:1,name:'Bed 1',occupied:false,session:null},
     {id:2,name:'Bed 2',occupied:false,session:null},
@@ -3135,7 +3251,7 @@ async function pushAllToFirebase(){
   document.getElementById('syncLbl').textContent='Syncing…';
 
   // Push small keys first
-  const smallKeys=['settings','users','rooms','clients','bookings','transactions','deletedTransactions','loginLogs'];
+  const smallKeys=['settings','users','rooms','clients','bookings','transactions','deletedTransactions','loginLogs','walkInQueue','cashAdvances'];
   for(const key of smallKeys){
     try{ await db.ref('gb/'+key).set(S[key]||[]); }
     catch(e){ console.warn('Failed:',key,e); }
@@ -3266,6 +3382,13 @@ function afterLoad(){
   renderStaff();
   setSyncUI(true);
   checkSyncBanner();
+  // Clean old walk-in queue items from previous days
+  if(S.walkInQueue&&S.walkInQueue.length){
+    const before=S.walkInQueue.length;
+    S.walkInQueue=S.walkInQueue.filter(q=>q.addedAt&&q.addedAt.startsWith(td()));
+    if(S.walkInQueue.length!==before) sync('walkInQueue');
+  }
+  updateQueueBadge();
 }
 
 function updateClock(){const el=document.getElementById('sbClock');if(el)el.textContent=new Date().toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'});}
@@ -3853,6 +3976,7 @@ function goPage(name){
   if(name==='products'){setProdView('service');}
   if(name==='attendance'){document.getElementById('attFilterDate').value=td();renderAttendance();}
   if(name==='payslip'){initPayPeriods();renderPayslip();}
+  if(name==='users'){renderCashAdvanceAdmin();}
   if(name==='capital'){initCapital();renderCapital();}
   if(name==='sop'){initSOPs();renderSOPs();}
   if(name==='manual'){setManualTab(isOwner?'owner':'staff');}
@@ -4225,6 +4349,24 @@ function selPay(el){
     intWrap.style.display=method==='internal-installment'?'block':'none';
     if(method==='internal-installment') updateInternalInst();
   }
+  // GCash / QR Ph reference number + QR code display
+  const gcashWrap=document.getElementById('gcashRefWrap');
+  if(gcashWrap){
+    const needsRef=['gcash','qrph'].includes(method);
+    gcashWrap.style.display=needsRef?'block':'none';
+    if(needsRef){
+      const qrImg=document.getElementById('gcashQrImg');
+      const qrDisp=document.getElementById('gcashQrDisplay');
+      const qr=S.settings?.gcashQr||'';
+      if(qrImg&&qrDisp){qrImg.src=qr;qrDisp.style.display=qr?'block':'none';}
+    }
+  }
+  // Update split method1 label if split is active
+  if(document.getElementById('splitPayToggle')?.checked){
+    const lbl=document.getElementById('splitMethod1Label');
+    if(lbl) lbl.textContent=method.replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+    updateSplitAmt();
+  }
 }
 
 function setCashPreset(amount){
@@ -4237,6 +4379,32 @@ function setCashPreset(amount){
   calcChange();
 }
 
+function toggleSplitPay(){
+  const en=document.getElementById('splitPayToggle').checked;
+  document.getElementById('splitPayWrap').style.display=en?'block':'none';
+  if(en){
+    const m=document.querySelector('.pay-m.sel')?.dataset.m||'cash';
+    document.getElementById('splitMethod1Label').textContent=m.replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+  }
+  updateSplitAmt();
+}
+function updateSplitAmt(){
+  const total=parseFloat(document.getElementById('cartTotal')?.textContent?.replace(/[₱,]/g,''))||0;
+  const amt1=parseFloat(document.getElementById('splitAmt1')?.value)||0;
+  const remaining=Math.max(0,total-amt1);
+  const sp=document.getElementById('splitAmt2Display');
+  if(sp) sp.textContent=fmtPrice(remaining);
+  const m2=document.getElementById('splitMethod2')?.value||'cash';
+  const feeNote=document.getElementById('splitFeeNote');
+  if(feeNote){
+    const fees={card:0.03,'bank-installment':0.03,veritaspay:0.03};
+    const m1=document.querySelector('.pay-m.sel')?.dataset.m||'cash';
+    const notes=[];
+    if(fees[m1]) notes.push(m1+': +'+Math.round(fees[m1]*100)+'% fee on '+fmtPrice(amt1));
+    if(fees[m2]) notes.push(m2+': +'+Math.round(fees[m2]*100)+'% fee on '+fmtPrice(remaining));
+    feeNote.textContent=notes.join(' · ');
+  }
+}
 function calcChange(){
   const totalEl=document.getElementById('cartTotal');
   const cashGivenEl=document.getElementById('cashGiven');
@@ -4429,6 +4597,12 @@ function stopRefCam(){
 
 function confirmPay(){
   const method=document.querySelector('.pay-m.sel')?.dataset.m||'cash';
+  // Split payment
+  const isSplit=document.getElementById('splitPayToggle')?.checked;
+  const splitAmt1=isSplit?parseFloat(document.getElementById('splitAmt1')?.value)||0:0;
+  const splitMethod2=isSplit?document.getElementById('splitMethod2')?.value||'cash':null;
+  // GCash / QR Ph reference number
+  const refNumber=(document.getElementById('gcashRefNum')?.value||'').trim()||null;
   const sub=cart.reduce((s,i)=>s+i.price*i.qty,0);
   const dv=parseFloat(document.getElementById('discInp').value)||0;
   const disc=discType==='pct'?sub*(dv/100):Math.min(dv,sub);
@@ -4487,6 +4661,17 @@ function confirmPay(){
     internalInstInfo={totalAmount:originalAmount,depositPaid:depositToday,remaining,months:instMonths,monthly,schedule:sched};
     finalTotal=depositToday;
   }
+  // Split payment fee calculation
+  let splitPaymentData=null;
+  if(isSplit){
+    const splitAmt2=Math.max(0,finalTotal-splitAmt1);
+    const fee1=_FEE_RATES[method]?.flat||0;
+    const fee2=_FEE_RATES[splitMethod2]?.flat||0;
+    const splitFee1=Math.round(splitAmt1*fee1*100)/100;
+    const splitFee2=Math.round(splitAmt2*fee2*100)/100;
+    splitPaymentData={method1:method,amount1:splitAmt1,fee1:splitFee1,method2:splitMethod2,amount2:splitAmt2,fee2:splitFee2,totalFees:splitFee1+splitFee2};
+    finalTotal=finalTotal+splitFee1+splitFee2;
+  }
   const cn=selClient?selClient.name:'Walk-in Client';
   const txid=uid('TXN');
   const now=new Date();
@@ -4534,7 +4719,18 @@ function confirmPay(){
   const cashGiven=method==='cash'?(parseFloat(document.getElementById('cashGiven').value)||0):0;
   const cashChange=method==='cash'?Math.max(0,cashGiven-finalTotal):0;
   const instMeta=_pendingInstallmentPlan?{visit:1,totalVisits:_pendingInstallmentPlan.schedule.length,totalPrice:_pendingInstallmentPlan.totalPrice,packageName:_pendingInstallmentPlan.pkg.name}:null;
-  S.transactions.push({id:txid,client:cn,clientId:selClient?.id||null,items:JSON.parse(JSON.stringify(cart)),sub,disc,discType,tip,vat,vatOn,total:finalTotal,originalAmount:payFeeAmt>0?originalAmount:null,payFee:payFeeAmt||null,feePct:payFeePct||null,feeTerm:payFeeTerm||null,depositApplied:dep||null,method,cashGiven:cashGiven||null,cashChange:cashChange||null,refPhoto:_refPhotoData||null,time:now.toISOString(),staff:currentUser.name,installmentInfo:instMeta||null,internalInstallment:internalInstInfo||null,scpwd:scpwdEnabled?{type:scpwdType,idNum:scpwdId,discAmt:scpwdDiscAmt}:null,orNumber});
+  // Commission breakdown per service category (Feature 4)
+  const commInfo=[];
+  if(currentUser){
+    cart.forEach(ci=>{
+      const prod=S.products.find(p=>p.id===ci.id)||S.packages?.find(p=>p.id===ci.id);
+      const cat=prod?.cat||'Other';
+      const catRate=currentUser.categoryCommissions?.[cat]??currentUser.commission??0;
+      const commAmt=Math.round(ci.price*ci.qty*(catRate/100)*100)/100;
+      if(commAmt>0) commInfo.push({cat,item:ci.name,rate:catRate,amount:commAmt});
+    });
+  }
+  S.transactions.push({id:txid,client:cn,clientId:selClient?.id||null,items:JSON.parse(JSON.stringify(cart)),sub,disc,discType,tip,vat,vatOn,total:finalTotal,originalAmount:payFeeAmt>0?originalAmount:null,payFee:payFeeAmt||null,feePct:payFeePct||null,feeTerm:payFeeTerm||null,depositApplied:dep||null,method,cashGiven:cashGiven||null,cashChange:cashChange||null,refPhoto:_refPhotoData||null,time:now.toISOString(),staff:currentUser.name,installmentInfo:instMeta||null,internalInstallment:internalInstInfo||null,scpwd:scpwdEnabled?{type:scpwdType,idNum:scpwdId,discAmt:scpwdDiscAmt}:null,orNumber,splitPayment:splitPaymentData||null,refNumber:refNumber||null,commissionBreakdown:commInfo.length?commInfo:null});
   window.lastTx=S.transactions[S.transactions.length-1];
   window._lastPaidClientId = selClient?.id||null;
   window._lastTxId = txid;
@@ -4579,7 +4775,12 @@ function confirmPay(){
     ${vatOn?`<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink2);margin-bottom:3px;"><span>VAT (12%)</span><span>${fmtPrice(vat)}</span></div>`:''}
     ${dep>0?`<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--success);margin-bottom:3px;"><span>💰 Deposit Applied</span><span>-${fmtPrice(dep)}</span></div>`:''}
     <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:600;border-top:1px solid var(--cream3);padding-top:8px;margin-top:4px;"><span>TOTAL</span><span>${fmtPrice(finalTotal)}</span></div>
-    <div style="text-align:center;margin-top:12px;padding:10px;background:rgba(74,140,92,0.08);border-radius:10px;color:var(--success);font-weight:600;font-size:13px;">✓ PAID via ${method.toUpperCase()}</div>
+    <div style="text-align:center;margin-top:12px;padding:10px;background:rgba(74,140,92,0.08);border-radius:10px;color:var(--success);font-weight:600;font-size:13px;">✓ PAID via ${isSplit?`${method.toUpperCase()} + ${splitMethod2.toUpperCase()}`:method.toUpperCase()}</div>
+    ${isSplit&&splitPaymentData?`<div style="margin-top:6px;padding:8px 12px;background:var(--cream2);border-radius:10px;font-size:11px;color:var(--ink2);">
+      <div style="display:flex;justify-content:space-between;"><span>${splitPaymentData.method1.toUpperCase()}</span><span>${fmtPrice(splitPaymentData.amount1)}${splitPaymentData.fee1>0?` +${fmtPrice(splitPaymentData.fee1)} fee`:''}</span></div>
+      <div style="display:flex;justify-content:space-between;"><span>${splitPaymentData.method2.toUpperCase()}</span><span>${fmtPrice(splitPaymentData.amount2)}${splitPaymentData.fee2>0?` +${fmtPrice(splitPaymentData.fee2)} fee`:''}</span></div>
+    </div>`:''}
+    ${refNumber?`<div style="margin-top:6px;text-align:center;font-size:11px;color:var(--ink3);">Ref #: <strong>${refNumber}</strong></div>`:''}
     ${instMeta?`<div style="margin-top:10px;padding:10px 12px;background:#fffbe6;border-radius:10px;border:1px solid #f0d9a8;"><div style="font-size:11px;font-weight:700;color:var(--gold-dk);margin-bottom:4px;">💳 Installment Plan — Visit 1 of ${instMeta.totalVisits}</div><div style="font-size:11px;color:var(--ink3);">${instMeta.packageName} · Total: ${fmtPrice(instMeta.totalPrice)}</div><div style="font-size:12px;margin-top:3px;">Paid today: <strong>${fmtPrice(finalTotal)}</strong> · Remaining: <strong>${fmtPrice(instMeta.totalPrice-finalTotal)}</strong></div></div>`:''}
     ${method==='cash'&&cashGiven>0?`<div style="margin-top:10px;padding:10px 12px;background:var(--cream2);border-radius:10px;">
       <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--ink2);margin-bottom:4px;"><span>Cash Received</span><span style="font-weight:600;">${fmtPrice(cashGiven)}</span></div>
@@ -4674,12 +4875,101 @@ function clearCart(){
   if(_el('scpwdToggle')) _el('scpwdToggle').checked=false;
   if(_el('scpwdFields')) _el('scpwdFields').style.display='none';
   if(_el('scpwdIdNum')) _el('scpwdIdNum').value='';
+  if(_el('splitPayToggle')){_el('splitPayToggle').checked=false;}
+  if(_el('splitPayWrap')) _el('splitPayWrap').style.display='none';
+  if(_el('splitAmt1')) _el('splitAmt1').value='';
+  if(_el('splitAmt2Display')) _el('splitAmt2Display').textContent='₱0.00';
+  if(_el('gcashRefWrap')) _el('gcashRefWrap').style.display='none';
+  if(_el('gcashRefNum')) _el('gcashRefNum').value='';
   document.querySelectorAll('.pay-m').forEach(b=>b.classList.remove('sel'));
   try{resetRefPhotoUI();}catch(e){}
   try{updateDepositDisplay();}catch(e){}
   try{updateReferralRow();}catch(e){}
   renderCart();
 }
+// ══ WALK-IN QUEUE ══
+function openWalkInQueue(){
+  // Clean up old day's items
+  S.walkInQueue=(S.walkInQueue||[]).filter(q=>q.addedAt&&q.addedAt.startsWith(td()));
+  // Populate service dropdown
+  const sel=document.getElementById('wqService');
+  if(sel){
+    sel.innerHTML=S.products.filter(p=>p.inPOS!==false).map(p=>`<option value="${p.id}" data-dur="${p.durationMins||30}">${p.name}</option>`).join('');
+  }
+  renderWalkInQueue();
+  openM('walkInQueueModal');
+}
+function addToWalkInQueue(){
+  const name=(document.getElementById('wqName')?.value||'').trim();
+  const sel=document.getElementById('wqService');
+  if(!name){showToast('Enter client name','err');return;}
+  const serviceId=sel?.value||'';
+  const serviceName=sel?.options[sel.selectedIndex]?.text||'';
+  const item={id:'WQ'+Date.now(),name,serviceId,service:serviceName,addedAt:new Date().toISOString(),served:false};
+  if(!S.walkInQueue) S.walkInQueue=[];
+  S.walkInQueue.push(item);
+  sync('walkInQueue');
+  document.getElementById('wqName').value='';
+  renderWalkInQueue();
+  updateQueueBadge();
+  showToast(name+' added to queue','ok');
+}
+function serveQueueItem(id){
+  const item=S.walkInQueue.find(q=>q.id===id);if(!item)return;
+  item.served=true;
+  sync('walkInQueue');
+  renderWalkInQueue();
+  updateQueueBadge();
+  closeM('walkInQueueModal');
+  // Pre-fill cart note with client name
+  showToast('Serving: '+item.name,'ok');
+}
+function removeFromQueue(id){
+  S.walkInQueue=(S.walkInQueue||[]).filter(q=>q.id!==id);
+  sync('walkInQueue');
+  renderWalkInQueue();
+  updateQueueBadge();
+}
+function clearServedQueue(){
+  S.walkInQueue=(S.walkInQueue||[]).filter(q=>!q.served);
+  sync('walkInQueue');
+  renderWalkInQueue();
+  updateQueueBadge();
+  showToast('Served items cleared','ok');
+}
+function renderWalkInQueue(){
+  const list=document.getElementById('walkInQueueList');if(!list)return;
+  const today=td();
+  const items=(S.walkInQueue||[]).filter(q=>q.addedAt&&q.addedAt.startsWith(today));
+  if(!items.length){list.innerHTML='<div style="text-align:center;color:var(--ink3);font-size:13px;padding:16px;">No walk-ins queued today</div>';return;}
+  // Estimate wait: 30 mins per unserved item ahead
+  let unservedAhead=0;
+  list.innerHTML=items.map((q,i)=>{
+    const waitMins=unservedAhead*30;
+    if(!q.served) unservedAhead++;
+    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:${q.served?'var(--cream2)':'#fff'};border-radius:10px;border:1px solid var(--border);margin-bottom:6px;opacity:${q.served?0.6:1};">
+      <div style="flex:1;">
+        <div style="font-size:13px;font-weight:600;color:var(--ink);${q.served?'text-decoration:line-through;color:var(--ink3);':''}">${q.name}</div>
+        <div style="font-size:11px;color:var(--ink3);">${q.service}</div>
+        ${!q.served?`<div style="font-size:10px;color:var(--gold-dk);font-weight:600;">~${waitMins} min wait · #${i+1}</div>`:'<div style="font-size:10px;color:var(--success);font-weight:600;">✓ Served</div>'}
+      </div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap;">
+        ${!q.served?`<button class="btn btn-gold btn-sm" style="font-size:11px;" onclick="serveQueueItem('${q.id}')">Serve Now</button>`:''}
+        <button class="btn btn-outline btn-sm" style="font-size:11px;" onclick="removeFromQueue('${q.id}')">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function updateQueueBadge(){
+  const today=td();
+  const active=(S.walkInQueue||[]).filter(q=>!q.served&&q.addedAt&&q.addedAt.startsWith(today));
+  const badge=document.getElementById('queueCount');
+  if(badge){
+    badge.textContent=active.length;
+    badge.style.display=active.length?'inline':'none';
+  }
+}
+
 function printR(){const c=document.getElementById('receiptContent').innerHTML;const w=window.open('','_blank','width=380,height=560');w.document.write('<html><head><title>GlowBar Receipt</title><style>body{font-family:sans-serif;padding:18px;font-size:12px;}</style></head><body>'+c+'</body></html>');w.document.close();w.print();}
 
 function shareReceipt(){
@@ -5256,7 +5546,7 @@ function renderCalendar(){
     // Check if any slot is full
     const slots=getAvailableSlots(ds);
     const allFull=slots.length>0&&slots.every(s=>!s.available);
-    const evHtml=dayBks.slice(0,3).map(b=>`<div class="cal-event-dot ${b.status}" onclick="event.stopPropagation();openApptDetail(${b.id})" title="${b.client} — ${b.service}${b.staff?' ('+b.staff+')':''}">${b.time} ${b.client.split(' ')[0]}${b.staff?' · '+b.staff.split(' ')[0]:''}</div>`).join('');
+    const evHtml=dayBks.slice(0,3).map(b=>`<div class="cal-event-dot ${b.status}" onclick="event.stopPropagation();openApptDetail(${b.id})" title="${b.client} — ${b.service}${b.staff?' ('+b.staff+')':''}${b.seriesId?' [Series '+b.seriesNum+'/'+b.seriesTotal+']':''}">${b.time} ${b.client.split(' ')[0]}${b.seriesId?' 📅':''}</div>`).join('');
     const more=dayBks.length>3?`<div style="font-size:9px;color:var(--ink3);">+${dayBks.length-3} more</div>`:'';
     const closedBadge=isClosed?'<div style="font-size:8px;color:var(--danger);font-weight:600;letter-spacing:.5px;">CLOSED</div>':'';
     const fullBadge=!isClosed&&allFull?'<div style="font-size:8px;color:var(--warn);font-weight:600;letter-spacing:.5px;">FULL</div>':'';
@@ -5297,7 +5587,7 @@ function showDayAppts(ds){
         <span class="appt-time">${b.time}${b.duration?' ('+b.duration+'m)':''}</span><span class="pill pill-${b.status==='confirmed'?'green':b.status==='pending'?'amber':b.status==='completed'?'gray':'red'}">${cap(b.status)}</span>
       </div>
       <div class="appt-client">${b.client}${b.groupSize>1?' <span style="font-size:10px;color:var(--gold);">👥 ×'+b.groupSize+'</span>':''}</div>
-      <div class="appt-svc">${b.service}${alertDot}</div>
+      <div class="appt-svc">${b.service}${alertDot}${b.seriesId?` <span style="font-size:10px;background:rgba(201,168,76,0.15);color:var(--gold-dk);border-radius:5px;padding:1px 5px;">📅 ${b.seriesNum}/${b.seriesTotal}</span>`:''}</div>
       <div class="appt-staff">👤 ${b.staff||'Unassigned'}${b.source==='online'?' · <span style="font-size:10px;color:var(--gold-dk);">Online</span>':''}</div>
       ${consentHtml}
       ${instFlag?`<div style="font-size:10px;font-weight:600;color:${instFlag.overdue?'var(--danger)':'var(--warn)'};margin-top:3px;">💳 ${instFlag.overdue?'Overdue':'Due'}: ${fmtPrice(instFlag.total)}</div>`:''}
@@ -5552,11 +5842,39 @@ function openClinicSettings(){
   document.getElementById('csBusinessAddress').value=cfg.businessAddress||'';
   document.getElementById('csOrStart').value=String(cfg.orStart||1);
   document.getElementById('csTimeoutMins').value=String(cfg.timeoutMins||10);
+  // GCash QR preview
+  const qr=cfg.gcashQr||'';
+  const qrImg=document.getElementById('csGcashQrImg');
+  const qrPreview=document.getElementById('csGcashQrPreview');
+  if(qrImg&&qrPreview){qrImg.src=qr;qrPreview.style.display=qr?'block':'none';}
   openM('clinicSettingsModal');
 }
 
 function toggleDay(btn){ btn.classList.toggle('active'); }
 function togglePtDay(btn){ btn.classList.toggle('active'); }
+function handleGcashQrUpload(event){
+  const file=event.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    if(!S.settings) S.settings={};
+    S.settings.gcashQr=e.target.result;
+    const qrImg=document.getElementById('csGcashQrImg');
+    const qrPreview=document.getElementById('csGcashQrPreview');
+    if(qrImg){qrImg.src=e.target.result;}
+    if(qrPreview) qrPreview.style.display='block';
+    showToast('QR code uploaded ✓','ok');
+  };
+  reader.readAsDataURL(file);
+}
+function clearGcashQr(){
+  if(!S.settings) S.settings={};
+  S.settings.gcashQr='';
+  const qrImg=document.getElementById('csGcashQrImg');
+  const qrPreview=document.getElementById('csGcashQrPreview');
+  if(qrImg) qrImg.src='';
+  if(qrPreview) qrPreview.style.display='none';
+  showToast('QR code cleared','ok');
+}
 
 function saveClinicSettings(){
   const openDays=[];
@@ -5591,6 +5909,7 @@ function saveClinicSettings(){
     orStart:orStartNew,
     orCounter:S.settings?.orCounter||orStartNew,
     timeoutMins:parseInt(document.getElementById('csTimeoutMins').value)||10,
+    gcashQr:S.settings?.gcashQr||'',
   };
   sync('settings');
   closeM('clinicSettingsModal');
@@ -5769,7 +6088,7 @@ function renderBookings(){
       <div class="bk-time">${b.time}<div style="font-size:10px;color:var(--ink3);">${fmtDate(b.date)}</div></div>
       <div style="flex:1;">
         <div class="bk-client">${b.client}</div>
-        <div class="bk-svc">${b.service} · ${b.staff||'Unassigned'}</div>
+        <div class="bk-svc">${b.service} · ${b.staff||'Unassigned'}${b.seriesId?` <span style="font-size:10px;background:rgba(201,168,76,0.15);color:var(--gold-dk);border-radius:6px;padding:1px 6px;font-weight:600;">📅 Series ${b.seriesNum||''}/${b.seriesTotal||''}</span>`:''}</div>
         ${b.notes?`<div style="font-size:10px;color:var(--ink3);">${b.notes}</div>`:''}
         ${(()=>{if(!b.depositAmt)return'';const p=S.products.find(x=>x.name===b.service);const bal=p?.price?Math.max(0,p.price-b.depositAmt):null;return`<div style="font-size:10px;color:var(--success);margin-top:2px;">💰 Deposit: ${fmtPrice(b.depositAmt)}${bal!==null?` · Balance due: ${fmtPrice(bal)}`:''}</div>`;})()}
         ${(()=>{if(b.status==='completed'||b.status==='cancelled')return'';const f=getApptInstFlag(b.client,b.date);return f?`<div style="font-size:10px;font-weight:600;color:${f.overdue?'var(--danger)':'var(--warn)'};margin-top:2px;">💳 Installment ${f.overdue?'overdue':'due'}: ${fmtPrice(f.total)}</div>`:''})()}
@@ -5780,6 +6099,7 @@ function renderBookings(){
         ${b.status!=='completed'&&b.status!=='cancelled'&&b.status!=='no-show'?`<button class="btn btn-outline btn-sm" onclick="updBk('${b.id}','completed')">Done</button>`:''}
         ${b.status!=='cancelled'&&b.status!=='no-show'&&b.status!=='completed'?`<button class="btn btn-danger btn-sm" onclick="updBk('${b.id}','no-show')">🚫</button>`:''}
         ${b.status!=='cancelled'&&b.status!=='completed'&&b.status!=='no-show'?`<button class="btn btn-danger btn-sm" onclick="updBk('${b.id}','cancelled')">Cancel</button>`:''}
+        ${b.seriesId&&b.status!=='cancelled'&&b.status!=='completed'?`<button class="btn btn-danger btn-sm" style="font-size:10px;" onclick="cancelSeries('${b.seriesId}')">Cancel Series</button>`:''}
         <button class="btn btn-outline btn-sm" onclick="openApptDetail('${b.id}')">Edit</button>
       </div>
     </div>`).join(''):'<div style="padding:30px;text-align:center;color:var(--ink3);font-size:13px;">No appointments found</div>';
@@ -5798,7 +6118,26 @@ function openNewAppt(){
   if(document.getElementById('apGroupSize'))document.getElementById('apGroupSize').value=1;
   if(document.getElementById('apDeposit'))document.getElementById('apDeposit').value=0;
   const depBal=document.getElementById('apDepositBalance');if(depBal)depBal.style.display='none';
+  // Reset series fields
+  if(document.getElementById('apSeries')){document.getElementById('apSeries').checked=false;toggleSeriesFields();}
   openM('apptModal');
+}
+function cancelSeries(seriesId){
+  if(!seriesId)return;
+  const count=S.bookings.filter(b=>b.seriesId===seriesId&&b.status!=='cancelled'&&b.status!=='completed').length;
+  if(!confirm(`Cancel all ${count} remaining appointments in this series?`))return;
+  S.bookings.forEach(b=>{if(b.seriesId===seriesId&&b.status!=='cancelled'&&b.status!=='completed')b.status='cancelled';});
+  sync('bookings');renderBookings();renderCalendar();
+  showToast('Series cancelled ('+count+' appointments)','ok');
+}
+function toggleSeriesFields(){
+  const el=document.getElementById('seriesFields');
+  if(el) el.style.display=document.getElementById('apSeries')?.checked?'block':'none';
+}
+function addDays(dateStr,n){
+  const d=new Date(dateStr+'T12:00');
+  d.setDate(d.getDate()+n);
+  return d.toISOString().split('T')[0];
 }
 function saveAppt(){
   const client=document.getElementById('apClient').value.trim();
@@ -5829,13 +6168,27 @@ function saveAppt(){
     const next=getNextAvailableSlot(date,toMins(time),service,duration,groupSize);
     showToast(`Slot fully booked (cap ${cap})${next?' — next available: '+next:''}`.trim(),'err');return;
   }
+  const isSeries=!editApptId&&document.getElementById('apSeries')?.checked;
+  const seriesCount=isSeries?parseInt(document.getElementById('apSeriesCount')?.value)||6:1;
+  const seriesInterval=isSeries?parseInt(document.getElementById('apSeriesInterval')?.value)||14:0;
+  const seriesId=isSeries?uid('SRS'):null;
   const appt={client,service,staff:document.getElementById('apStaff').value||'',date,time,duration,groupSize,depositAmt,status:'pending',notes:document.getElementById('apNotes').value.trim(),reminder:document.getElementById('apSendReminder').checked};
   if(editApptId){const i=S.bookings.findIndex(x=>String(x.id)===String(editApptId));if(i>=0)S.bookings[i]={...S.bookings[i],...appt};}
-  else S.bookings.push({id:Date.now(),...appt});
+  else if(isSeries){
+    for(let si=0;si<seriesCount;si++){
+      const apptDate=addDays(date,si*seriesInterval);
+      const seriesAppt={...appt,date:apptDate,seriesId,seriesNum:si+1,seriesTotal:seriesCount};
+      S.bookings.push({id:Date.now()+si,...seriesAppt});
+    }
+  } else {
+    S.bookings.push({id:Date.now(),...appt});
+  }
   closeM('apptModal');sync('bookings');renderBookings();renderCalendar();renderDashboard();
-  showToast((editApptId?'Appointment updated':'Appointment booked')+' for '+client,'ok');
+  showToast((editApptId?'Appointment updated':isSeries?`Series of ${seriesCount} booked`:'Appointment booked')+' for '+client,'ok');
   // Auto-send confirmation message for new bookings
-  if(!editApptId) setTimeout(()=>sendBookingConfirmation({...appt,id:S.bookings[S.bookings.length-1]?.id}),500);
+  if(!editApptId&&!isSeries) setTimeout(()=>sendBookingConfirmation({...appt,id:S.bookings[S.bookings.length-1]?.id}),500);
+  // Reset series fields
+  if(document.getElementById('apSeries')){document.getElementById('apSeries').checked=false;toggleSeriesFields();}
   editApptId=null;
   if(appt.reminder)showToast('📱 Reminder will be sent to '+client,'ok');
 }
@@ -7797,6 +8150,41 @@ function computeDeductions(u, grossPay){
   return {sss, ph, pagibig, tax, govDeductions, otherDeduct, allowance, totalDeductions, netPay, taxableIncome};
 }
 
+// ══ CASH ADVANCE ADMIN ══
+function renderCashAdvanceAdmin(){
+  const el=document.getElementById('cashAdvanceAdminList');if(!el)return;
+  const advances=S.cashAdvances||[];
+  if(!advances.length){el.innerHTML='<div style="color:var(--ink3);font-size:13px;text-align:center;padding:16px;">No cash advance requests.</div>';return;}
+  el.innerHTML=advances.slice().reverse().map(ca=>{
+    const statusColor={pending:'var(--warn)',approved:'var(--success)',rejected:'var(--danger)'}[ca.status]||'var(--ink3)';
+    return `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);">
+      <div style="flex:1;">
+        <div style="font-size:13px;font-weight:600;">${ca.userName}</div>
+        <div style="font-size:12px;color:var(--ink2);">${fmtPrice(ca.amount)} — ${ca.reason||'No reason given'}</div>
+        <div style="font-size:10px;color:var(--ink3);">${ca.requestedAt?new Date(ca.requestedAt).toLocaleDateString('en-PH'):''}</div>
+      </div>
+      <span style="font-size:11px;font-weight:700;color:${statusColor};text-transform:uppercase;">${ca.status}</span>
+      ${ca.status==='pending'?`
+        <div style="display:flex;gap:5px;">
+          <button class="btn btn-sm" style="background:var(--success);color:#fff;border:none;border-radius:7px;padding:5px 10px;font-size:11px;cursor:pointer;" onclick="approveCashAdvance('${ca.id}')">✓ Approve</button>
+          <button class="btn btn-sm" style="background:var(--danger);color:#fff;border:none;border-radius:7px;padding:5px 10px;font-size:11px;cursor:pointer;" onclick="rejectCashAdvance('${ca.id}')">✕ Reject</button>
+        </div>`:''}
+    </div>`;
+  }).join('');
+}
+function approveCashAdvance(id){
+  const ca=S.cashAdvances.find(x=>x.id===id);if(!ca)return;
+  ca.status='approved';ca.approvedBy=currentUser.name;ca.approvedAt=new Date().toISOString();
+  sync('cashAdvances');renderCashAdvanceAdmin();
+  showToast('Cash advance approved for '+ca.userName,'ok');
+}
+function rejectCashAdvance(id){
+  const ca=S.cashAdvances.find(x=>x.id===id);if(!ca)return;
+  ca.status='rejected';ca.approvedBy=currentUser.name;ca.approvedAt=new Date().toISOString();
+  sync('cashAdvances');renderCashAdvanceAdmin();
+  showToast('Cash advance rejected','ok');
+}
+
 function renderCommissionRates(){
   const g=document.getElementById('commissionRatesGrid');if(!g)return;
   g.innerHTML=S.users.map(u=>{
@@ -7838,6 +8226,18 @@ function openStaffComp(uid){
   document.getElementById('scOtherDeduct').value=u.otherDeductions||0;
   document.getElementById('scAllowance').value=u.allowances||0;
   document.getElementById('scPreview').style.display='none';
+  // Populate per-category commission inputs
+  const cats=[...new Set(S.products.map(p=>p.cat).filter(Boolean))].sort();
+  const catComm=u.categoryCommissions||{};
+  const catEl=document.getElementById('scCatCommissions');
+  if(catEl){
+    catEl.innerHTML=cats.map(cat=>`
+      <div style="display:flex;align-items:center;gap:10px;">
+        <label style="flex:1;font-size:12px;color:var(--ink2);">${cat}</label>
+        <input class="form-input" type="number" id="scCat_${cat.replace(/[^a-zA-Z0-9]/g,'_')}" value="${catComm[cat]!==undefined?catComm[cat]:''}" placeholder="—" min="0" max="100" style="width:70px;font-size:12px;text-align:right;" title="Leave blank to use global commission rate">
+        <span style="font-size:11px;color:var(--ink3);">%</span>
+      </div>`).join('');
+  }
   openM('staffCompModal');
 }
 
@@ -7883,11 +8283,18 @@ const otherDeductions=parseFloat(document.getElementById('scOtherDeduct').value)
 const allowances=parseFloat(document.getElementById('scAllowance').value)||0;
 // Auto-sync dailyRate from salary
 const dailyRate=Math.round(salary/26);
+// Collect per-category commission rates
+const cats=[...new Set(S.products.map(p=>p.cat).filter(Boolean))].sort();
+const categoryCommissions={};
+cats.forEach(cat=>{
+  const key='scCat_'+cat.replace(/[^a-zA-Z0-9]/g,'_');
+  const el=document.getElementById(key);
+  if(el&&el.value.trim()!=='') categoryCommissions[cat]=parseFloat(el.value)||0;
+});
 const i=S.users.findIndex(x=>x.id===editCompUserId);
-if(i>=0) S.users[i]={...S.users[i],salary,commission,sssVoluntary,philhealthVoluntary,pagibigVoluntary,withholdingTax,otherDeductions,allowances,dailyRate};
+if(i>=0) S.users[i]={...S.users[i],salary,commission,sssVoluntary,philhealthVoluntary,pagibigVoluntary,withholdingTax,otherDeductions,allowances,dailyRate,categoryCommissions};
 closeM('staffCompModal');sync('users');renderPayslip();
 showToast(u.name+'\'s compensation saved','ok');
-  showToast(u.name+'\'s compensation saved','ok');
 }
 
 // ── Payroll helpers ──
@@ -8081,7 +8488,24 @@ function renderPayslip(){
   g.innerHTML=staffList.map(u=>{
     const myTxns=txns.filter(t=>t.staff===u.name);
     const totalSales=myTxns.reduce((s,t)=>s+t.total,0);
-    const commissionAmt=Math.round(totalSales*(u.commission||0)/100);
+    // Calculate commission using per-category rates if available
+    let commissionAmt=0;
+    const catCommDetails=[];
+    if(u.categoryCommissions&&Object.keys(u.categoryCommissions).length){
+      myTxns.forEach(t=>{
+        (t.items||[]).forEach(ci=>{
+          const prod=S.products.find(p=>p.id===ci.id)||S.packages?.find(p=>p.id===ci.id);
+          const cat=prod?.cat||'Other';
+          const rate=u.categoryCommissions[cat]!==undefined?u.categoryCommissions[cat]:u.commission||0;
+          const amt=Math.round(ci.price*ci.qty*(rate/100)*100)/100;
+          commissionAmt+=amt;
+          if(amt>0){const existing=catCommDetails.find(x=>x.cat===cat);if(existing)existing.amount+=amt;else catCommDetails.push({cat,rate,amount:amt});}
+        });
+      });
+      commissionAmt=Math.round(commissionAmt);
+    } else {
+      commissionAmt=Math.round(totalSales*(u.commission||0)/100);
+    }
     const sessions=myTxns.reduce((s,t)=>s+(t.items?.length||0),0);
 
     // Attendance from clock logs
@@ -8123,9 +8547,15 @@ const dailyRate=actualWorkingDays>0?salary/actualWorkingDays:0;
     const absenceDeduction=Math.round(dailyRate*daysAbsent);
     const earnedBasic=salary-absenceDeduction;
 
+    // Cash advance deductions for this pay period
+    const caDeduct=(S.cashAdvances||[]).filter(ca=>
+      ca.userId===u.id&&ca.status==='approved'&&
+      ca.approvedAt&&ca.approvedAt.startsWith(period)
+    ).reduce((s,ca)=>s+ca.amount,0);
     // Gross = earned basic + commission + allowance
     const grossPay=Math.max(0, earnedBasic)+commissionAmt;
-    const d=computeDeductions(u, grossPay);
+    const uWithCA={...u,otherDeductions:(u.otherDeductions||0)+caDeduct};
+    const d=computeDeductions(uWithCA, grossPay);
     const netPay=d.netPay;
     const fp2=n=>'₱'+Math.round(n).toLocaleString('en-PH');
     const monthLabel=new Date(py,pm-1,1).toLocaleDateString('en-PH',{month:'long',year:'numeric'});
@@ -8154,7 +8584,8 @@ const dailyRate=actualWorkingDays>0?salary/actualWorkingDays:0;
         ${daysAbsent>0?`<div class="payslip-row"><span style="color:var(--danger);">Absent Deduction (${daysAbsent} day${daysAbsent!==1?'s':''})</span><span style="color:var(--danger);">-${fp2(absenceDeduction)}</span></div>`:''}
         ${leaveDays>0?`<div class="payslip-row"><span style="color:var(--info);">Approved Leave (${leaveDays} day${leaveDays!==1?'s':''})</span><span style="color:var(--info);">no deduction</span></div>`:''}
         <div class="payslip-row"><span>Earned Basic Pay</span><span style="color:var(--success);">${fp2(earnedBasic)}</span></div>
-        ${commissionAmt>0?`<div class="payslip-row"><span>Commission (${u.commission||0}% of ${fp2(totalSales)})</span><span style="color:var(--success);">+${fp2(commissionAmt)}</span></div>`:''}
+        ${commissionAmt>0&&catCommDetails.length?catCommDetails.map(cd=>`<div class="payslip-row"><span>Commission — ${cd.cat} (${cd.rate}%)</span><span style="color:var(--success);">+${fp2(cd.amount)}</span></div>`).join(''):''}
+        ${commissionAmt>0&&!catCommDetails.length?`<div class="payslip-row"><span>Commission (${u.commission||0}% of ${fp2(totalSales)})</span><span style="color:var(--success);">+${fp2(commissionAmt)}</span></div>`:''}
         ${d.allowance>0?`<div class="payslip-row"><span>Allowances</span><span style="color:var(--success);">+${fp2(d.allowance)}</span></div>`:''}
         <div class="payslip-row"><span style="font-weight:600;">Gross Pay</span><span style="font-weight:600;">${fp2(grossPay+d.allowance)}</span></div>
 
@@ -8163,7 +8594,8 @@ const dailyRate=actualWorkingDays>0?salary/actualWorkingDays:0;
         ${u.philhealthVoluntary!==false?`<div class="payslip-row"><span>PhilHealth (2.5%)</span><span style="color:var(--danger);">-${fp2(d.ph)}</span></div>`:''}
         ${u.pagibigVoluntary!==false?`<div class="payslip-row"><span>Pag-IBIG</span><span style="color:var(--danger);">-${fp2(d.pagibig)}</span></div>`:''}
         ${u.withholdingTax!==false&&d.tax>0?`<div class="payslip-row"><span>Withholding Tax</span><span style="color:var(--danger);">-${fp2(d.tax)}</span></div>`:''}
-        ${d.otherDeduct>0?`<div class="payslip-row"><span>Other Deductions</span><span style="color:var(--danger);">-${fp2(d.otherDeduct)}</span></div>`:''}
+        ${(d.otherDeduct-caDeduct)>0?`<div class="payslip-row"><span>Other Deductions</span><span style="color:var(--danger);">-${fp2(d.otherDeduct-caDeduct)}</span></div>`:''}
+        ${caDeduct>0?`<div class="payslip-row"><span>Cash Advance Recovery</span><span style="color:var(--danger);">-${fp2(caDeduct)}</span></div>`:''}
         <div class="payslip-row"><span style="font-weight:600;">Total Deductions</span><span style="font-weight:600;color:var(--danger);">-${fp2(d.totalDeductions)}</span></div>
 
         <div style="font-size:10px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:0.8px;margin:10px 0 6px;">Activity</div>
@@ -8718,7 +9150,11 @@ function renderClientPhotos(c){
   grid.innerHTML=photos.map((p,i)=>`
     <div style="position:relative;cursor:pointer;border-radius:10px;overflow:hidden;aspect-ratio:1;background:var(--cream2);" onclick="openPhoto(${i})">
       <img src="${p.src}" style="width:100%;height:100%;object-fit:cover;">
-      ${p.label?`<div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.55);color:#fff;font-size:9px;font-weight:600;padding:4px 6px;text-transform:uppercase;letter-spacing:.5px;">${p.label}</div>`:''}
+      <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.55);color:#fff;font-size:9px;font-weight:600;padding:4px 6px;letter-spacing:.5px;">
+        ${p.label?`<div style="text-transform:uppercase;">${p.label}</div>`:''}
+        ${p.service?`<div style="font-weight:400;opacity:0.85;">${p.service}</div>`:''}
+        ${p.consented?`<div style="color:#a0f0a0;font-size:8px;">✓ Consent</div>`:''}
+      </div>
     </div>`).join('');
 }
 
@@ -8750,11 +9186,12 @@ function showPhotoLabelModal(){
   // Build label options for each photo
   const modal=document.getElementById('photoLabelModal');
   const list=document.getElementById('photoLabelList');
+  const serviceOptions=S.products.filter(p=>p.inPOS!==false).map(p=>`<option value="${p.name}">${p.name}</option>`).join('');
   list.innerHTML=window._pendingPhotos.map((p,i)=>`
-    <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--cream3);">
+    <div style="display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--cream3);">
       <img src="${p.src}" style="width:56px;height:56px;border-radius:8px;object-fit:cover;flex-shrink:0;">
-      <div style="flex:1;">
-        <div style="font-size:12px;color:var(--ink3);margin-bottom:5px;">${p.file}</div>
+      <div style="flex:1;display:flex;flex-direction:column;gap:6px;">
+        <div style="font-size:12px;color:var(--ink3);">${p.file}</div>
         <select class="form-select photo-label-sel" data-idx="${i}" style="font-size:12px;padding:6px 10px;">
           <option value="">No label</option>
           <option value="Before">Before</option>
@@ -8768,6 +9205,14 @@ function showPhotoLabelModal(){
           <option value="Session 2">Session 2</option>
           <option value="Session 3">Session 3</option>
         </select>
+        <select class="form-select photo-service-sel" data-idx="${i}" style="font-size:12px;padding:6px 10px;">
+          <option value="">— Link to service (optional) —</option>
+          ${serviceOptions}
+        </select>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--ink3);cursor:pointer;">
+          <input type="checkbox" class="photo-consent-chk" data-idx="${i}" style="accent-color:var(--gold);width:13px;height:13px;">
+          I confirm client has given consent for this photo
+        </label>
       </div>
     </div>`).join('');
   openM('photoLabelModal');
@@ -8777,10 +9222,15 @@ function confirmPhotoLabels(){
   const cl=S.clients.find(x=>x.id===window._cpClientId);
   if(!cl) return;
   if(!cl.photos) cl.photos=[];
-  document.querySelectorAll('.photo-label-sel').forEach((sel,i)=>{
+  const labelSels=document.querySelectorAll('.photo-label-sel');
+  const serviceSels=document.querySelectorAll('.photo-service-sel');
+  const consentChks=document.querySelectorAll('.photo-consent-chk');
+  labelSels.forEach((sel,i)=>{
     const label=sel.value||'';
+    const service=(serviceSels[i]?.value||'')||'';
+    const consented=consentChks[i]?.checked||false;
     const date=new Date().toISOString().split('T')[0];
-    cl.photos.push({src:window._pendingPhotos[i].src, label, date, id:Date.now()+i});
+    cl.photos.push({src:window._pendingPhotos[i].src, label, date, id:Date.now()+i, service, consented});
   });
   closeM('photoLabelModal');
   sync('clients');
@@ -8796,8 +9246,10 @@ function openPhoto(idx){
   _photoIdx=idx;
   const p=cl.photos[idx];
   document.getElementById('photoViewImg').src=p.src;
-  const lbl=p.label?`${p.label}  ·  `:'' ;
-  document.getElementById('photoViewLabel').textContent=lbl+(p.date||'');
+  const lbl=p.label?`${p.label}  ·  `:'';
+  const svc=p.service?`  ·  ${p.service}`:'';
+  const consent=p.consented?'  ·  ✓ Consent':'';
+  document.getElementById('photoViewLabel').textContent=lbl+(p.date||'')+svc+consent;
   document.getElementById('photoViewPrev').style.opacity=idx===0?'0.3':'1';
   document.getElementById('photoViewNext').style.opacity=idx===cl.photos.length-1?'0.3':'1';
   openM('photoViewModal');

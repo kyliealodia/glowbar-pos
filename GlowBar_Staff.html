@@ -256,6 +256,7 @@ nav{flex:1;padding:12px 0;overflow-y:auto;}
         <div class="nav-item" onclick="goPage('attendance')"><span class="nav-icon">🕐</span>Attendance</div>
         <div class="nav-item" onclick="goPage('leave')"><span class="nav-icon">🌿</span>Leave</div>
         <div class="nav-item" onclick="goPage('schedule')"><span class="nav-icon">📅</span>My Schedule</div>
+        <div class="nav-item" onclick="goPage('cashadvance')"><span class="nav-icon">💸</span>Cash Advance</div>
         <div class="nav-item" id="navAdmin" style="display:none;" onclick="goPage('admin')"><span class="nav-icon">⚙️</span>Staff Admin</div>
         <div class="nav-item" id="navCompliance" style="display:none;" onclick="goPage('compliance')"><span class="nav-icon">📊</span>Compliance</div>
       </nav>
@@ -356,6 +357,24 @@ nav{flex:1;padding:12px 0;overflow-y:auto;}
         </div>
       </div>
 
+      <!-- CASH ADVANCE -->
+      <div id="page-cashadvance" class="page" style="display:none;">
+        <div class="page-hdr">
+          <div class="page-title">💸 Cash Advance</div>
+          <button class="btn btn-gold btn-sm" onclick="openCashAdvanceRequest()" style="margin-top:10px;">+ Request Cash Advance</button>
+        </div>
+        <div id="cashAdvanceBanner" style="margin-bottom:12px;"></div>
+        <div class="card">
+          <div class="card-hdr"><h3>My Cash Advance History</h3></div>
+          <div class="card-body" style="padding:0;">
+            <table class="tbl">
+              <thead><tr><th>Amount</th><th>Reason</th><th>Date</th><th>Status</th></tr></thead>
+              <tbody id="cashAdvanceHistory"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       <!-- SCHEDULE -->
       <div id="page-schedule" class="page" style="display:none;">
         <div class="page-hdr">
@@ -383,6 +402,16 @@ nav{flex:1;padding:12px 0;overflow-y:auto;}
             <table class="tbl">
               <thead><tr><th>Staff</th><th>Type</th><th>Date(s)</th><th>Days</th><th>Reason</th><th>Actions</th></tr></thead>
               <tbody id="adminLeaveBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <!-- Cash Advance requests pending -->
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-hdr"><h3>💸 Pending Cash Advance Requests</h3></div>
+          <div class="card-body" style="padding:0;">
+            <table class="tbl">
+              <thead><tr><th>Staff</th><th>Amount</th><th>Reason</th><th>Date</th><th>Actions</th></tr></thead>
+              <tbody id="adminCaBody"></tbody>
             </table>
           </div>
         </div>
@@ -839,6 +868,29 @@ const zSal=salaries[0]||0,rSal=salaries[1]||0;
   </div>
 </div>
 
+<div class="overlay hidden" id="cashAdvanceModal">
+  <div class="modal">
+    <div class="modal-hdr"><div class="modal-title">💸 Request Cash Advance</div><div class="modal-x" onclick="closeModal('cashAdvanceModal')">✕</div></div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Amount (₱)</label>
+        <input class="form-input" type="number" id="caAmount" placeholder="e.g. 1000" min="100" step="100">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Reason</label>
+        <textarea class="form-textarea" id="caReason" placeholder="Brief reason for cash advance request…" style="min-height:80px;"></textarea>
+      </div>
+      <div style="font-size:11px;color:var(--ink3);background:var(--cream2);border-radius:8px;padding:10px 12px;margin-top:4px;">
+        ℹ Approved advances will be automatically deducted from your next payslip.
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('cashAdvanceModal')">Cancel</button>
+      <button class="btn btn-gold" onclick="submitCashAdvance()">Submit Request</button>
+    </div>
+  </div>
+</div>
+
 <div class="overlay hidden" id="leaveModal">
   <div class="modal">
     <div class="modal-hdr"><div class="modal-title">🌿 Request Leave</div><div class="modal-x" onclick="closeModal('leaveModal')">✕</div></div>
@@ -899,6 +951,7 @@ let S={
   loginLogs:[],
   leaveRequests:[], // {id, userId, type, from, to, days, reason, status, createdAt}
   overtimeRequests:[], // {id, userId, userName, date, hours, rate, amount, reason, status, createdAt}
+  cashAdvances:[], // {id, userId, userName, amount, reason, status, requestedAt, approvedBy, approvedAt}
   settings:{}
 };
 
@@ -941,6 +994,13 @@ function loadFromCloud(){
     } else { S.overtimeRequests=[]; }
     if(document.getElementById('otBody')) renderOTHistory();
   });
+  db.ref('gb/cashAdvances').on('value',snap=>{
+    if(snap.exists()){
+      const val=snap.val();
+      S.cashAdvances=Array.isArray(val)?val:Object.values(val);
+    } else { S.cashAdvances=[]; }
+    if(document.getElementById('cashAdvanceHistory')) renderCashAdvanceHistory();
+  });
 }
 
 function syncLeave(){
@@ -955,6 +1015,13 @@ function syncOvertime(){
   const obj={};
   S.overtimeRequests.forEach((o,i)=>{ obj[o.id||i]=o; });
   db.ref('gb/overtimeRequests').set(obj);
+}
+
+function syncCashAdvances(){
+  if(!db) return;
+  const obj={};
+  (S.cashAdvances||[]).forEach((ca,i)=>{ obj[ca.id||i]=ca; });
+  db.ref('gb/cashAdvances').set(obj);
 }
 
 // Philippine public holidays — regular (200%) and special non-working (130%)
@@ -1080,6 +1147,7 @@ function goPage(name){
   else if(name==='schedule') renderSchedule();
   else if(name==='admin'){renderAdmin();renderAdminPayroll();}
   else if(name==='compliance') renderCompliance();
+  else if(name==='cashadvance') renderCashAdvanceHistory();
 }
 
 function toggleSidebar(){
@@ -1905,6 +1973,54 @@ function submitLeave(){
   showToast('Leave request submitted ✓','ok');
 }
 
+// ══ CASH ADVANCE ══
+function openCashAdvanceRequest(){
+  document.getElementById('caAmount').value='';
+  document.getElementById('caReason').value='';
+  openModal('cashAdvanceModal');
+}
+function submitCashAdvance(){
+  const amount=parseFloat(document.getElementById('caAmount')?.value)||0;
+  const reason=(document.getElementById('caReason')?.value||'').trim();
+  if(amount<100){showToast('Minimum cash advance is ₱100','err');return;}
+  if(!reason){showToast('Please provide a reason','err');return;}
+  if(!S.cashAdvances) S.cashAdvances=[];
+  const req={
+    id:'CA'+Date.now(),
+    userId:currentUser.id,
+    userName:currentUser.name,
+    amount,
+    reason,
+    status:'pending',
+    requestedAt:new Date().toISOString(),
+    approvedBy:null,
+    approvedAt:null
+  };
+  S.cashAdvances.push(req);
+  syncCashAdvances();
+  closeModal('cashAdvanceModal');
+  renderCashAdvanceHistory();
+  showToast('Cash advance request submitted ✓','ok');
+}
+function renderCashAdvanceHistory(){
+  const tbody=document.getElementById('cashAdvanceHistory');
+  if(!tbody)return;
+  const myCA=(S.cashAdvances||[]).filter(ca=>ca.userId===currentUser?.id)
+    .sort((a,b)=>new Date(b.requestedAt)-new Date(a.requestedAt));
+  if(!myCA.length){
+    tbody.innerHTML='<tr><td colspan="4" style="text-align:center;color:var(--ink3);padding:20px;">No cash advance requests yet</td></tr>';
+    return;
+  }
+  tbody.innerHTML=myCA.map(ca=>`<tr>
+    <td style="font-weight:600;">${fmtPrice(ca.amount)}</td>
+    <td style="font-size:12px;color:var(--ink3);">${ca.reason||'—'}</td>
+    <td style="font-size:12px;">${ca.requestedAt?new Date(ca.requestedAt).toLocaleDateString('en-PH'):''}</td>
+    <td><span class="pill ${ca.status==='approved'?'pill-green':ca.status==='rejected'?'pill-red':'pill-amber'}">${cap(ca.status)}</span>
+      ${ca.approvedBy?`<div style="font-size:10px;color:var(--ink3);">by ${ca.approvedBy}</div>`:''}
+    </td>
+  </tr>`).join('');
+}
+
 // ══ SCHEDULE ══
 function schedWeek(dir){
   schedOffset+=dir;
@@ -1959,6 +2075,19 @@ function renderSchedule(){
   document.getElementById('schedContent').innerHTML=html;
 }
 
+function adminApproveCa(id){
+  const ca=S.cashAdvances.find(x=>x.id===id);if(!ca)return;
+  ca.status='approved';ca.approvedBy=currentUser.name;ca.approvedAt=new Date().toISOString();
+  syncCashAdvances();renderAdmin();
+  showToast('Cash advance approved for '+ca.userName,'ok');
+}
+function adminRejectCa(id){
+  const ca=S.cashAdvances.find(x=>x.id===id);if(!ca)return;
+  ca.status='rejected';ca.approvedBy=currentUser.name;ca.approvedAt=new Date().toISOString();
+  syncCashAdvances();renderAdmin();
+  showToast('Cash advance rejected','ok');
+}
+
 // ══ ADMIN ══
 function renderAdmin(){
   if(currentUser.role!=='owner'&&currentUser.role!=='admin') return;
@@ -1983,6 +2112,28 @@ function renderAdmin(){
         </div>
       </td>
     </tr>`).join('');
+  }
+
+  // Pending cash advance requests
+  const pendingCA=(S.cashAdvances||[]).filter(ca=>ca.status==='pending');
+  const caTbody=document.getElementById('adminCaBody');
+  if(caTbody){
+    if(!pendingCA.length){
+      caTbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--ink3);padding:24px;">No pending cash advance requests</td></tr>';
+    } else {
+      caTbody.innerHTML=pendingCA.map(ca=>`<tr>
+        <td style="font-weight:500;">${ca.userName||'Unknown'}</td>
+        <td style="font-weight:600;color:var(--gold-dk);">${fmtPrice(ca.amount)}</td>
+        <td style="font-size:12px;color:var(--ink3);">${ca.reason||'—'}</td>
+        <td style="font-size:12px;">${ca.requestedAt?new Date(ca.requestedAt).toLocaleDateString('en-PH'):''}</td>
+        <td>
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-sm" style="background:var(--success);color:#fff;border:none;border-radius:7px;padding:5px 10px;font-size:11px;font-family:'Jost',sans-serif;cursor:pointer;" onclick="adminApproveCa('${ca.id}')">✓ Approve</button>
+            <button class="btn btn-sm" style="background:var(--danger);color:#fff;border:none;border-radius:7px;padding:5px 10px;font-size:11px;font-family:'Jost',sans-serif;cursor:pointer;" onclick="adminRejectCa('${ca.id}')">✕ Reject</button>
+          </div>
+        </td>
+      </tr>`).join('');
+    }
   }
 
   // Pending overtime requests
