@@ -133,7 +133,7 @@ window.pushServicesToPOS = async function(){
       updated.push({
         id: existingCombo ? existingCombo.id : combo.id,
         name: combo.name,
-        cat: 'Combos',
+        cat: combo.cat || 'Combos',
         subcat: '',
         price: parseFloat(combo.price || 0),
         cost: comboCost,
@@ -1690,6 +1690,8 @@ function buildComboCard(combo){
   const added=new Set(combo.serviceIds||[]);
   const availOpts=allSvcs.filter(s=>!added.has(s.id)).map(s=>`<option value="${s.id}">${s.name} (${s.catGroup})</option>`).join('');
   const commPct=parseFloat(document.getElementById('comm-pct')?.value||10);
+  const groups=[...new Set(SVC_CATS.map(c=>c.group||c.name))];
+  const catOpts=groups.map(g=>`<option value="${g}"${combo.cat===g?' selected':''}>${g}</option>`).join('')+'<option value="Combos"'+((!combo.cat||combo.cat==='Combos')?' selected':'')+'>Combos (standalone)</option>';
   return `<div class="svc-card" id="combo-card-${combo.id}">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px;margin-bottom:10px;padding-bottom:8px;border-bottom:0.5px solid var(--border-l)">
       <div style="display:flex;align-items:center;gap:6px;flex:1">
@@ -1706,9 +1708,15 @@ function buildComboCard(combo){
       </select>
       <button class="add-row" style="padding:3px 10px;font-size:11px;white-space:nowrap" onclick="addServiceToCombo('${combo.id}')">&#xff0b; Add</button>
     </div>
-    <div style="margin-bottom:10px">
-      <div style="font-size:10px;color:var(--muted);margin-bottom:3px">Combined selling price (&#8369;)</div>
-      <input class="ii" type="number" style="width:100%" value="${combo.price||0}" placeholder="0" oninput="updateComboPrice('${combo.id}',+this.value)">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      <div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:3px">Combined selling price (&#8369;)</div>
+        <input class="ii" type="number" style="width:100%" value="${combo.price||0}" placeholder="0" oninput="updateComboPrice('${combo.id}',+this.value)">
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:3px">POS category</div>
+        <select class="ii" style="width:100%;font-size:11px;padding:3px 5px" onchange="updateComboCat('${combo.id}',this.value)">${catOpts}</select>
+      </div>
     </div>
     <div style="font-size:11px;margin-bottom:6px">
       <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:0.5px solid var(--border-l)"><span style="color:var(--muted)">Total duration</span><span>${costs.totalDuration} min</span></div>
@@ -1752,6 +1760,10 @@ function updateComboName(id,v){
 function updateComboPrice(id,v){
   const c=SVC_COMBOS.find(x=>x.id===id); if(!c)return;
   c.price=v; saveSvcState(); refreshComboCard(id);
+}
+function updateComboCat(id,v){
+  const c=SVC_COMBOS.find(x=>x.id===id); if(!c)return;
+  c.cat=v; saveSvcState();
 }
 
 function addServiceToCombo(comboId){
