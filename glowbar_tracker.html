@@ -114,6 +114,42 @@ window.pushServicesToPOS = async function(){
       });
     });
 
+    // Also push combos as bundled products
+    const allSvcsFlat = [];
+    cats.forEach(cat => cat.services.forEach(svc => allSvcsFlat.push({...svc, catGroup: cat.group || cat.name})));
+    const combos = d.combos || (typeof SVC_COMBOS !== 'undefined' ? SVC_COMBOS : []);
+    combos.forEach(combo => {
+      if(!combo.serviceIds || !combo.serviceIds.length) return;
+      let comboCost = 0, comboDuration = 0;
+      const memberNames = [];
+      combo.serviceIds.forEach(sid => {
+        const svc = allSvcsFlat.find(s => s.id === sid);
+        if(!svc) return;
+        comboCost += calcTrackerCost(svc, state[svc.id] || {});
+        comboDuration += parseFloat((state[svc.id] || {}).durationMins || svc.durationMins || 30);
+        memberNames.push(svc.name);
+      });
+      const existingCombo = existingArr.find(p => p && p.name === combo.name);
+      updated.push({
+        id: existingCombo ? existingCombo.id : combo.id,
+        name: combo.name,
+        cat: 'Combos',
+        subcat: '',
+        price: parseFloat(combo.price || 0),
+        cost: comboCost,
+        unit: 'sessions',
+        stock: existingCombo ? (existingCombo.stock || 0) : 0,
+        lowAt: existingCombo ? (existingCombo.lowAt || 5) : 5,
+        inPOS: true,
+        consumables: [],
+        addons: existingCombo ? (existingCombo.addons || []) : [],
+        notes: memberNames.join(' + '),
+        durationMins: comboDuration,
+        isCombo: true,
+        trackerComboId: combo.id
+      });
+    });
+
     await set(posRef, updated);
 
     // Also write gb/serviceNames so Booking portal gets it immediately
@@ -126,7 +162,7 @@ window.pushServicesToPOS = async function(){
     }));
     await set(ref(db, 'gb/serviceNames'), serviceNames);
 
-    console.log('GlowBar Tracker: pushed', updated.length, 'services to gb/products & gb/serviceNames');
+    console.log('GlowBar Tracker: pushed', updated.length, 'services to gb/products & gb/serviceNames (incl.', combos.length, 'combos)');
   } catch(e) {
     console.error('pushServicesToPOS error:', e);
   }
@@ -652,6 +688,16 @@ body{font-family:system-ui,sans-serif;background:var(--cream);color:var(--text);
   <div id="svc-cat-tabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:1rem"></div>
   <div id="svc-container"></div>
   <button class="add-cat-btn" style="margin-top:10px" onclick="addSvcCategory()">&#xff0b; Add service category</button>
+
+  <!-- COMBO BUNDLES SECTION -->
+  <div style="margin-top:28px;border-top:2px solid var(--gold-l);padding-top:20px">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+      <span style="font-size:15px;font-weight:700;color:var(--gold-d)">🔗 Service Combos</span>
+      <span style="font-size:12px;color:var(--muted)">Bundle services into one POS item — costs &amp; durations merge automatically</span>
+      <button class="add-cat-btn" style="margin-left:auto;padding:5px 14px;font-size:12px" onclick="addCombo()">&#xff0b; New Combo</button>
+    </div>
+    <div id="combo-container" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px"></div>
+  </div>
 </div>
 
 <!-- STAFFING TAB -->
@@ -1194,10 +1240,12 @@ function getHourlyRate(roleId){ const r=staffRoles.find(x=>x.id===roleId); retur
 
 // ── SERVICE STATE ─────────────────────────────────────────────────
 let svcCatState = {}; // stores per-service edits keyed by service id
+let SVC_COMBOS = []; // [{id, name, price, serviceIds:[...]}]
 function loadSvcState(){
   try{
     const d=JSON.parse(localStorage.getItem('glowbar_svc2')||'{}');
     svcCatState=d.state||{};
+    SVC_COMBOS=d.combos||[];
     if(d.cats&&d.cats.length){
       // Merge saved cats with code: keep user edits, add new categories/services from code
       const savedCats=d.cats;
@@ -1215,7 +1263,7 @@ function loadSvcState(){
   }catch(e){ svcCatState={}; }
 }
 function saveSvcState(){
-  localStorage.setItem('glowbar_svc2',JSON.stringify({state:svcCatState,cats:SVC_CATS}));
+  localStorage.setItem('glowbar_svc2',JSON.stringify({state:svcCatState,cats:SVC_CATS,combos:SVC_COMBOS}));
   // Sync to POS — debounced so it doesn't fire on every keystroke
   clearTimeout(window._posSvcTimer);
   window._posSvcTimer = setTimeout(()=>{
@@ -1504,7 +1552,7 @@ function refreshSvcCard(svcId){
   el.innerHTML=buildSvcCardInner(foundSvc,foundCat.id);
 }
 
-function rebuildAllServices(){ SVC_CATS.forEach(cat=>cat.services.forEach(svc=>refreshSvcCard(svc.id))); }
+function rebuildAllServices(){ SVC_CATS.forEach(cat=>cat.services.forEach(svc=>refreshSvcCard(svc.id))); buildCombos(); }
 
 // ── SERVICE CATEGORY MANAGEMENT ───────────────────────────────────
 let activeSvcCat='all';
@@ -1567,7 +1615,7 @@ function addSvcCatInGroup(groupName){
   saveSvcState(); buildSvcCatTabs(); buildSvcContainer();
 }
 
-function buildServices(){ buildSvcCatTabs(); buildSvcContainer(); }
+function buildServices(){ buildSvcCatTabs(); buildSvcContainer(); buildCombos(); }
 
 // ── ADD / REMOVE SERVICES & CATEGORIES ───────────────────────────
 function addSvc(catId){
@@ -1597,6 +1645,132 @@ function delSvcCat(id){
   if(cat) cat.services.forEach(s=>delete svcCatState[s.id]);
   SVC_CATS=SVC_CATS.filter(c=>c.id!==id);
   saveSvcState(); buildSvcCatTabs(); buildSvcContainer();
+}
+
+// ── SERVICE COMBOS ────────────────────────────────────────────────
+function getAllSvcsFlat(){
+  const out=[];
+  SVC_CATS.forEach(cat=>cat.services.forEach(svc=>out.push({...svc,catGroup:cat.group||cat.name})));
+  return out;
+}
+
+function calcComboCost(combo){
+  const allSvcs=getAllSvcsFlat();
+  const elecRate=parseFloat(document.getElementById('elec-rate')?.value||15);
+  const waterRate=parseFloat(document.getElementById('water-rate')?.value||9);
+  const commPct=parseFloat(document.getElementById('comm-pct')?.value||10)/100;
+  let totalLabor=0,totalElec=0,totalWater=0,totalCons=0,totalDuration=0;
+  (combo.serviceIds||[]).forEach(sid=>{
+    const svc=allSvcs.find(s=>s.id===sid); if(!svc)return;
+    const c=calcSvcCost(svc);
+    totalLabor+=c.laborCost; totalElec+=c.elec; totalWater+=c.water;
+    totalCons+=c.consCost; totalDuration+=c.durationMins;
+  });
+  const totalCost=totalLabor+totalElec+totalWater+totalCons;
+  const price=parseFloat(combo.price||0);
+  const commission=price*commPct;
+  const profit=price-totalCost-commission;
+  const margin=price>0?Math.round(profit/price*100):0;
+  return {totalLabor,totalElec,totalWater,totalCons,totalCost,totalDuration,price,commission,profit,margin};
+}
+
+function buildComboCard(combo){
+  const allSvcs=getAllSvcsFlat();
+  const costs=calcComboCost(combo);
+  const pColor=costs.profit>=0?'var(--green)':'var(--red)';
+  const memberRows=(combo.serviceIds||[]).map(sid=>{
+    const svc=allSvcs.find(s=>s.id===sid); if(!svc)return '';
+    const sc=calcSvcCost(svc);
+    return `<div style="display:flex;align-items:center;gap:6px;padding:5px 8px;background:var(--cream);border-radius:7px;margin-bottom:4px;font-size:12px">
+      <span style="flex:1;font-weight:500;color:var(--text)">${svc.name}</span>
+      <span style="color:var(--muted);white-space:nowrap;font-size:11px">${sc.durationMins}m &middot; &#8369;${sc.totalCost.toFixed(2)}</span>
+      <button class="del-row" onclick="removeServiceFromCombo('${combo.id}','${sid}')" style="font-size:11px;padding:1px 5px" title="Remove from combo">&#10005;</button>
+    </div>`;
+  }).join('');
+  const added=new Set(combo.serviceIds||[]);
+  const availOpts=allSvcs.filter(s=>!added.has(s.id)).map(s=>`<option value="${s.id}">${s.name} (${s.catGroup})</option>`).join('');
+  const commPct=parseFloat(document.getElementById('comm-pct')?.value||10);
+  return `<div class="svc-card" id="combo-card-${combo.id}">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px;margin-bottom:10px;padding-bottom:8px;border-bottom:0.5px solid var(--border-l)">
+      <div style="display:flex;align-items:center;gap:6px;flex:1">
+        <span style="font-size:15px">&#128279;</span>
+        <input class="ni" type="text" value="${combo.name.replace(/"/g,'&quot;')}" placeholder="Combo name" style="font-size:13px;font-weight:600;color:var(--gold-d);border:none;background:transparent;padding:0;font-family:inherit;flex:1" oninput="updateComboName('${combo.id}',this.value)">
+      </div>
+      <button class="del-row" onclick="delCombo('${combo.id}')" style="font-size:14px;flex-shrink:0" title="Delete combo">&#10005;</button>
+    </div>
+    <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;font-weight:600">Services in this combo</div>
+    ${memberRows||'<div style="font-size:12px;color:var(--muted);padding:8px 0;text-align:center;">No services added yet</div>'}
+    <div style="display:flex;gap:6px;margin-top:6px;margin-bottom:12px">
+      <select class="ii" id="combo-add-sel-${combo.id}" style="font-size:11px;padding:3px 6px;flex:1">
+        <option value="">&#8212; add a service &#8212;</option>${availOpts}
+      </select>
+      <button class="add-row" style="padding:3px 10px;font-size:11px;white-space:nowrap" onclick="addServiceToCombo('${combo.id}')">&#xff0b; Add</button>
+    </div>
+    <div style="margin-bottom:10px">
+      <div style="font-size:10px;color:var(--muted);margin-bottom:3px">Combined selling price (&#8369;)</div>
+      <input class="ii" type="number" style="width:100%" value="${combo.price||0}" placeholder="0" oninput="updateComboPrice('${combo.id}',+this.value)">
+    </div>
+    <div style="font-size:11px;margin-bottom:6px">
+      <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:0.5px solid var(--border-l)"><span style="color:var(--muted)">Total duration</span><span>${costs.totalDuration} min</span></div>
+      <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:0.5px solid var(--border-l)"><span style="color:var(--muted)">Labor</span><span>&#8369;${costs.totalLabor.toFixed(2)}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:0.5px solid var(--border-l)"><span style="color:var(--muted)">Electricity + Water</span><span>&#8369;${(costs.totalElec+costs.totalWater).toFixed(2)}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:0.5px solid var(--border-l)"><span style="color:var(--muted)">Consumables</span><span>&#8369;${costs.totalCons.toFixed(2)}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:2px 0;font-weight:600"><span>Total cost</span><span>&#8369;${costs.totalCost.toFixed(2)}</span></div>
+    </div>
+    <div style="font-size:11px;border-top:0.5px solid var(--border-l);padding-top:6px">
+      <div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:var(--muted)">Commission (${commPct}%)</span><span style="color:var(--warn)">&#8722;&#8369;${costs.commission.toFixed(2)}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:4px 0;font-weight:600;font-size:12px;border-top:0.5px solid var(--border-l);margin-top:2px">
+        <span>Net profit</span><span style="color:${pColor}">&#8369;${costs.profit.toFixed(2)} <span style="font-weight:400;font-size:10px">(${costs.margin}%)</span></span>
+      </div>
+    </div>
+  </div>`;
+}
+
+function buildCombos(){
+  const el=document.getElementById('combo-container'); if(!el)return;
+  el.innerHTML=SVC_COMBOS.length?SVC_COMBOS.map(c=>buildComboCard(c)).join('')
+    :'<div style="font-size:13px;color:var(--muted);padding:16px 0;">No combos yet &#8212; click <strong>+ New Combo</strong> to bundle services into a single POS item.</div>';
+}
+
+function addCombo(){
+  const id='combo'+Date.now();
+  SVC_COMBOS.push({id,name:'New Combo',price:0,serviceIds:[]});
+  saveSvcState(); buildCombos();
+  setTimeout(()=>{ const el=document.getElementById('combo-card-'+id); if(el){el.scrollIntoView({behavior:'smooth',block:'center'}); el.querySelector('input[type="text"]')?.focus();} },100);
+}
+
+function delCombo(id){
+  if(!confirm('Delete this combo?'))return;
+  SVC_COMBOS=SVC_COMBOS.filter(c=>c.id!==id);
+  saveSvcState(); buildCombos();
+}
+
+function updateComboName(id,v){
+  const c=SVC_COMBOS.find(x=>x.id===id); if(c)c.name=v; saveSvcState();
+}
+
+function updateComboPrice(id,v){
+  const c=SVC_COMBOS.find(x=>x.id===id); if(!c)return;
+  c.price=v; saveSvcState(); refreshComboCard(id);
+}
+
+function addServiceToCombo(comboId){
+  const sel=document.getElementById('combo-add-sel-'+comboId); if(!sel||!sel.value)return;
+  const c=SVC_COMBOS.find(x=>x.id===comboId); if(!c)return;
+  if(!c.serviceIds)c.serviceIds=[];
+  if(!c.serviceIds.includes(sel.value)){ c.serviceIds.push(sel.value); saveSvcState(); refreshComboCard(comboId); }
+}
+
+function removeServiceFromCombo(comboId,svcId){
+  const c=SVC_COMBOS.find(x=>x.id===comboId); if(!c)return;
+  c.serviceIds=(c.serviceIds||[]).filter(s=>s!==svcId);
+  saveSvcState(); refreshComboCard(comboId);
+}
+
+function refreshComboCard(comboId){
+  const c=SVC_COMBOS.find(x=>x.id===comboId); if(!c)return;
+  const el=document.getElementById('combo-card-'+comboId); if(!el)return;
+  el.outerHTML=buildComboCard(c);
 }
 
 // ── DRAG TO REORDER ───────────────────────────────────────────────
