@@ -653,6 +653,8 @@ function renderStep2(){
     <div class="date-grid" id="calGrid"></div>
   </div>
 
+  <div id="surgeNote" style="display:none;background:#fff8ec;border:1.5px solid #f0c060;border-radius:10px;padding:10px 14px;font-size:12px;color:#b5831a;margin-top:10px;"></div>
+
   <div class="card" id="timeCard" style="${booking.date?'':'display:none'}">
     <div class="card-title">Choose a Time</div>
     <div class="card-sub" id="timeSub">Available slots for <strong>${booking.date}</strong></div>
@@ -789,6 +791,17 @@ function pickDate(ds){
   renderSlots(ds);
   const btn=document.getElementById('step2next');
   if(btn) btn.setAttribute('disabled','');
+  // Show surge notice if this date has holiday/surge pricing
+  const surge=((DATA.settings||{}).surgeDates||{})[ds];
+  const surgeEl=document.getElementById('surgeNote');
+  if(surgeEl){
+    if(surge){
+      surgeEl.style.display='block';
+      surgeEl.innerHTML=`⚡ <strong>${surge.label||'Surge'} pricing</strong> applies on this date — a <strong>+${surge.pct}%</strong> surcharge will be added to all service prices.`;
+    } else {
+      surgeEl.style.display='none';
+    }
+  }
 }
 
 function toMins(t){ var p=(t||'00:00').split(':'); return parseInt(p[0])*60+parseInt(p[1]); }

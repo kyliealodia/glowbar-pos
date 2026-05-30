@@ -111,6 +111,7 @@ function renderReceipt(r){
 
   // Payment breakdown
   const payRows=[];
+  if(r.surgeAmt>0) payRows.push(`<div class="row"><span class="label">${r.surgeMeta?.label||'Surge'} (+${r.surgeMeta?.pct||0}%)</span><span class="value accent">+${fp(r.surgeAmt)}</span></div>`);
   if(r.disc>0) payRows.push(`<div class="row"><span class="label">Discount</span><span class="value danger">-${fp(r.disc)}</span></div>`);
   if(hasScpwd) payRows.push(`<div class="row"><span class="label">SC/PWD Discount (20%)<br><span style="font-size:10px;">${r.scpwd.type==='SC'?'Senior Citizen':'PWD'} · ID: ${r.scpwd.idNum}</span></span><span class="value danger">-${fp(r.scpwd.discAmt)}</span></div>`);
   if(r.depositApplied>0) payRows.push(`<div class="row"><span class="label">Deposit Applied</span><span class="value success">-${fp(r.depositApplied)}</span></div>`);
