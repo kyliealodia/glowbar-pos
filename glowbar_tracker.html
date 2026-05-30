@@ -8,7 +8,7 @@
 // ── FIREBASE REALTIME DATABASE SETUP ─────────────────────────────
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, get, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
-import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAoSdhij_phFCaKQMWca40x6xXD5hhi7vU",
@@ -24,6 +24,10 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const _auth = getAuth(app);
+// Start auth immediately at module load — the modular SDK does not auto-buffer
+// Realtime Database requests the way the compat SDK does, so auth must be
+// initiated as early as possible before any get() or set() calls.
+signInAnonymously(_auth).catch(()=>{});
 const TRACKER_REF = ref(db, 'tracker/glowbar_main');
 const TRACKED = ['glowbar_v4','glowbar_cons','glowbar_svc2','glowbar_svcs','glowbar_staff','glowbar_monthly'];
 
@@ -305,7 +309,18 @@ function bootApp(){
 // ── LOAD FROM REALTIME DB ─────────────────────────────────────────
 async function initFirebase(){
   setSyncStatus('loading');
-  try { await signInAnonymously(_auth); } catch(e){}
+  // Wait for the auth state to settle before making any DB requests.
+  // onAuthStateChanged fires once the SDK has determined the initial state,
+  // which accounts for the sign-in started at module load.
+  if(!_auth.currentUser){
+    await new Promise(resolve=>{
+      const unsub=onAuthStateChanged(_auth,()=>{unsub();resolve();});
+    });
+  }
+  // If still unauthenticated (e.g. network glitch on first attempt), retry once.
+  if(!_auth.currentUser){
+    try{await signInAnonymously(_auth);}catch(e){console.warn('GlowBar: anonymous auth failed —',e.message);}
+  }
   try {
     const snap = await get(TRACKER_REF);
     if(snap.exists()){
