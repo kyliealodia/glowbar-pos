@@ -791,13 +791,15 @@ function pickDate(ds){
   renderSlots(ds);
   const btn=document.getElementById('step2next');
   if(btn) btn.setAttribute('disabled','');
-  // Show surge notice if this date has holiday/surge pricing
+  // Show surge notice and update service price if this date has holiday/surge pricing
   const surge=((DATA.settings||{}).surgeDates||{})[ds];
   const surgeEl=document.getElementById('surgeNote');
+  const basePrice=booking.services.reduce((t,s)=>t+s.price,0);
+  booking.servicePrice=surge?Math.round(basePrice*(1+surge.pct/100)*100)/100:basePrice;
   if(surgeEl){
     if(surge){
       surgeEl.style.display='block';
-      surgeEl.innerHTML=`⚡ <strong>${surge.label||'Surge'} pricing</strong> applies on this date — a <strong>+${surge.pct}%</strong> surcharge will be added to all service prices.`;
+      surgeEl.innerHTML=`⚡ <strong>${surge.label||'Surge'} pricing</strong> applies on this date — a <strong>+${surge.pct}%</strong> surcharge is included in the price shown.`;
     } else {
       surgeEl.style.display='none';
     }

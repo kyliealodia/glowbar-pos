@@ -4591,11 +4591,12 @@ async function startRefCam(){
 function snapRefPhoto(){
   const vid=document.getElementById('refCamVid');
   const canvas=document.getElementById('refCamCanvas');
-  canvas.width=vid.videoWidth||640;
-  canvas.height=vid.videoHeight||640;
-  const ctx=canvas.getContext('2d');
-  ctx.drawImage(vid,0,0,canvas.width,canvas.height);
-  _refPhotoData=canvas.toDataURL('image/jpeg',0.8);
+  const MAX=800;
+  const scale=Math.min(1,MAX/Math.max(vid.videoWidth||640,vid.videoHeight||640));
+  canvas.width=Math.round((vid.videoWidth||640)*scale);
+  canvas.height=Math.round((vid.videoHeight||640)*scale);
+  canvas.getContext('2d').drawImage(vid,0,0,canvas.width,canvas.height);
+  _refPhotoData=canvas.toDataURL('image/jpeg',0.7);
   vid.style.display='none';
   canvas.style.display='block';
   document.getElementById('refCamCtrls').style.display='none';
@@ -4611,15 +4612,18 @@ function uploadRefPhoto(input){
   if(!file)return;
   const reader=new FileReader();
   reader.onload=e=>{
-    _refPhotoData=e.target.result;
     const canvas=document.getElementById('refCamCanvas');
     const img=new Image();
     img.onload=()=>{
-      canvas.width=img.width;canvas.height=img.height;
-      canvas.getContext('2d').drawImage(img,0,0);
+      const MAX=800;
+      const scale=Math.min(1,MAX/Math.max(img.width,img.height));
+      canvas.width=Math.round(img.width*scale);
+      canvas.height=Math.round(img.height*scale);
+      canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+      _refPhotoData=canvas.toDataURL('image/jpeg',0.7);
       canvas.style.display='block';
     };
-    img.src=_refPhotoData;
+    img.src=e.target.result;
     document.getElementById('refCamVid').style.display='none';
     document.getElementById('refCamCtrls').style.display='none';
     document.getElementById('refCamPrompt').style.display='none';
@@ -4777,7 +4781,8 @@ function confirmPay(){
       if(commAmt>0) commInfo.push({cat,item:ci.name,rate:catRate,amount:commAmt});
     });
   }
-  S.transactions.push({id:txid,client:cn,clientId:selClient?.id||null,items:JSON.parse(JSON.stringify(cart)),sub,disc,discType,tip,vat,vatOn,total:finalTotal,originalAmount:payFeeAmt>0?originalAmount:null,payFee:payFeeAmt||null,feePct:payFeePct||null,feeTerm:payFeeTerm||null,depositApplied:dep||null,method,cashGiven:cashGiven||null,cashChange:cashChange||null,refPhoto:_refPhotoData||null,time:now.toISOString(),staff:currentUser.name,installmentInfo:instMeta||null,internalInstallment:internalInstInfo||null,scpwd:scpwdEnabled?{type:scpwdType,idNum:scpwdId,discAmt:scpwdDiscAmt}:null,orNumber,splitPayment:splitPaymentData||null,refNumber:refNumber||null,commissionBreakdown:commInfo.length?commInfo:null,surgeAmt:surgeAmt||null,surgeMeta:surge||null});
+  const _rcptId=uid('RCP-').toUpperCase();
+  S.transactions.push({id:txid,client:cn,clientId:selClient?.id||null,items:JSON.parse(JSON.stringify(cart)),sub,disc,discType,tip,vat,vatOn,total:finalTotal,originalAmount:payFeeAmt>0?originalAmount:null,payFee:payFeeAmt||null,feePct:payFeePct||null,feeTerm:payFeeTerm||null,depositApplied:dep||null,method,cashGiven:cashGiven||null,cashChange:cashChange||null,refPhoto:_refPhotoData||null,time:now.toISOString(),staff:currentUser.name,installmentInfo:instMeta||null,internalInstallment:internalInstInfo||null,scpwd:scpwdEnabled?{type:scpwdType,idNum:scpwdId,discAmt:scpwdDiscAmt}:null,orNumber,splitPayment:splitPaymentData||null,refNumber:refNumber||null,commissionBreakdown:commInfo.length?commInfo:null,surgeAmt:surgeAmt||null,surgeMeta:surge||null,receiptId:_rcptId});
   window.lastTx=S.transactions[S.transactions.length-1];
   window._lastPaidClientId = selClient?.id||null;
   window._lastTxId = txid;
@@ -4849,7 +4854,6 @@ function confirmPay(){
   window._lastTxId=txid;
   // Save receipt to Firebase and send email
   {
-    const _rcptId=uid('RCP-').toUpperCase();
     window._lastReceiptId=_rcptId;
     const _rcptPkgItems=cart.filter(i=>i.type==='package');
     const _rcptPkgInfo=(_rcptPkgItems.length&&_rcptClientSnap)?_rcptPkgItems.map(pi=>{
@@ -6274,11 +6278,14 @@ function saveAppt(){
   const appt={client,service,staff:document.getElementById('apStaff').value||'',date,time,duration,groupSize,depositAmt,status:'pending',notes:document.getElementById('apNotes').value.trim(),reminder:document.getElementById('apSendReminder').checked};
   if(editApptId){const i=S.bookings.findIndex(x=>String(x.id)===String(editApptId));if(i>=0)S.bookings[i]={...S.bookings[i],...appt};}
   else if(isSeries){
+    const conflicts=[];
     for(let si=0;si<seriesCount;si++){
       const apptDate=addDays(date,si*seriesInterval);
       const seriesAppt={...appt,date:apptDate,seriesId,seriesNum:si+1,seriesTotal:seriesCount};
       S.bookings.push({id:Date.now()+si,...seriesAppt});
+      if(si>0&&!isSlotAvailable(apptDate,time,service,duration,null,groupSize)){conflicts.push(`#${si+1} (${apptDate})`);}
     }
+    if(conflicts.length) showToast(`⚠️ Slot conflict in series: ${conflicts.slice(0,2).join(', ')}${conflicts.length>2?' +more':''}. All sessions booked.`,'warn');
   } else {
     S.bookings.push({id:Date.now(),...appt});
   }
@@ -7737,7 +7744,7 @@ function renderRptSales(txns){
         <td style="font-size:12px;">${hasFee?fmtPrice(t.originalAmount||t.total-t.payFee):'—'}</td>
         <td style="font-size:12px;color:var(--warn);">${hasFee?'+'+fmtPrice(t.payFee):'—'}</td>
         <td style="font-weight:600;font-size:13px;color:${isRefund?'var(--danger)':''};">${isRefund?'-':''} ${fmtPrice(Math.abs(t.total))}</td>
-        ${isAdmin?`<td style="white-space:nowrap;">${!isRefund&&!isRefunded?`<button class="btn btn-outline btn-sm" onclick="openRefund('${t.id}')" style="font-size:11px;color:var(--danger);border-color:var(--danger);">↩ Refund</button>`:isRefunded?'<span style="font-size:10px;color:var(--danger);">Refunded</span>':''}</td>`:''}
+        ${isAdmin?`<td style="white-space:nowrap;">${!isRefund&&!isRefunded?`<button class="btn btn-outline btn-sm" onclick="openRefund('${t.id}')" style="font-size:11px;color:var(--danger);border-color:var(--danger);">↩ Refund</button>`:isRefunded?'<span style="font-size:10px;color:var(--danger);">Refunded</span>':''}${t.receiptId&&!isRefund?` <button class="btn btn-outline btn-sm" onclick="window.open('GlowBar_Receipt.html?id='+encodeURIComponent('${t.receiptId}'))" style="font-size:11px;" title="View receipt">🧾</button>`:''}</td>`:''}
       </tr>`;}).join('')}</tbody>
     </table>`:'<div style="padding:30px;text-align:center;color:var(--ink3);">No transactions found</div>';
 }
