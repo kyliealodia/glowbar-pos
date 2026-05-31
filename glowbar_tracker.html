@@ -137,8 +137,10 @@ window.pushServicesToPOS = async function(){
       id: p.id,
       name: p.name,
       cat: p.cat,
+      subcat: p.subcat || '',
       price: p.price,
-      durationMins: p.durationMins || 60
+      durationMins: p.durationMins || 60,
+      inPOS: true
     }));
     await set(ref(db, 'gb/serviceNames'), serviceNames);
 

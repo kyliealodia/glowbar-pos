@@ -3270,7 +3270,7 @@ function sync(key){
     if(key==='products'){
       const serviceNames=S.products
         .filter(p=>p.inPOS!==false)
-        .map(p=>({id:p.id,name:p.name,cat:p.cat,price:p.price,durationMins:p.durationMins||60}));
+        .map(p=>({id:p.id,name:p.name,cat:p.cat,subcat:p.subcat||'',price:p.price,durationMins:p.durationMins||60,inPOS:true}));
       db.ref('gb/serviceNames').set(serviceNames).catch(()=>{});
     }
     return;
@@ -3293,7 +3293,7 @@ async function pushAllToFirebase(){
   try{
     const serviceNames=S.products
       .filter(p=>p.inPOS!==false)
-      .map(p=>({id:p.id,name:p.name,cat:p.cat,price:p.price,durationMins:p.durationMins||60}));
+      .map(p=>({id:p.id,name:p.name,cat:p.cat,subcat:p.subcat||'',price:p.price,durationMins:p.durationMins||60,inPOS:true}));
     await db.ref('gb/serviceNames').set(serviceNames);
   }catch(e){ console.warn('serviceNames failed',e); }
 
