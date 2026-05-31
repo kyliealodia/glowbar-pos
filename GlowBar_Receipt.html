@@ -12,8 +12,9 @@
 *{box-sizing:border-box;margin:0;padding:0;}
 body{background:#f5f0eb;min-height:100vh;font-family:'Jost',sans-serif;color:#2a2218;display:flex;flex-direction:column;align-items:center;padding:24px 16px 48px;}
 .receipt-wrap{background:#fff;border-radius:16px;max-width:480px;width:100%;box-shadow:0 4px 24px rgba(0,0,0,0.10);overflow:hidden;}
-.receipt-header{width:100%;display:block;}
+.receipt-header{width:100%;display:block;position:relative;}
 .receipt-header img{width:100%;display:block;max-height:120px;object-fit:cover;}
+.receipt-header-fallback{display:none;padding:18px 0;text-align:center;font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:500;color:#2a2218;background:#faf7f3;letter-spacing:1px;}
 .receipt-body{padding:28px 28px 20px;}
 .brand{text-align:center;margin-bottom:20px;}
 .brand h1{font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:500;letter-spacing:1px;color:#2a2218;}
@@ -46,11 +47,26 @@ body{background:#f5f0eb;min-height:100vh;font-family:'Jost',sans-serif;color:#2a
 .balance-box .bal-label{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#8a7a6a;margin-bottom:6px;font-weight:600;}
 .balance-box .bal-amount{font-size:20px;font-weight:700;color:#b5831a;}
 .balance-box .bal-next{font-size:11px;color:#6a5a4a;margin-top:4px;}
-.print-btn{margin-top:20px;width:100%;padding:13px;background:#2a2218;color:#fff;border:none;border-radius:10px;font-family:'Jost',sans-serif;font-size:14px;font-weight:600;cursor:pointer;letter-spacing:.5px;}
+.installment-box{background:#f0f7ff;border:1.5px solid #a8c8e8;border-radius:10px;padding:14px 16px;margin-top:12px;}
+.installment-box .inst-label{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#5a7a9a;margin-bottom:8px;font-weight:600;}
+.installment-box .inst-row{display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:0.5px solid #cfe0ef;}
+.installment-box .inst-row:last-child{border-bottom:none;font-weight:600;font-size:13px;padding-top:6px;}
+.btn-row{display:flex;gap:10px;margin-top:20px;}
+.print-btn{flex:1;padding:13px;background:#2a2218;color:#fff;border:none;border-radius:10px;font-family:'Jost',sans-serif;font-size:14px;font-weight:600;cursor:pointer;letter-spacing:.5px;}
 .print-btn:hover{background:#3d3127;}
+.share-btn{display:none;flex:1;padding:13px;background:#b5831a;color:#fff;border:none;border-radius:10px;font-family:'Jost',sans-serif;font-size:14px;font-weight:600;cursor:pointer;letter-spacing:.5px;}
+.share-btn:hover{background:#9a6f15;}
 .footer-note{text-align:center;font-size:10px;color:#8a7a6a;margin-top:18px;line-height:1.6;letter-spacing:.3px;}
+.social-links{display:flex;justify-content:center;gap:16px;margin-top:12px;flex-wrap:wrap;}
+.social-links a{font-size:11px;color:#8a7a6a;text-decoration:none;border-bottom:1px solid #d4c9bc;padding-bottom:1px;}
+.social-links a:hover{color:#b5831a;}
+.book-again-btn{display:block;width:100%;margin-top:16px;padding:11px;background:#faf7f3;border:1.5px solid #d4c9bc;border-radius:10px;font-family:'Jost',sans-serif;font-size:13px;font-weight:600;color:#5a4a3a;text-align:center;text-decoration:none;cursor:pointer;}
+.book-again-btn:hover{background:#f0ebe4;border-color:#b5831a;color:#b5831a;}
 .loading{text-align:center;padding:60px 20px;color:#8a7a6a;font-size:14px;}
 .error-box{text-align:center;padding:60px 20px;color:#c0392b;font-size:14px;}
+.timeout-box{text-align:center;padding:40px 20px;font-size:13px;color:#5a4a3a;line-height:1.7;}
+.timeout-box a{color:#b5831a;}
+.retry-btn{margin-top:14px;padding:10px 24px;background:#2a2218;color:#fff;border:none;border-radius:8px;font-family:'Jost',sans-serif;font-size:13px;font-weight:600;cursor:pointer;}
 @media(max-width:480px){
   body{padding:0;}
   .receipt-wrap{border-radius:0;max-width:100%;min-height:100vh;}
@@ -59,12 +75,14 @@ body{background:#f5f0eb;min-height:100vh;font-family:'Jost',sans-serif;color:#2a
   .row{font-size:12px;}
   .svc-item{font-size:12px;}
   .total-row{font-size:15px;}
-  .print-btn{border-radius:0;position:sticky;bottom:0;}
+  .btn-row{position:sticky;bottom:0;border-radius:0;gap:0;}
+  .print-btn{border-radius:0;}
+  .share-btn{display:flex;align-items:center;justify-content:center;border-radius:0;}
 }
 @media print{
   body{background:#fff;padding:0;}
   .receipt-wrap{box-shadow:none;border-radius:0;max-width:100%;}
-  .print-btn{display:none;}
+  .btn-row,.book-again-btn,.social-links{display:none;}
 }
 </style>
 </head>
@@ -92,15 +110,39 @@ function fd(d){if(!d)return'—';try{return new Date(d).toLocaleDateString('en-P
 function fdt(d){if(!d)return'—';try{return new Date(d).toLocaleString('en-PH',{month:'long',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'});}catch(e){return d;}}
 function cap(s){return (s||'').replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase());}
 
+// stored globally so shareReceipt() can access it after render
+let _r = null;
+
+function shareReceipt(){
+  if(!_r) return;
+  const svcNames = (_r.services||[]).map(s=>s.name).join(', ') || 'Beauty Service';
+  const text = `GlowBar Receipt — ${svcNames} | ${fp(_r.totalCharged)} | ${fdt(_r.createdAt)}`;
+  const url = location.href;
+  if(navigator.share){
+    navigator.share({title:'GlowBar Receipt',text,url}).catch(()=>{});
+  } else {
+    navigator.clipboard.writeText(url).then(()=>{
+      alert('Receipt link copied to clipboard!');
+    }).catch(()=>{
+      prompt('Copy this link:',url);
+    });
+  }
+}
+
 function renderReceipt(r){
+  _r = r;
   const wrap=document.getElementById('receiptWrap');
   const hasFee=r.payFee>0;
   const hasBalance=r.remainingBalance>0;
   const hasPackage=r.packageInfo&&r.packageInfo.length>0;
-  const hasInstallment=r.installmentInfo||r.internalInstallment;
+  const ii=r.installmentInfo||(r.internalInstallment&&typeof r.internalInstallment==='object'?r.internalInstallment:null);
+  const hasInstallment=!!(ii||r.internalInstallment);
   const methodLabel=cap(r.method||'cash')+(r.feeTerm?' ('+r.feeTerm+' months)':'');
   const hasScpwd=r.scpwd&&r.scpwd.discAmt>0;
   const hasBir=r.tin||r.birPermit||r.lguPermit||r.businessAddress;
+
+  // Actual amount collected today (totalCharged minus any outstanding balance)
+  const amountPaidToday = r.totalCharged - (r.remainingBalance||0);
 
   // Services rows
   const svcRows=(r.services||[]).map(s=>`
@@ -120,7 +162,7 @@ function renderReceipt(r){
   } else if(r.vat>0){
     payRows.push(`<div class="row"><span class="label">VAT (12%)</span><span class="value">+${fp(r.vat)}</span></div>`);
   } else if(r.vatOn===false){
-    payRows.push(`<div class="row" style="font-size:11px;"><span class="label" style="color:var(--ink3);">VAT Status</span><span class="value" style="font-size:11px;color:var(--ink3);">VAT-Exempt</span></div>`);
+    payRows.push(`<div class="row" style="font-size:11px;"><span class="label" style="color:#8a7a6a;">VAT Status</span><span class="value" style="font-size:11px;color:#8a7a6a;">VAT-Exempt</span></div>`);
   }
   if(hasFee) payRows.push(`
     <div class="row"><span class="label">Original Amount</span><span class="value">${fp(r.originalAmount)}</span></div>
@@ -133,13 +175,32 @@ function renderReceipt(r){
       <div class="divider"></div>
       <div class="section-label">Package Info</div>
       <div class="row"><span class="label">Package</span><span class="value"><span class="badge badge-pkg">${pi.packageName}</span></span></div>
-      <div class="row"><span class="label">Sessions Used</span><span class="value">${pi.sessionsUsed}</span></div>
+      <div class="row"><span class="label">Sessions Used</span><span class="value">${pi.sessionsUsed}${pi.totalSessions?' of '+pi.totalSessions:''}</span></div>
       <div class="row"><span class="label">Sessions Remaining</span><span class="value accent">${pi.sessionsRemaining}</span></div>`).join('');
   }
 
-  // Remaining balance block
+  // Installment details block
+  let installBlock='';
+  if(hasInstallment){
+    const visitLabel=ii?.visitNumber?`Visit ${ii.visitNumber}${ii.totalVisits?' of '+ii.totalVisits:''}`:null;
+    const schedLabel=ii?.schedule||ii?.paymentSchedule||null;
+    installBlock=`
+      <div class="divider"></div>
+      <div class="section-label">Installment Plan</div>
+      <div class="installment-box">
+        <div class="inst-label">Payment Schedule</div>
+        ${visitLabel?`<div class="inst-row"><span>Payment Number</span><span>${visitLabel}</span></div>`:''}
+        ${ii?.amountPerVisit?`<div class="inst-row"><span>Amount per Visit</span><span>${fp(ii.amountPerVisit)}</span></div>`:''}
+        ${schedLabel?`<div class="inst-row"><span>Schedule</span><span>${schedLabel}</span></div>`:''}
+        ${r.nextPaymentDate?`<div class="inst-row"><span>Next Payment Due</span><span>${fd(r.nextPaymentDate+'T12:00')}</span></div>`:''}
+        ${hasBalance?`<div class="inst-row"><span>Remaining Balance</span><span style="color:#c0392b;">${fp(r.remainingBalance)}</span></div>`:''}
+        <div class="inst-row"><span>Paid Today</span><span style="color:#b5831a;">${fp(amountPaidToday)}</span></div>
+      </div>`;
+  }
+
+  // Remaining balance block (shown when no installment block, or always for non-installment)
   let balBlock='';
-  if(hasBalance){
+  if(hasBalance&&!hasInstallment){
     const nextDueTxt=r.nextPaymentDate?fd(r.nextPaymentDate+'T12:00'):null;
     balBlock=`
       <div class="balance-box">
@@ -151,7 +212,8 @@ function renderReceipt(r){
 
   wrap.innerHTML=`
     <div class="receipt-header">
-      <img src="images/email-header.jpg" alt="GlowBar" onerror="this.style.display='none'">
+      <img src="https://raw.githubusercontent.com/kyliealodia/glowbar-pos/main/images/email-header.jpg" alt="GlowBar" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+      <div class="receipt-header-fallback">GlowBar Beauty Clinic</div>
     </div>
     <div class="receipt-body">
       <div class="brand">
@@ -189,26 +251,47 @@ function renderReceipt(r){
         <span class="total-val">${fp(r.totalCharged)}</span>
       </div>
 
-      <div class="row" style="margin-top:8px;"><span class="label">Amount Paid Today</span><span class="value accent">${fp(r.totalCharged)}</span></div>
+      <div class="row" style="margin-top:8px;"><span class="label">Amount Paid Today</span><span class="value accent">${fp(amountPaidToday)}</span></div>
 
       ${pkgBlock}
+      ${installBlock}
       ${balBlock}
 
       <hr class="divider">
 
       <div class="footer-note">
         Thank you for visiting ${r.businessName||'GlowBar'}!<br>
-        For questions, contact us at hello@glowbarph.com<br>
+        ${hasScpwd?`<span style="font-size:9px;">SC/PWD Discount applied per RA 9994/RA 9442. ID verified.</span><br>`:''}
         Receipt ID: ${r.id}${r.orNumber?' · OR No. '+r.orNumber:''} · Ref: ${r.txId||''}
-        ${hasScpwd?`<br><span style="font-size:9px;">SC/PWD Discount applied per RA 9994/RA 9442. ID verified.</span>`:''}
       </div>
 
-      <button class="print-btn" onclick="window.print()">🖨 Print Receipt</button>
+      <a class="book-again-btn" href="GlowBar_Booking.html">✦ Book Again</a>
+
+      <div class="social-links">
+        <a href="https://instagram.com/glowbarph" target="_blank">Instagram</a>
+        <a href="https://m.me/glowbarph" target="_blank">Messenger</a>
+        <a href="mailto:hello@glowbarph.com">hello@glowbarph.com</a>
+      </div>
+
+      <div class="btn-row">
+        <button class="share-btn" onclick="shareReceipt()">Share Receipt</button>
+        <button class="print-btn" onclick="window.print()">🖨 Print Receipt</button>
+      </div>
     </div>`;
 }
 
 function showError(msg){
   document.getElementById('receiptWrap').innerHTML=`<div class="error-box"><div style="font-size:32px;margin-bottom:12px;">⚠️</div><strong>Receipt not found</strong><br><span style="font-size:12px;color:#8a7a6a;margin-top:6px;display:block;">${msg||'This receipt may have expired or the link is invalid.'}</span></div>`;
+}
+
+function showTimeout(){
+  document.getElementById('loadingState').className='timeout-box';
+  document.getElementById('loadingState').innerHTML=`
+    <div style="font-size:28px;margin-bottom:12px;">⏱</div>
+    <strong>Receipt is taking longer than usual to load.</strong><br>
+    Please check your connection or contact us at<br>
+    <a href="mailto:hello@glowbarph.com">hello@glowbarph.com</a>
+    <br><button class="retry-btn" onclick="location.reload()">Retry</button>`;
 }
 
 if(!receiptId){
@@ -217,10 +300,18 @@ if(!receiptId){
   try{
     firebase.initializeApp(FB_CONFIG);
     const db=firebase.database();
+    let timedOut=false;
+    const loadTimer=setTimeout(()=>{ timedOut=true; showTimeout(); },8000);
     db.ref('gb/receipts/'+receiptId).once('value').then(snap=>{
+      clearTimeout(loadTimer);
+      if(timedOut) return; // user already sees timeout UI
       if(!snap.exists()){showError('Receipt '+receiptId+' was not found.');return;}
       renderReceipt(snap.val());
-    }).catch(e=>{showError('Failed to load receipt: '+e.message);});
+    }).catch(e=>{
+      clearTimeout(loadTimer);
+      if(timedOut) return;
+      showError('Failed to load receipt: '+e.message);
+    });
   }catch(e){
     showError('Unable to connect: '+e.message);
   }
