@@ -482,30 +482,22 @@ body{
 
   <!-- STEP 4 — CONSENT -->
   <div class="section" id="sec4">
-    <div class="section-title">Consent & Waiver</div>
-    <div class="section-sub">Please read the consent form carefully and sign below.</div>
+    <div class="section-title">Care and Consent Agreement</div>
+    <div class="section-sub">Please read the following carefully before signing.</div>
 
-    <div class="waiver-sel" id="waiverSel">
-      <button class="waiver-btn sel" onclick="switchWaiver(this,'general')">General</button>
-      <button class="waiver-btn" onclick="switchWaiver(this,'laser')">Laser</button>
-      <button class="waiver-btn" onclick="switchWaiver(this,'injectables')">Injectables</button>
-      <button class="waiver-btn" onclick="switchWaiver(this,'facial')">Facial</button>
-      <button class="waiver-btn" onclick="switchWaiver(this,'body')">Body Contouring</button>
+    <div class="consent-box" style="max-height:none;display:flex;flex-direction:column;gap:12px;font-size:13px;line-height:1.85;">
+      <p style="margin:0;"><strong>Informed Consent &amp; Risks.</strong> I understand that aesthetic treatments carry inherent risks, including but not limited to temporary redness, swelling, bruising, skin sensitivity, and in rare cases more serious adverse reactions. I have been given the opportunity to ask questions and all questions have been answered to my satisfaction. I understand that results vary per individual and are not guaranteed.</p>
+      <p style="margin:0;"><strong>Medical Disclosure.</strong> I confirm that all information I have provided in this form is truthful, accurate, and complete. I have disclosed all relevant medical history, current medications, supplements, and known allergies. I will inform Glow Bar staff of any changes to my health status on future visits.</p>
+      <p style="margin:0;"><strong>Limitation of Liability.</strong> I understand that Glow Bar Aesthetic Clinic and its staff are not liable for any adverse reactions, complications, or unsatisfactory results arising from undisclosed medical conditions, allergies, contraindications, or failure to follow post-treatment care instructions. I voluntarily consent to treatment and release Glow Bar Aesthetic Clinic, its owners, and staff from any related claims or liability.</p>
+      <p style="margin:0;"><strong>Age &amp; Authority.</strong> I confirm that I am at least 18 years old, or if a minor, that my parent or guardian has reviewed and signed this form on my behalf.</p>
+      <p style="margin:0;"><strong>Sanitation &amp; Safety.</strong> I understand that Glow Bar follows strict sanitation and safety protocols for all treatments and services.</p>
+      <p style="margin:0;"><strong>Photography.</strong> Any before/after photos taken during my visit are for clinical documentation purposes only and will not be shared publicly or used for marketing without my separate written consent.</p>
+      <p style="margin:0;"><strong>Data Privacy.</strong> I consent to the collection and use of my personal information in accordance with the Philippine Data Privacy Act. My information is kept confidential and will not be shared without my consent.</p>
     </div>
 
-    <div class="consent-box" id="consentBox"></div>
-
-    <label class="consent-check" onclick="toggleConsent(this,'c1',event)" id="cc1">
+    <label class="consent-check" onclick="toggleConsent(this,'c1',event)" id="cc1" style="margin-top:16px;border-color:rgba(201,168,76,0.4);">
       <input type="checkbox" id="c1"><div class="cc-box">✓</div>
-      <div class="cc-text">I have read, understood, and agree to the consent and waiver above.</div>
-    </label>
-    <label class="consent-check" onclick="toggleConsent(this,'c2',event)" id="cc2">
-      <input type="checkbox" id="c2"><div class="cc-box">✓</div>
-      <div class="cc-text">All information I provided in this form is accurate and complete to the best of my knowledge.</div>
-    </label>
-    <label class="consent-check" onclick="toggleConsent(this,'c3',event)" id="cc3">
-      <input type="checkbox" id="c3"><div class="cc-box">✓</div>
-      <div class="cc-text">I allow Glow Bar to take before/after photos for clinical documentation only (not shared publicly without my written consent).</div>
+      <div class="cc-text" style="font-weight:500;">I have read and understood all the information above and agree to the terms of this Care and Consent Agreement.</div>
     </label>
 
     <div class="fg" style="margin-top:20px;">
@@ -944,8 +936,7 @@ function toggleConsent(el,id,e){
   updateSubmitBtn();
 }
 function updateSubmitBtn(){
-  const allChecked=document.getElementById('c1').checked&&document.getElementById('c2').checked&&document.getElementById('c3').checked;
-  document.getElementById('submitBtn').disabled=!(allChecked&&sigHasMark);
+  document.getElementById('submitBtn').disabled=!(document.getElementById('c1').checked&&sigHasMark);
 }
 
 // ── SIGNATURE ──
@@ -1030,10 +1021,11 @@ async function submitForm(){
     currentProducts,
     goals:document.getElementById('s3Goals').value.trim(),
     todayService:document.getElementById('s3Service').value,
-    // Consent
-    waiverType:currentWaiver,
+    // Consent — stored in the same structure as the main POS app
     consentSigned:true,
     signature:sig,
+    consents:{general:{signed:true,date:new Date().toISOString().split('T')[0],signedAt:new Date().toISOString(),signature:sig,data:{fullName:document.getElementById('s1FirstName').value.trim()+' '+document.getElementById('s1LastName').value.trim(),dob:document.getElementById('s1Bday').value,contact:document.getElementById('s1Phone').value.trim(),allergies:document.getElementById('s2Allergies').value.trim(),medications:document.getElementById('s2Meds').value.trim(),medConditions:medConds.join(', ')}}},
+    intakeComplete:true,
     skinAnalysis:window._skinAnalysis||null,
     visits:0,
     totalSpent:0,

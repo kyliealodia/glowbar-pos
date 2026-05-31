@@ -2801,6 +2801,11 @@ html{height:-webkit-fill-available;}
     </div>
     <div class="modal-body" style="padding:20px;display:flex;flex-direction:column;gap:16px;">
 
+      <!-- Intake banner -->
+      <div id="cpIntakeBanner" style="display:none;background:#FFF3CD;border:1.5px solid rgba(201,168,76,0.5);border-radius:12px;padding:14px 16px;font-size:13px;color:#856404;cursor:pointer;">
+        ⚠️ <strong>Intake incomplete</strong> — please complete the Care and Consent Agreement before proceeding. <span style="text-decoration:underline;font-weight:500;">Tap here to complete →</span>
+      </div>
+
       <!-- Stats row -->
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;">
         <div style="background:var(--cream2);border-radius:10px;padding:12px 14px;text-align:center;">
@@ -3358,6 +3363,8 @@ window.addEventListener('DOMContentLoaded',()=>{
     db.ref('gb/clients').on('value', snap=>{
       const val=snap.val();
       if(val) S.clients=fbVal(val,[]);
+      // Backfill: clients with consents.general.signed but no intakeComplete flag
+      S.clients.forEach(c=>{if(c.intakeComplete==null)c.intakeComplete=!!(c.consents?.general?.signed);});
       if(document.getElementById('page-clients')?.classList.contains('active')) renderClientsTable();
       if(document.getElementById('page-dashboard')?.classList.contains('active')) renderDashboard();
     });
@@ -5681,6 +5688,12 @@ function quickBook(){
   const time=document.getElementById('qbTime').value;
   if(!client||!service||!date||!time){showToast('Fill required fields','err');return;}
   if(!isClinicOpen(date)){showToast('Clinic is closed on that day','err');return;}
+  // Check general consent for matched client
+  const qbClientObj=S.clients.find(c=>c.name.toLowerCase()===client.toLowerCase());
+  if(qbClientObj&&!isConsentSigned(qbClientObj,'general')){
+    _showConsentPrompt(['general'],qbClientObj,()=>{quickBook();});
+    return;
+  }
   const prod=S.products.find(p=>p.name===service);
   const dur=prod?.durationMins||60;
   if(!isSlotAvailable(date,time,service,dur,null,1)){
@@ -8956,6 +8969,9 @@ function submitKiosk(){
     signature:sigData,
     submittedAt:new Date().toISOString()
   };
+  // Build consent record matching the main app's consents.general structure
+  const _today=new Date().toISOString().split('T')[0];
+  const _consentRecord={signed:true,date:_today,signedAt:new Date().toISOString(),signature:sigData,data:{fullName:name,phone:formData.phone,skinType:formData.skinType,skinConcerns:formData.skinConcerns,allergies:formData.allergies,medications:formData.medications,medConditions:formData.medConditions,service:formData.service}};
   // Save to existing client or create new
   let cl=S.clients.find(c=>c.name.toLowerCase()===name.toLowerCase()||c.phone===formData.phone);
   if(cl){
@@ -8964,8 +8980,11 @@ function submitKiosk(){
     cl.skin=formData.skinType;
     cl.notes=formData.allergies||cl.notes;
     cl.messenger=cl.messenger||'';
+    if(!cl.consents)cl.consents={};
+    cl.consents.general=_consentRecord;
+    cl.intakeComplete=true;
   } else {
-    S.clients.push({id:Date.now(),name,phone:formData.phone,email:formData.email,messenger:'',bday:formData.bday,skin:formData.skinType,notes:formData.allergies,visits:0,totalSpent:0,vip:false,color:COLORS[S.clients.length%COLORS.length],intakeForms:[formData]});
+    S.clients.push({id:Date.now(),name,phone:formData.phone,email:formData.email,messenger:'',bday:formData.bday,skin:formData.skinType,notes:formData.allergies,visits:0,totalSpent:0,vip:false,color:COLORS[S.clients.length%COLORS.length],intakeForms:[formData],consents:{general:_consentRecord},intakeComplete:true});
   }
   sync('clients');
   // Show success
@@ -9331,6 +9350,18 @@ function viewClientProfile(id){
     cpRefs.innerHTML='';
   }
   if(c.referredBy){const ri=cpRefCredit.innerHTML;cpRefCredit.style.display='block';cpRefCredit.innerHTML=(ri?ri+'<br>':'')+`<span style="font-size:11px;color:var(--ink3);">Referred by: ${c.referredBy}</span>`;}
+
+  // Intake banner
+  const _ib=document.getElementById('cpIntakeBanner');
+  if(_ib){
+    if(!c.intakeComplete){
+      _ib.style.display='block';
+      _ib.onclick=()=>openConsentForm(id,'general',()=>{viewClientProfile(id);});
+    } else {
+      _ib.style.display='none';
+      _ib.onclick=null;
+    }
+  }
 
   openM('clientProfileModal');
 }
@@ -11260,8 +11291,15 @@ function openConsentForm(clientId, formKey, onSigned){
 }
 
 function cancelConsentForm(){
+  const _wasIntake=_cfFormKey==='general';
+  const _pendingId=_cfClientId;
   closeM('consentFormModal');
   _cfClientId=null;_cfFormKey=null;_cfOnSigned=null;
+  if(_wasIntake&&_pendingId){
+    const _cl=S.clients.find(c=>c.id===_pendingId);
+    if(_cl&&!_cl.intakeComplete)
+      showToast('Intake form not yet completed — open the client\'s profile to complete','warn');
+  }
 }
 
 function saveConsentForm(){
