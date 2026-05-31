@@ -685,6 +685,57 @@ body{font-family:system-ui,sans-serif;background:var(--cream);color:var(--text);
       <p style="margin-top:12px;font-size:11px;color:var(--muted)">Day rate ÷ 8 = hourly rate used in labor cost.</p>
     </div>
   </div>
+  <!-- ADD SERVICE TYPE CHOICE MODAL -->
+  <div id="add-svc-type-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center" onclick="if(event.target===this)closeAddSvcType()">
+    <div style="background:#fff;border-radius:16px;padding:28px 24px;width:360px;max-width:94vw;box-shadow:0 8px 32px rgba(0,0,0,.2)">
+      <div style="font-size:16px;font-weight:700;color:var(--gold-d);margin-bottom:20px">Add a service</div>
+      <button onclick="chooseAddSingle()" style="display:flex;align-items:flex-start;gap:12px;width:100%;background:var(--cream);border:1.5px solid var(--border-l);border-radius:12px;padding:14px 16px;cursor:pointer;margin-bottom:10px;text-align:left;font-family:inherit">
+        <span style="font-size:20px;line-height:1">&#9724;</span>
+        <div>
+          <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:3px">Single Service</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.4">One service with its own price, duration, and consumables</div>
+        </div>
+      </button>
+      <button onclick="openComboBuilder()" style="display:flex;align-items:flex-start;gap:12px;width:100%;background:#F0F3FF;border:1.5px solid #C7D0F8;border-radius:12px;padding:14px 16px;cursor:pointer;text-align:left;font-family:inherit">
+        <span style="font-size:20px;line-height:1">&#128279;</span>
+        <div>
+          <div style="font-size:14px;font-weight:600;color:#3D4DBF;margin-bottom:3px">Combo Service</div>
+          <div style="font-size:12px;color:#6B7ACD;line-height:1.4">Bundle 2 or more existing services — consumables, durations, and costs merge automatically</div>
+        </div>
+      </button>
+      <button class="btn-s" style="margin-top:14px;width:100%;font-size:13px" onclick="closeAddSvcType()">Cancel</button>
+    </div>
+  </div>
+
+  <!-- COMBO BUILDER MODAL -->
+  <div id="combo-builder-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center" onclick="if(event.target===this)closeComboBuilder()">
+    <div style="background:#fff;border-radius:16px;padding:24px;width:500px;max-width:96vw;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,.2)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-shrink:0">
+        <div>
+          <div style="font-size:16px;font-weight:700;color:var(--gold-d)">&#128279; Create Combo Service</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px">Select 2 or more services to bundle together</div>
+        </div>
+        <button class="del-row" onclick="closeComboBuilder()" style="font-size:16px">&#10005;</button>
+      </div>
+      <div id="combo-builder-services" style="flex:1;overflow-y:auto;min-height:120px;max-height:340px;padding-right:4px"></div>
+      <div id="combo-builder-preview" style="font-size:12px;color:var(--muted);padding:10px 0 6px;flex-shrink:0;border-top:0.5px solid var(--border-l);margin-top:8px">Select at least 2 services to continue</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;flex-shrink:0">
+        <div>
+          <div style="font-size:10px;color:var(--muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em">Combo name</div>
+          <input id="combo-builder-name" class="ii" type="text" placeholder="e.g. Facial + Mani Combo" style="width:100%;font-size:13px" oninput="this.dataset.autoFilled='false'">
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em">Combined price (&#8369;)</div>
+          <input id="combo-builder-price" class="ii" type="number" placeholder="0" style="width:100%;font-size:13px">
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:14px;flex-shrink:0">
+        <button class="btn-s" style="flex:1;font-size:13px" onclick="closeComboBuilder()">Cancel</button>
+        <button class="btn-p" style="flex:2;font-size:13px" onclick="confirmComboBuilder()">&#128279; Create Combo Service</button>
+      </div>
+    </div>
+  </div>
+
   <div id="svc-cat-tabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:1rem"></div>
   <div id="svc-container"></div>
   <button class="add-cat-btn" style="margin-top:10px" onclick="addSvcCategory()">&#xff0b; Add service category</button>
@@ -1420,7 +1471,56 @@ function setSvcCons(svcId,ci,f,v){
 function delSvcCons(svcId,ci){ const st=getSvcState(svcId); if(!st.consumables)return; st.consumables.splice(ci,1); setSvcStateField(svcId,'consumables',st.consumables); refreshSvcCard(svcId); }
 function addSvcCons(svcId){ const st=getSvcState(svcId); const cons=st.consumables||[]; cons.push({groupId:'',iIdx:-1,amt:'',unit:'ml'}); st.consumables=cons; svcCatState[svcId]=st; saveSvcState(); refreshSvcCard(svcId); }
 
+function buildComboSvcCardInner(svc, catId){
+  const allSvcs=getAllSvcsFlat();
+  const {laborCost,elec,water,consCost,totalCost,price,commission,profit,margin,durationMins}=calcSvcCost(svc);
+  const pColor=profit>=0?'var(--green)':'var(--red)';
+  const memberRows=(svc.memberServiceIds||[]).map(mid=>{
+    const ms=allSvcs.find(s=>s.id===mid);
+    if(!ms)return`<div style="padding:4px 8px;font-size:12px;color:var(--muted);font-style:italic">Deleted service</div>`;
+    const sc=calcSvcCost(ms);
+    return`<div style="display:flex;align-items:center;gap:6px;padding:5px 8px;background:var(--cream2);border-radius:6px;margin-bottom:3px;font-size:12px">
+      <span style="flex:1;font-weight:500">${ms.name}</span>
+      <span style="color:var(--muted);font-size:11px;white-space:nowrap">${sc.durationMins}m &middot; &#8369;${sc.totalCost.toFixed(2)}</span>
+      <button class="del-row" onclick="removeComboMember('${catId}','${svc.id}','${mid}')" style="font-size:11px;padding:1px 4px" title="Remove">&#10005;</button>
+    </div>`;
+  }).join('');
+  return`<div class="svc-drag-handle" draggable="true" ondragstart="onSvcDragStart(event,'${catId}','${svc.id}')" ondragover="event.preventDefault()" ondrop="onSvcDrop(event,'${catId}','${svc.id}')" style="cursor:grab;padding:2px 0 4px;font-size:16px;color:var(--border);text-align:center;letter-spacing:4px">&#8942;&#8942;</div>
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px;margin-bottom:8px;padding-bottom:8px;border-bottom:0.5px solid var(--border-l)">
+    <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0">
+      <span style="font-size:10px;font-weight:600;background:#EEF2FF;color:#3D4DBF;border-radius:20px;padding:2px 8px;white-space:nowrap;flex-shrink:0">&#128279; COMBO</span>
+      <input class="ni" type="text" value="${svc.name.replace(/"/g,'&quot;')}" style="font-size:13px;font-weight:600;color:var(--gold-d);border:none;background:transparent;padding:0;font-family:inherit;min-width:0;flex:1" oninput="debounce('n_${svc.id}',()=>updSvcName('${catId}','${svc.id}',this.value),400)">
+    </div>
+    <button class="del-row" onclick="delSvc('${catId}','${svc.id}')" style="font-size:14px;flex-shrink:0" title="Delete combo">&#10005;</button>
+  </div>
+  <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:5px;font-weight:600">Bundled services</div>
+  ${memberRows||'<div style="font-size:12px;color:var(--muted);padding:4px 0">No members — add via Rebuild</div>'}
+  <button class="add-row" style="margin:4px 0 12px;padding:3px 8px;font-size:11px" onclick="rebuildComboFromMembers('${catId}','${svc.id}')">&#8635; Rebuild costs &amp; consumables from members</button>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+    <div><div style="font-size:10px;color:var(--muted);margin-bottom:2px">Combined price (&#8369;)</div>
+      <input class="ii" type="number" style="width:100%" value="${price}" oninput="debounce('p_${svc.id}',()=>{setSvcStateField('${svc.id}','price',+this.value);refreshSvcCard('${svc.id}');},400)">
+    </div>
+    <div><div style="font-size:10px;color:var(--muted);margin-bottom:2px">Total duration (mins)</div>
+      <input class="ii" type="number" style="width:100%" value="${durationMins}" oninput="debounce('d_${svc.id}',()=>{setSvcStateField('${svc.id}','durationMins',+this.value);refreshSvcCard('${svc.id}');},400)">
+    </div>
+  </div>
+  <div style="font-size:11px;margin-bottom:6px">
+    <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:0.5px solid var(--border-l)"><span style="color:var(--muted)">Labor</span><span>&#8369;${laborCost.toFixed(2)}</span></div>
+    ${elec>0?`<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:0.5px solid var(--border-l)"><span style="color:var(--muted)">Electricity</span><span>&#8369;${elec.toFixed(2)}</span></div>`:''}
+    ${water>0?`<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:0.5px solid var(--border-l)"><span style="color:var(--muted)">Water</span><span>&#8369;${water.toFixed(2)}</span></div>`:''}
+    <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:0.5px solid var(--border-l)"><span style="color:var(--muted)">Consumables (merged)</span><span>&#8369;${consCost.toFixed(2)}</span></div>
+    <div style="display:flex;justify-content:space-between;padding:2px 0;font-weight:600"><span>Total cost</span><span>&#8369;${totalCost.toFixed(2)}</span></div>
+  </div>
+  <div style="font-size:11px;border-top:0.5px solid var(--border-l);padding-top:6px">
+    <div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:var(--muted)">Commission (${document.getElementById('comm-pct')?.value||10}%)</span><span style="color:var(--warn)">&#8722;&#8369;${commission.toFixed(2)}</span></div>
+    <div style="display:flex;justify-content:space-between;padding:4px 0;font-weight:600;font-size:12px;border-top:0.5px solid var(--border-l);margin-top:2px">
+      <span>Net profit</span><span style="color:${pColor}">&#8369;${profit.toFixed(2)} <span style="font-weight:400;font-size:10px">(${margin}%)</span></span>
+    </div>
+  </div>`;
+}
+
 function buildSvcCardInner(svc, catId){
+  if(svc.isCombo) return buildComboSvcCardInner(svc, catId);
   const st=getSvcState(svc.id);
   const {laborCost,elec,water,consCost,totalCost,price,commission,discount,profit,margin,durationMins,roleId}=calcSvcCost(svc);
   const pColor=profit>=0?'var(--green)':'var(--red)';
@@ -1597,7 +1697,7 @@ function buildSvcContainer(){
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:6px;border-bottom:${isMultiSub?'0.5px dashed var(--border-l)':'1px solid var(--border-l)'}">
           <span style="font-size:${isMultiSub?'13':'15'}px;font-weight:600;color:${isMultiSub?'var(--text)':'var(--gold-d)'}">${isMultiSub?subName:groupName}</span>${typeTag(cat.type)}
           <span style="font-size:11px;color:var(--muted)">${cat.services.length} services</span>
-          <button class="add-row" style="margin-left:auto;padding:3px 10px;font-size:11px" onclick="addSvc('${cat.id}')">&#xff0b; Add service</button>
+          <button class="add-row" style="margin-left:auto;padding:3px 10px;font-size:11px" onclick="addSvcChoice('${cat.id}')">&#xff0b; Add service</button>
           <button class="del-cat" onclick="delSvcCat('${cat.id}')">&#10005; Remove</button>
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px" id="svc-cat-grid-${cat.id}">${cards}</div>
@@ -1638,6 +1738,129 @@ function addSvcCategory(){
   const id='cat'+Date.now();
   SVC_CATS.push({id,name,type:'standard',canAddServices:true,services:[]});
   saveSvcState(); buildSvcCatTabs(); buildSvcContainer();
+}
+
+// ── ADD SERVICE CHOICE (single vs combo) ──────────────────────────
+function addSvcChoice(catId){
+  const m=document.getElementById('add-svc-type-modal');
+  m.dataset.catId=catId; m.style.display='flex';
+}
+function closeAddSvcType(){
+  document.getElementById('add-svc-type-modal').style.display='none';
+}
+function chooseAddSingle(){
+  const catId=document.getElementById('add-svc-type-modal').dataset.catId;
+  closeAddSvcType(); addSvc(catId);
+}
+function openComboBuilder(){
+  const catId=document.getElementById('add-svc-type-modal').dataset.catId;
+  closeAddSvcType();
+  const m=document.getElementById('combo-builder-modal');
+  m.dataset.catId=catId;
+  document.getElementById('combo-builder-name').value='';
+  document.getElementById('combo-builder-name').dataset.autoFilled='true';
+  document.getElementById('combo-builder-price').value='';
+  renderComboBuilderServices();
+  m.style.display='flex';
+}
+function closeComboBuilder(){
+  document.getElementById('combo-builder-modal').style.display='none';
+}
+function renderComboBuilderServices(){
+  const allSvcs=getAllSvcsFlat();
+  const groups={};
+  allSvcs.forEach(s=>{ if(s.isCombo)return; if(!groups[s.catGroup])groups[s.catGroup]=[]; groups[s.catGroup].push(s); });
+  let html='';
+  Object.entries(groups).forEach(([group,svcs])=>{
+    html+=`<div style="font-size:10px;font-weight:600;color:var(--gold-d);text-transform:uppercase;letter-spacing:0.05em;margin:10px 0 4px;padding:0 2px">${group}</div>`;
+    svcs.forEach(svc=>{
+      const sc=calcSvcCost(svc);
+      html+=`<label style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:7px;cursor:pointer;background:var(--cream);margin-bottom:3px">
+        <input type="checkbox" class="combo-svc-check" value="${svc.id}" onchange="updateComboBuilderPreview()">
+        <span style="flex:1;font-size:12px;font-weight:500">${svc.name}</span>
+        <span style="font-size:11px;color:var(--muted);white-space:nowrap">${sc.durationMins}m &middot; &#8369;${sc.totalCost.toFixed(2)}</span>
+      </label>`;
+    });
+  });
+  document.getElementById('combo-builder-services').innerHTML=html||'<div style="color:var(--muted);font-size:12px;padding:8px 0">No single services found — add some first.</div>';
+  updateComboBuilderPreview();
+}
+function updateComboBuilderPreview(){
+  const checked=[...document.querySelectorAll('.combo-svc-check:checked')].map(cb=>cb.value);
+  const allSvcs=getAllSvcsFlat();
+  let totalDuration=0,totalCost=0;
+  const names=[];
+  checked.forEach(sid=>{
+    const svc=allSvcs.find(s=>s.id===sid); if(!svc)return;
+    const sc=calcSvcCost(svc);
+    totalDuration+=sc.durationMins; totalCost+=sc.totalCost; names.push(svc.name);
+  });
+  const nameInput=document.getElementById('combo-builder-name');
+  if(nameInput.dataset.autoFilled!=='false'){ nameInput.value=names.join(' + '); }
+  const prev=document.getElementById('combo-builder-preview');
+  if(checked.length<2){ prev.textContent='Select at least 2 services to continue'; prev.style.color='var(--muted)'; }
+  else{ prev.textContent=`${totalDuration} min total · ₱${totalCost.toFixed(2)} combined cost`; prev.style.color='var(--text)'; }
+}
+function confirmComboBuilder(){
+  const catId=document.getElementById('combo-builder-modal').dataset.catId;
+  const checked=[...document.querySelectorAll('.combo-svc-check:checked')].map(cb=>cb.value);
+  if(checked.length<2){alert('Please select at least 2 services.');return;}
+  const name=(document.getElementById('combo-builder-name').value||'').trim()||'Combo Service';
+  const price=parseFloat(document.getElementById('combo-builder-price').value)||0;
+  const allSvcs=getAllSvcsFlat();
+  const mergedConMap={};
+  const mergedCons=[];
+  let totalDuration=0;
+  checked.forEach(sid=>{
+    const svc=allSvcs.find(s=>s.id===sid); if(!svc)return;
+    const st=getSvcState(svc.id);
+    totalDuration+=parseFloat(st.durationMins||svc.durationMins||30);
+    const cons=st.consumables||svc.consumables||[];
+    cons.forEach(c=>{
+      if(!c.groupId||c.iIdx<0)return;
+      const key=c.groupId+'_'+c.iIdx;
+      if(mergedConMap[key]){ mergedConMap[key].amt=String(parseFloat(mergedConMap[key].amt||0)+parseFloat(c.amt||0)); }
+      else{ mergedConMap[key]={...c}; mergedCons.push(mergedConMap[key]); }
+    });
+  });
+  const cat=SVC_CATS.find(c=>c.id===catId); if(!cat)return;
+  const id='s'+Date.now();
+  cat.services.push({id,name,price,durationMins:totalDuration,staffRole:'',consumables:mergedCons,isCombo:true,memberServiceIds:checked});
+  saveSvcState(); closeComboBuilder(); buildSvcContainer();
+  setTimeout(()=>{ const el=document.getElementById('svc-card-'+id); if(el)el.scrollIntoView({behavior:'smooth',block:'center'}); },100);
+}
+
+// ── COMBO MEMBER MANAGEMENT ────────────────────────────────────────
+function removeComboMember(catId,svcId,memberId){
+  const cat=SVC_CATS.find(c=>c.id===catId); if(!cat)return;
+  const svc=cat.services.find(s=>s.id===svcId); if(!svc||!svc.isCombo)return;
+  svc.memberServiceIds=(svc.memberServiceIds||[]).filter(id=>id!==memberId);
+  rebuildComboFromMembers(catId,svcId);
+}
+function rebuildComboFromMembers(catId,svcId){
+  const cat=SVC_CATS.find(c=>c.id===catId); if(!cat)return;
+  const svc=cat.services.find(s=>s.id===svcId); if(!svc||!svc.isCombo)return;
+  const allSvcs=getAllSvcsFlat();
+  const mergedConMap={};
+  const mergedCons=[];
+  let totalDuration=0;
+  (svc.memberServiceIds||[]).forEach(mid=>{
+    const ms=allSvcs.find(s=>s.id===mid); if(!ms)return;
+    const st=getSvcState(ms.id);
+    totalDuration+=parseFloat(st.durationMins||ms.durationMins||30);
+    const cons=st.consumables||ms.consumables||[];
+    cons.forEach(c=>{
+      if(!c.groupId||c.iIdx<0)return;
+      const key=c.groupId+'_'+c.iIdx;
+      if(mergedConMap[key]){ mergedConMap[key].amt=String(parseFloat(mergedConMap[key].amt||0)+parseFloat(c.amt||0)); }
+      else{ mergedConMap[key]={...c}; mergedCons.push(mergedConMap[key]); }
+    });
+  });
+  svc.consumables=mergedCons;
+  svc.durationMins=totalDuration;
+  setSvcStateField(svc.id,'consumables',mergedCons);
+  setSvcStateField(svc.id,'durationMins',totalDuration);
+  saveSvcState(); refreshSvcCard(svcId);
 }
 function delSvcCat(id){
   if(!confirm('Remove this entire service category?'))return;
