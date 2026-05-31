@@ -29,6 +29,7 @@ const _auth = getAuth(app);
 // initiated as early as possible before any get() or set() calls.
 signInAnonymously(_auth).catch(()=>{});
 const TRACKER_REF = ref(db, 'tracker/glowbar_main');
+const RATES_REF = ref(db, 'tracker/settings');
 const TRACKED = ['glowbar_v4','glowbar_cons','glowbar_svc2','glowbar_svcs','glowbar_staff','glowbar_monthly'];
 
 // ── SYNC STATUS ───────────────────────────────────────────────────
@@ -60,6 +61,20 @@ window.saveToFirebase = async function(){
     console.error('RTDB save error:', e);
     setSyncStatus('error');
   }
+};
+
+// ── PERSIST RATE SETTINGS → tracker/settings ─────────────────────
+let _rateTimer = null;
+window.saveRatesToFirebase = function(){
+  clearTimeout(_rateTimer);
+  _rateTimer = setTimeout(async ()=>{
+    try {
+      const elec = parseFloat(document.getElementById('elec-rate')?.value) || 15;
+      const water = parseFloat(document.getElementById('water-rate')?.value) || 9;
+      const comm = parseFloat(document.getElementById('comm-pct')?.value) || 10;
+      await set(RATES_REF, {elec, water, comm, updatedAt: new Date().toISOString()});
+    } catch(e){ console.error('saveRatesToFirebase error:', e); }
+  }, 1000);
 };
 
 // ── PUSH SERVICES → gb/products (POS sync) ───────────────────────
@@ -404,6 +419,21 @@ async function initFirebase(){
     console.error('RTDB init error:', e);
     setSyncStatus('error');
   }
+  // Load persisted rate settings
+  try {
+    const rSnap = await get(RATES_REF);
+    if(rSnap.exists()){
+      const r = rSnap.val();
+      const elecEl = document.getElementById('elec-rate');
+      const waterEl = document.getElementById('water-rate');
+      const commEl = document.getElementById('comm-pct');
+      if(elecEl && r.elec != null) elecEl.value = r.elec;
+      if(waterEl && r.water != null) waterEl.value = r.water;
+      if(commEl && r.comm != null) commEl.value = r.comm;
+      if(typeof rebuildAllServices === 'function') rebuildAllServices();
+    }
+  } catch(e){ console.error('loadRates error:', e); }
+
   // Always boot — Firebase or localStorage fallback
   bootApp();
 }
@@ -669,9 +699,9 @@ body{font-family:system-ui,sans-serif;background:var(--cream);color:var(--text);
 </div>
 <div id="tab-services" class="section">
   <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:1.2rem;padding:12px 16px;background:var(--cream2);border-radius:10px;border:0.5px solid var(--border-l)">
-    <div style="display:flex;align-items:center;gap:6px;font-size:13px"><span style="color:var(--muted)">Electricity/service: &#8369;</span><input id="elec-rate" class="ii" type="number" style="width:65px" value="15" oninput="rebuildAllServices()"></div>
-    <div style="display:flex;align-items:center;gap:6px;font-size:13px"><span style="color:var(--muted)">Water/service: &#8369;</span><input id="water-rate" class="ii" type="number" style="width:65px" value="9" oninput="rebuildAllServices()"></div>
-    <div style="display:flex;align-items:center;gap:6px;font-size:13px"><span style="color:var(--muted)">Commission:</span><input id="comm-pct" class="ii" type="number" style="width:55px" value="10" oninput="rebuildAllServices()"><span style="color:var(--muted)">%</span></div>
+    <div style="display:flex;align-items:center;gap:6px;font-size:13px"><span style="color:var(--muted)">Electricity/service: &#8369;</span><input id="elec-rate" class="ii" type="number" style="width:65px" value="15" oninput="rebuildAllServices();if(window.saveRatesToFirebase)window.saveRatesToFirebase()"></div>
+    <div style="display:flex;align-items:center;gap:6px;font-size:13px"><span style="color:var(--muted)">Water/service: &#8369;</span><input id="water-rate" class="ii" type="number" style="width:65px" value="9" oninput="rebuildAllServices();if(window.saveRatesToFirebase)window.saveRatesToFirebase()"></div>
+    <div style="display:flex;align-items:center;gap:6px;font-size:13px"><span style="color:var(--muted)">Commission:</span><input id="comm-pct" class="ii" type="number" style="width:55px" value="10" oninput="rebuildAllServices();if(window.saveRatesToFirebase)window.saveRatesToFirebase()"><span style="color:var(--muted)">%</span></div>
     <button class="btn-p" style="font-size:12px;padding:5px 12px;margin-left:auto" onclick="showStaffModal()">&#9881; Manage staff</button>
   </div>
   <div id="staff-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:999;align-items:center;justify-content:center">
@@ -1457,7 +1487,6 @@ function setSvcCons(svcId,ci,f,v){
       }
       if(found) break;
     }
-    console.log('setSvcCons itemIdx resolved:', {target, groupId:c.groupId, iIdx:c.iIdx});
     // Save immediately and refresh
     svcCatState[svcId]=st;
     saveSvcState();
@@ -2696,9 +2725,9 @@ function renderPOSTab(){
     return;
   }
 
-  const totalRev = txns.reduce((s,t)=>s+(t.total||0),0);
-  const cashRev = txns.filter(t=>!t.paymentMethod||t.paymentMethod==='cash').reduce((s,t)=>s+(t.total||0),0);
-  const cardRev = txns.filter(t=>t.paymentMethod==='card').reduce((s,t)=>s+(t.total||0),0);
+  const totalRev = txns.reduce((s,t)=>s+(t.totalCharged||t.total||0),0);
+  const cashRev = txns.filter(t=>!t.method||t.method==='cash').reduce((s,t)=>s+(t.totalCharged||t.total||0),0);
+  const cardRev = txns.filter(t=>t.method==='card').reduce((s,t)=>s+(t.totalCharged||t.total||0),0);
 
   if(sumEl) sumEl.innerHTML = `
     <div class="metric"><div class="metric-label">Total Revenue</div><div class="metric-value gd">₱${Math.round(totalRev).toLocaleString()}</div></div>
@@ -2709,7 +2738,7 @@ function renderPOSTab(){
 
   // By staff
   const byStaff = {};
-  txns.forEach(t=>{ const n=t.staff||'Unassigned'; if(!byStaff[n])byStaff[n]={rev:0,count:0}; byStaff[n].rev+=t.total||0; byStaff[n].count++; });
+  txns.forEach(t=>{ const n=t.staff||'Unassigned'; if(!byStaff[n])byStaff[n]={rev:0,count:0}; byStaff[n].rev+=(t.totalCharged||t.total||0); byStaff[n].count++; });
   const staffRows = Object.entries(byStaff).sort((a,b)=>b[1].rev-a[1].rev).map(([n,d])=>`<tr>
     <td style="font-weight:500">${n}</td><td>${d.count}</td>
     <td style="font-weight:600;color:var(--gold-d)">₱${Math.round(d.rev).toLocaleString()}</td>
@@ -2725,7 +2754,7 @@ function renderPOSTab(){
   // By service
   const bySvc = {};
   txns.forEach(t=>{
-    const items = t.items?.length ? t.items : [{name:t.service||t.item||'Service',qty:1,price:t.total||0}];
+    const items = t.services?.length ? t.services : [{name:t.service||t.item||'Service',qty:1,price:(t.totalCharged||t.total||0)}];
     items.forEach(item=>{ const n=item.name||'Service'; if(!bySvc[n])bySvc[n]={rev:0,count:0}; bySvc[n].rev+=(item.price||0)*(item.qty||1); bySvc[n].count+=item.qty||1; });
   });
   const svcRows = Object.entries(bySvc).sort((a,b)=>b[1].rev-a[1].rev).slice(0,15).map(([n,d])=>`<tr>
