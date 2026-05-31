@@ -1613,7 +1613,7 @@ html{height:-webkit-fill-available;}
           </div>
           <!-- Step 3 -->
           <div id="kioskStep3" class="card" style="padding:22px;display:none;flex-direction:column;gap:13px;">
-            <div style="font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:500;">Consent & Waiver</div>
+            <div style="font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:500;">Care and Consent Agreement</div>
             <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
               <div id="consentLabel" style="font-size:11px;font-weight:600;color:var(--gold-dk);text-transform:uppercase;letter-spacing:0.8px;">General Treatment</div>
               <select onchange="switchWaiver(this.value)" style="font-size:11px;padding:5px 8px;border:1px solid var(--border2);border-radius:8px;background:var(--cream2);color:var(--ink2);font-family:'DM Sans',sans-serif;">
@@ -6317,7 +6317,7 @@ function renderClientsTable(){
       <td><div style="font-size:12px;">${esc(c.phone||'')}</div><div style="font-size:10px;color:var(--ink3);">${esc(c.messenger)||'—'}</div></td>
       <td style="font-size:13px;">${c.visits}</td>
       <td style="font-size:13px;">${fmtPrice(c.totalSpent)}</td>
-      <td><span class="pill ${c.vip?'pill-gold':'pill-gray'}">${c.vip?'VIP':'Regular'}</span></td>
+      <td><div style="display:flex;flex-direction:column;gap:4px;"><span class="pill ${c.vip?'pill-gold':'pill-gray'}">${c.vip?'VIP':'Regular'}</span><span class="pill ${c.intakeComplete?'pill-green':'pill-amber'}">${c.intakeComplete?'✓ Intake':'Intake needed'}</span></div></td>
       <td><div style="display:flex;gap:5px;flex-wrap:wrap;">
         <button class="btn btn-gold btn-sm" onclick="viewClientProfile(${c.id})">👁 Profile</button>
         <button class="btn btn-outline btn-sm" onclick="editClient(${c.id})">Edit</button>
@@ -6369,10 +6369,17 @@ function saveClient(){
     lastPico:document.getElementById('acLastPico')?.value||'',
     machineNotes:get('acMachineNotes')
   };
-  if(editUserId){const i=S.clients.findIndex(x=>x.id===editUserId);if(i>=0)S.clients[i]={...S.clients[i],...data};}
-  else S.clients.push({id:Date.now(),...data,visits:0,totalSpent:0,vip:false,color:COLORS[S.clients.length%COLORS.length],intakeForms:[],photos:[]});
-  closeM('addClientModal');renderClientsTable();populateForms();sync('clients');
-  showToast(name+(editUserId!==null?' updated':' added'),'ok');editUserId=null;
+  if(editUserId){
+    const i=S.clients.findIndex(x=>x.id===editUserId);if(i>=0)S.clients[i]={...S.clients[i],...data};
+    closeM('addClientModal');renderClientsTable();populateForms();sync('clients');
+    showToast(name+' updated','ok');editUserId=null;
+  } else {
+    const newId=Date.now();
+    S.clients.push({id:newId,...data,visits:0,totalSpent:0,vip:false,color:COLORS[S.clients.length%COLORS.length],intakeForms:[],photos:[],intakeComplete:false});
+    closeM('addClientModal');renderClientsTable();populateForms();sync('clients');
+    showToast(name+' added — please complete intake form','ok');editUserId=null;
+    openConsentForm(newId,'general',()=>{renderClientsTable();});
+  }
 }
 
 // ══ PRODUCTS ══
@@ -11174,7 +11181,7 @@ function updateReferralRow(){
 // ════════════════════════════════════════════════
 
 const CONSENT_KEYS={
-  general:'General Consent',
+  general:'General Consent Form',
   hairWaxing:'Hair Waxing Consent',
   diodeLaser:'Diode Hair Removal Consent',
   skinRejuvenation:'Skin Rejuvenation / Whitening Consent',
@@ -11261,7 +11268,7 @@ function saveConsentForm(){
   const client=S.clients.find(c=>c.id===_cfClientId);
   if(!client)return;
   const waivers=document.querySelectorAll('#consentFormBody .cf-waiver-item input[type=checkbox]');
-  if(![...waivers].every(cb=>cb.checked)){showToast('Please check all liability waiver items','err');return;}
+  if(![...waivers].every(cb=>cb.checked)){showToast('Please check the Care and Consent Agreement box','err');return;}
   const canvas=document.getElementById('cfSigCanvas');
   const typed=(document.getElementById('cfTypedSig')?.value||'').trim();
   let sig=typed||(canvas&&!_isSigEmpty(canvas)?canvas.toDataURL('image/png'):'');
@@ -11269,6 +11276,7 @@ function saveConsentForm(){
   const data=_collectConsentData(_cfFormKey);
   if(!client.consents)client.consents={};
   client.consents[_cfFormKey]={signed:true,date:new Date().toISOString().split('T')[0],signedAt:new Date().toISOString(),signature:sig,data};
+  if(_cfFormKey==='general') client.intakeComplete=true;
   sync('clients');
   closeM('consentFormModal');
   showToast('✅ '+CONSENT_KEYS[_cfFormKey]+' signed','ok');
@@ -11366,18 +11374,21 @@ function _cfPostEffects(effects){
   </div>`;
 }
 function _cfLiabilityWaiver(){
-  const items=[
-    'I understand that aesthetic treatments carry inherent risks and that results are not guaranteed.',
-    'I confirm that I have disclosed all relevant medical history, medications, allergies, and conditions truthfully and completely.',
-    'I understand that Glowbar Aesthetic Clinic and its staff are not liable for any adverse reactions, complications, or unsatisfactory results arising from undisclosed medical conditions, allergies, or failure to follow post-treatment care instructions.',
-    'I acknowledge that I have been given the opportunity to ask questions about the treatment and that all my questions have been answered to my satisfaction.',
-    'I voluntarily consent to the treatment and release Glowbar Aesthetic Clinic, its owners, and staff from any claims, damages, or liability related to the services rendered.',
-    'I confirm that I am at least 18 years old, or if a minor, that a parent or guardian has reviewed and signed this form on my behalf.',
-    'By signing below, I confirm that I have read, understood, and agreed to all the terms stated in this consent form.',
-  ];
   return `<div class="cf-section cf-waiver">
-    <div class="cf-stitle">⚖️ Liability Waiver & Release</div>
-    ${items.map(text=>`<label class="cf-waiver-item"><input type="checkbox" class="cf-waiver-cb"> <span>${text}</span></label>`).join('')}
+    <div class="cf-stitle">📋 Care and Consent Agreement</div>
+    <div style="font-size:12px;color:var(--ink2);line-height:1.85;display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">
+      <p style="margin:0;"><strong>Informed Consent &amp; Risks.</strong> I understand that aesthetic treatments carry inherent risks, including but not limited to temporary redness, swelling, bruising, skin sensitivity, and in rare cases more serious adverse reactions. I have been given the opportunity to ask questions about my treatment and all questions have been answered to my satisfaction. I understand that results vary per individual and are not guaranteed.</p>
+      <p style="margin:0;"><strong>Medical Disclosure.</strong> I confirm that all information I have provided in this form is truthful, accurate, and complete. I have disclosed all relevant medical history, current medications, supplements, and known allergies. I will inform GlowBar staff of any changes to my health status on future visits.</p>
+      <p style="margin:0;"><strong>Limitation of Liability.</strong> I understand that GlowBar Aesthetic Clinic and its staff are not liable for any adverse reactions, complications, or unsatisfactory results arising from undisclosed medical conditions, allergies, contraindications, or failure to follow post-treatment care instructions. I voluntarily consent to the treatment and release GlowBar Aesthetic Clinic, its owners, and staff from any related claims or liability.</p>
+      <p style="margin:0;"><strong>Age &amp; Authority.</strong> I confirm that I am at least 18 years old, or if a minor, that my parent or guardian has reviewed and signed this form on my behalf.</p>
+      <p style="margin:0;"><strong>Sanitation &amp; Safety.</strong> I understand that GlowBar follows strict sanitation and safety protocols for all treatments and services.</p>
+      <p style="margin:0;"><strong>Photography.</strong> Any before/after photos taken during my visit are for clinical documentation purposes only and will not be shared publicly or used for marketing without my separate written consent.</p>
+      <p style="margin:0;"><strong>Data Privacy.</strong> I consent to the collection and use of my personal information in accordance with the Philippine Data Privacy Act. My information is kept confidential and will not be shared without my consent.</p>
+    </div>
+    <label class="cf-waiver-item" style="background:rgba(201,168,76,0.08);border-radius:8px;padding:10px 12px;border:1px solid rgba(201,168,76,0.25);margin-bottom:0;">
+      <input type="checkbox" class="cf-waiver-cb">
+      <span style="font-weight:500;color:var(--ink);">I have read and understood all the information above and agree to the terms of this Care and Consent Agreement.</span>
+    </label>
   </div>`;
 }
 function _cfSignaturePad(){
@@ -11423,7 +11434,7 @@ function _buildGeneralForm(client){
     </div>
   </div>
   <div class="cf-section">
-    <div class="cf-stitle">Health Screening</div>
+    <div class="cf-stitle">Health Declaration</div>
     <div class="cf-field"><label>Currently pregnant or breastfeeding?</label>
       <div class="cf-inline"><label class="cf-check"><input type="radio" name="cf-pregnant" value="no" checked> No</label><label class="cf-check"><input type="radio" name="cf-pregnant" value="yes"> Yes</label></div>
     </div>
@@ -11454,19 +11465,6 @@ function _buildGeneralForm(client){
         <label class="cf-check"><input type="radio" name="cf-adverse" value="yes" onchange="document.getElementById('cf-adverse-desc').style.display='block'"> Yes — describe:</label>
       </div>
       <input id="cf-adverse-desc" class="form-input" placeholder="Describe reactions" style="display:none;margin-top:6px">
-    </div>
-  </div>
-  <div class="cf-section">
-    <div class="cf-stitle">Acknowledgements</div>
-    <div style="display:flex;flex-direction:column;">
-      ${_cfConfirms([
-        'All information I provided is truthful and accurate.',
-        'I will inform GlowBar staff of any changes to my health status on future visits.',
-        'I understand that aesthetic results vary per individual and are not guaranteed.',
-        'I understand that GlowBar follows strict sanitation and safety protocols.',
-      ])}
-      <label class="cf-confirm-item"><input type="checkbox" id="cf-photo-opt"> <span>(Optional) I consent to photos being taken for treatment documentation purposes only.</span></label>
-      <label class="cf-confirm-item"><input type="checkbox" required> <span>I consent to the collection and use of my personal information in accordance with the Philippine Data Privacy Act. My information is kept confidential and will not be shared without my consent.</span></label>
     </div>
   </div>
   ${_cfLiabilityWaiver()}${_cfSignaturePad()}`;
