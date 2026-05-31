@@ -454,6 +454,25 @@ nav{flex:1;padding:12px 0;overflow-y:auto;}
             </table>
           </div>
         </div>
+
+        <!-- Payday Settings -->
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-hdr"><h3>📅 Payday Settings</h3></div>
+          <div class="card-body">
+            <p style="font-size:12px;color:var(--ink3);margin-bottom:14px;">Staff can only view their payslip after payday. Set the payday date for each cut-off below.</p>
+            <div class="form-row" style="max-width:400px;">
+              <div class="form-group">
+                <label class="form-label">Cut-off 1 Payday (1–15) — day of same month</label>
+                <input class="form-input" type="number" id="paydayCO1Input" min="1" max="31" placeholder="e.g. 20">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Cut-off 2 Payday (16–end) — day of next month</label>
+                <input class="form-input" type="number" id="paydayCO2Input" min="1" max="31" placeholder="e.g. 5">
+              </div>
+            </div>
+            <button class="btn btn-gold btn-sm" onclick="savePaydaySettings()">Save Payday Settings</button>
+          </div>
+        </div>
       </div>
        <div id="page-compliance" class="page" style="display:none;overflow:hidden;">
   <div class="page-hdr">
@@ -944,42 +963,55 @@ try{
 let S={
   users:[
     {id:1,name:'Kylie',role:'owner',pin:'0000',specialty:'Owner',color:'#B8935A'},
-    {id:2,name:'Staff 1',role:'staff',pin:'1111',specialty:'Therapist',color:'#7BA7BC'},
-    {id:3,name:'Staff 2',role:'staff',pin:'2222',specialty:'Therapist',color:'#BC9B7B'},
   ],
   bookings:[],
   loginLogs:[],
   leaveRequests:[], // {id, userId, type, from, to, days, reason, status, createdAt}
   overtimeRequests:[], // {id, userId, userName, date, hours, rate, amount, reason, status, createdAt}
   cashAdvances:[], // {id, userId, userName, amount, reason, status, requestedAt, approvedBy, approvedAt}
+  transactions:[],
   settings:{}
 };
 
 let currentUser=null;
 let schedOffset=0;
 let selectedLeaveType='sick';
+let cloudUsersLoaded=false;
 
 // Load from Firebase
 function loadFromCloud(){
-  db.ref('gb/users').once('value', snap => {
-  console.log('RAW USERS:', JSON.stringify(snap.val()));
-});
   if(!db) return;
   ['users','bookings','loginLogs','settings'].forEach(key=>{
     db.ref('gb/'+key).on('value',snap=>{
       if(snap.exists()){
         const val=snap.val();
-        S[key]=Array.isArray(val)?val:Object.values(val);
+        if(key==='settings'){
+          S.settings=val&&typeof val==='object'&&!Array.isArray(val)?val:{};
+          const co1In=document.getElementById('paydayCO1Input');
+          const co2In=document.getElementById('paydayCO2Input');
+          if(co1In) co1In.value=S.settings.paydayCO1||20;
+          if(co2In) co2In.value=S.settings.paydayCO2||5;
+        } else {
+          S[key]=Array.isArray(val)?val:Object.values(val);
+        }
         if(key==='users'){
+          cloudUsersLoaded=true;
           const container=document.getElementById('c-staff-inputs');
           if(container){
             const staff=S.users.filter(u=>u.role==='staff');
             container.innerHTML=staff.map(u=>`<div class="c-input-row"><label>${u.name} (${u.specialty})</label><input type="number" id="csal_${u.id}" value="${(u.dailyRate||700)*26}" onchange="cAll()"></div>`).join('');
-            if(typeof window.cAll==='function') window.cAll();
           }
+          if(typeof window.cAll==='function') window.cAll();
+          if(typeof window.cOwner==='function') window.cOwner();
         }
       }
     });
+  });
+  db.ref('gb/transactions').on('value',snap=>{
+    if(snap.exists()){
+      const val=snap.val();
+      S.transactions=Array.isArray(val)?val:Object.values(val);
+    } else { S.transactions=[]; }
   });
   db.ref('gb/leaveRequests').on('value',snap=>{
     if(snap.exists()){
@@ -1069,6 +1101,10 @@ function updateDots(){
   }
 }
 function pinEnter(){
+  if(useCloud&&!cloudUsersLoaded){
+    document.getElementById('loginError').textContent='Connecting to server… Please wait a moment and try again.';
+    pin=''; updateDots(); return;
+  }
   const user=S.users.find(u=>u.pin===pin);
   if(user){
     currentUser=user;
@@ -1231,6 +1267,25 @@ function renderCutoff(){
   const period=document.getElementById('payPeriodSel')?.value||td().slice(0,7);
   const [yr,mo]=period.split('-').map(Number);
   const n=selectedCutoff;
+
+  // Access control — staff cannot view payslip until payday
+  if(!isPayslipUnlocked(period,n)){
+    const co1Day=parseInt((S.settings&&S.settings.paydayCO1)||20);
+    const co2Day=parseInt((S.settings&&S.settings.paydayCO2)||5);
+    let paydayLabel;
+    if(n===1){
+      paydayLabel=new Date(yr,mo-1,co1Day).toLocaleDateString('en-PH',{month:'long',day:'numeric',year:'numeric'});
+    } else {
+      paydayLabel=new Date(yr,mo,co2Day).toLocaleDateString('en-PH',{month:'long',day:'numeric',year:'numeric'});
+    }
+    el.innerHTML=`<div style="text-align:center;padding:40px 20px;color:#8C7B65;">
+      <div style="font-size:36px;margin-bottom:12px;">🔒</div>
+      <div style="font-size:15px;font-weight:600;color:#2C2318;margin-bottom:6px;">Payslip Locked</div>
+      <div style="font-size:13px;">Your payslip for this period will be available on<br><strong style="color:#B8935A;">${paydayLabel}</strong></div>
+    </div>`;
+    return;
+  }
+
   const viewUser=getPayslipUser();
   const userRecord=S.users.find(u=>u.id===viewUser.id)||viewUser;
   const basicPay=userRecord.salary||userRecord.basicPay||0;
@@ -1255,7 +1310,7 @@ function renderCutoff(){
 
   // Working days in cut-off (respecting staff start date and today)
   const today=new Date();today.setHours(23,59,59,0);
-  const staffStart=userRecord.startDate?new Date(userRecord.startDate):new Date('2026-06-02');
+  const staffStart=userRecord.startDate?new Date(userRecord.startDate):new Date(getOpeningDate());
   const dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const shiftDays=userRecord.shiftDays||['Tue','Wed','Thu','Fri','Sat','Sun'];
   const coStartDate=new Date(yr,mo-1,coStart);
@@ -1287,7 +1342,7 @@ function renderCutoff(){
     const d=(t.time||'').slice(0,10);
     return t.staff===viewUser.name&&d>=coStartStr&&d<=coEndStr;
   });
-  const commEarned=Math.round(txns.reduce((s,t)=>s+t.total,0)*(commRate/100));
+  const commEarned=Math.round(txns.reduce((s,t)=>s+(t.subtotal||t.total||0),0)*(commRate/100));
 
   // Approved OT in cut-off
   const otPay=(S.overtimeRequests||[]).filter(o=>
@@ -1408,6 +1463,10 @@ function computeWithholdingTax(t){
   return 183667+(t-666667)*0.35;
 }
 
+function getOpeningDate(){
+  return (S.settings&&S.settings.openingDate)||'2026-06-02';
+}
+
 function getWorkingDaysSP(yr, mo, from, to, shiftDays){
   const dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const workDays=shiftDays&&shiftDays.length?shiftDays:['Tue','Wed','Thu','Fri','Sat','Sun'];
@@ -1423,6 +1482,31 @@ function getWorkingDaysSP(yr, mo, from, to, shiftDays){
   return count;
 }
 
+function isPayslipUnlocked(period, cutoff){
+  if(!currentUser) return false;
+  if(currentUser.role==='owner'||currentUser.role==='admin') return true;
+  const [yr,mo]=period.split('-').map(Number);
+  const co1Day=parseInt((S.settings&&S.settings.paydayCO1)||20);
+  const co2Day=parseInt((S.settings&&S.settings.paydayCO2)||5);
+  let payday;
+  if(cutoff===1){
+    payday=new Date(yr,mo-1,co1Day,23,59,59);
+  } else {
+    payday=new Date(yr,mo,co2Day,23,59,59); // next month's co2Day
+  }
+  return new Date()>payday;
+}
+
+function savePaydaySettings(){
+  const d1=parseInt(document.getElementById('paydayCO1Input')?.value)||20;
+  const d2=parseInt(document.getElementById('paydayCO2Input')?.value)||5;
+  S.settings.paydayCO1=d1;
+  S.settings.paydayCO2=d2;
+  if(db) db.ref('gb/settings/paydayCO1').set(d1);
+  if(db) db.ref('gb/settings/paydayCO2').set(d2);
+  showToast('Payday settings saved','ok');
+}
+
 function getPayslipUser(){
   const sel=document.getElementById('payStaffSel');
   if(sel&&sel.style.display!=='none'&&sel.value){
@@ -1435,6 +1519,20 @@ function renderPayslip(){
   renderCutoff();
   const period=document.getElementById('payPeriodSel')?.value||td().slice(0,7);
   const [yr,mo]=period.split('-').map(Number);
+
+  // Access control for full payslip — staff cannot view until payday
+  if(!isPayslipUnlocked(period,2)&&!isPayslipUnlocked(period,1)){
+    const co2Day=parseInt((S.settings&&S.settings.paydayCO2)||5);
+    const paydayLabel=new Date(yr,mo,co2Day).toLocaleDateString('en-PH',{month:'long',day:'numeric',year:'numeric'});
+    const el=document.getElementById('payslipContent');
+    if(el) el.innerHTML=`<div style="text-align:center;padding:60px 20px;color:#8C7B65;">
+      <div style="font-size:48px;margin-bottom:14px;">🔒</div>
+      <div style="font-size:16px;font-weight:600;color:#2C2318;margin-bottom:8px;">Payslip Locked</div>
+      <div style="font-size:13px;line-height:1.7;">Your full payslip for this period will be available after<br><strong style="color:#B8935A;">${paydayLabel}</strong></div>
+    </div>`;
+    return;
+  }
+
   const periodLabel=new Date(yr,mo-1,1).toLocaleDateString('en-PH',{month:'long',year:'numeric'});
 
   // User record — owner can view any staff
@@ -1452,7 +1550,7 @@ function renderPayslip(){
   // Daily rate from Users & Roles setting
 const dailyRate=userRecord.dailyRate||0;
 const today=new Date(); today.setHours(23,59,59,0);
-const staffStart=userRecord.startDate?new Date(userRecord.startDate):new Date('2026-06-02');
+const staffStart=userRecord.startDate?new Date(userRecord.startDate):new Date(getOpeningDate());
 const workingDays=getWorkingDaysSP(yr,mo,staffStart,today,userRecord.shiftDays)||1;
 
   // Days present from clock-in logs
@@ -1472,7 +1570,7 @@ const workingDays=getWorkingDaysSP(yr,mo,staffStart,today,userRecord.shiftDays)|
 
   // Earned basic = (days present + approved leave) × daily rate
   const today2=new Date(); today2.setHours(23,59,59,0);
-const staffStart2=userRecord.startDate?new Date(userRecord.startDate):new Date('2026-06-02');
+const staffStart2=userRecord.startDate?new Date(userRecord.startDate):new Date(getOpeningDate());
 const notStartedYet=staffStart2>today2;
 const paidDays=daysPresent+leaveDays;
   const earnedBasic=notStartedYet?0:Math.round(dailyRate*paidDays);
@@ -1483,7 +1581,7 @@ const paidDays=daysPresent+leaveDays;
     const d=new Date(t.time);
     return t.staff===viewUser.name&&d.getFullYear()===yr&&d.getMonth()===mo-1;
   });
-  const txnRevenue=txns.reduce((s,t)=>s+t.total,0);
+  const txnRevenue=txns.reduce((s,t)=>s+(t.subtotal||t.total||0),0);
   const commEarned=Math.round(txnRevenue*(commRate/100));
 
   // Holiday pay — check each present date against PH holidays
@@ -1758,11 +1856,10 @@ function openOtModal(){
 
 function previewOT(){
   const userRecord=S.users.find(u=>u.id===currentUser.id)||currentUser;
-  const basicPay=userRecord.salary||userRecord.basicPay||0;
+  const dailyR=userRecord.dailyRate||0;
   const hrs=parseFloat(document.getElementById('otHours')?.value)||0;
   const prev=document.getElementById('otPreview');
-  if(!prev||!hrs||!basicPay){if(prev)prev.style.display='none';return;}
-  const dailyR=Math.round(basicPay/26*100)/100;
+  if(!prev||!hrs||!dailyR){if(prev)prev.style.display='none';return;}
   const hrlyR=dailyR/8;
   const otRate=Math.round(hrlyR*1.25*100)/100;
   const amount=Math.round(otRate*hrs);
@@ -1777,8 +1874,7 @@ function submitOT(){
   if(!date){showToast('Please select a date','err');return;}
   if(hrs<=0){showToast('Please enter overtime hours','err');return;}
   const userRecord=S.users.find(u=>u.id===currentUser.id)||currentUser;
-  const basicPay=userRecord.salary||userRecord.basicPay||0;
-  const dailyR=Math.round(basicPay/26*100)/100;
+  const dailyR=userRecord.dailyRate||0;
   const hrlyR=Math.round(dailyR/8*100)/100;
   const otRate=Math.round(hrlyR*1.25*100)/100;
   const amount=Math.round(otRate*hrs);
@@ -2093,6 +2189,12 @@ function renderAdmin(){
   if(currentUser.role!=='owner'&&currentUser.role!=='admin') return;
   const period=document.getElementById('adminMonth')?.value||td().slice(0,7);
 
+  // Populate payday settings inputs with current values
+  const co1In=document.getElementById('paydayCO1Input');
+  const co2In=document.getElementById('paydayCO2Input');
+  if(co1In&&!co1In.value) co1In.value=(S.settings&&S.settings.paydayCO1)||20;
+  if(co2In&&!co2In.value) co2In.value=(S.settings&&S.settings.paydayCO2)||5;
+
   // Pending leave requests
   const pending=S.leaveRequests.filter(l=>l.status==='pending');
   const leaveTbody=document.getElementById('adminLeaveBody');
@@ -2244,7 +2346,7 @@ function renderAdminPayroll(){
     const otherDeductions=u.otherDeductions||0;
 
     // Working days in cut-off
-    const staffStart=u.startDate?new Date(u.startDate):new Date('2026-06-02');
+    const staffStart=u.startDate?new Date(u.startDate):new Date(getOpeningDate());
     const shiftDays=u.shiftDays||['Tue','Wed','Thu','Fri','Sat','Sun'];
     const coStartDate=new Date(yr,mo-1,coStart);
     const coEndDate=new Date(yr,mo-1,coEnd,23,59,59);
@@ -2272,7 +2374,7 @@ function renderAdminPayroll(){
       const d=(t.time||'').slice(0,10);
       return t.staff===u.name&&d>=coStartStr&&d<=coEndStr;
     });
-    const commEarned=Math.round(txns.reduce((s,t)=>s+t.total,0)*(commRate/100));
+    const commEarned=Math.round(txns.reduce((s,t)=>s+(t.subtotal||t.total||0),0)*(commRate/100));
 
     // OT
     const otPay=(S.overtimeRequests||[]).filter(o=>
