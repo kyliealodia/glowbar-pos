@@ -308,6 +308,16 @@ window.pushCapitalToPOS = async function(){
   }
 };
 
+// ── PUSH PROMOS → gb/promos (website + POS sync) ──────────────────
+window.pushPromosToPOS = async function(){
+  try{
+    const promos = JSON.parse(localStorage.getItem('glowbar_promos')||'[]');
+    await set(ref(db,'gb/promos'), promos);
+    console.log('GlowBar Tracker: pushed', promos.length, 'promos to gb/promos');
+    alert('✓ Promos pushed to website and POS!');
+  }catch(e){ console.error('pushPromosToPOS error:',e); alert('Error pushing promos: '+e.message); }
+};
+
 // ── AUTO-SAVE: patch localStorage.setItem ────────────────────────
 const _origSet = localStorage.setItem.bind(localStorage);
 let _saveTimer = null;
@@ -569,6 +579,7 @@ body{font-family:system-ui,sans-serif;background:var(--cream);color:var(--text);
   <button class="tab" onclick="showTab('monthly')">Monthly expenses</button>
   <button class="tab" onclick="showTab('staffing')">Staffing</button>
   <button class="tab" onclick="showTab('pos')">POS</button>
+  <button class="tab" onclick="showTab('promo')">Promo Calculator</button>
   <button class="tab" onclick="showTab('personal')">Personal</button>
 </div>
 
@@ -800,6 +811,84 @@ body{font-family:system-ui,sans-serif;background:var(--cream);color:var(--text);
   </div>
   <button class="save-btn" onclick="savePersonal()">Save</button>
   <p style="margin-top:12px;font-size:11px;color:var(--muted)">Personal expenses are stored locally on this device only — not synced to the clinic or Firebase.</p>
+</div>
+
+<!-- PROMO CALCULATOR TAB -->
+<div id="tab-promo" class="section">
+  <div style="display:grid;grid-template-columns:420px 1fr;gap:24px;align-items:start">
+
+    <!-- Left: calculator + save form -->
+    <div style="background:#fff;border:0.5px solid var(--border-l);border-radius:12px;padding:20px">
+      <div style="font-size:15px;font-weight:600;color:var(--gold-d);margin-bottom:16px;padding-bottom:10px;border-bottom:0.5px solid var(--border-l)">🧮 Promo Calculator</div>
+
+      <div style="margin-bottom:12px">
+        <div style="font-size:10px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">Service</div>
+        <select id="pc-svc" class="ii" style="width:100%;font-size:12px" onchange="pcCalc()">
+          <option value="">— pick a service —</option>
+        </select>
+      </div>
+
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:end;margin-bottom:12px">
+        <div>
+          <div style="font-size:10px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">Type</div>
+          <div style="display:flex;border:0.5px solid var(--border);border-radius:8px;overflow:hidden">
+            <button id="pc-pct-btn" onclick="pcSetType('pct')" style="padding:7px 12px;font-size:12px;font-weight:600;border:none;cursor:pointer;background:var(--gold);color:#fff">%</button>
+            <button id="pc-flat-btn" onclick="pcSetType('flat')" style="padding:7px 12px;font-size:12px;font-weight:600;border:none;cursor:pointer;background:transparent;color:var(--gold-d)">₱</button>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">Discount amount</div>
+          <input id="pc-val" class="ii" type="number" min="0" style="width:100%" placeholder="0" oninput="pcCalc()">
+        </div>
+      </div>
+
+      <div id="pc-result" style="background:var(--cream2);border-radius:10px;padding:14px;font-size:12px;margin-bottom:16px;display:none"></div>
+
+      <div style="border-top:0.5px solid var(--border-l);padding-top:14px;margin-bottom:10px">
+        <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px">Save as Promo</div>
+        <div style="margin-bottom:8px">
+          <div style="font-size:10px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">Promo name</div>
+          <input id="pc-name" class="ni" type="text" style="width:100%" placeholder="e.g. Opening Week Special">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div>
+            <div style="font-size:10px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">Valid from</div>
+            <input id="pc-from" class="ii" type="date" style="width:100%">
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">Valid until</div>
+            <input id="pc-to" class="ii" type="date" style="width:100%">
+          </div>
+        </div>
+        <div style="margin-bottom:8px">
+          <div style="font-size:10px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">Applies to</div>
+          <select id="pc-apply" class="ii" style="width:100%;font-size:12px">
+            <option value="selected">Selected service only</option>
+            <option value="category">Entire category</option>
+            <option value="all">All services</option>
+          </select>
+        </div>
+        <div style="margin-bottom:12px">
+          <div style="font-size:10px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">Terms (shown on website)</div>
+          <input id="pc-terms" class="ni" type="text" style="width:100%" placeholder="e.g. Valid Jun 9–15 · Cannot be combined">
+        </div>
+        <div style="margin-bottom:8px">
+          <div style="font-size:10px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">Description (website sub-text)</div>
+          <input id="pc-desc" class="ni" type="text" style="width:100%" placeholder="e.g. Celebrate our grand opening with exclusive discounts!">
+        </div>
+        <button class="btn-p" style="width:100%" onclick="savePromo()">Save Promo</button>
+      </div>
+    </div>
+
+    <!-- Right: saved promos list -->
+    <div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div style="font-size:15px;font-weight:600;color:var(--gold-d)">Saved Promos</div>
+        <button class="btn-p" style="font-size:11px;padding:5px 16px" onclick="pushPromosToPOS()">⟳ Push to website &amp; POS</button>
+      </div>
+      <div id="promos-list"></div>
+    </div>
+  </div>
 </div>
 
 <!-- OVERTIME LOG MODAL -->
@@ -2015,6 +2104,189 @@ function showTab(tab){
   document.getElementById('tab-'+tab).classList.add('active');
   if(tab==='staffing' && window.loadStaffingData) window.loadStaffingData();
   if(tab==='pos' && window.loadPOSData) window.loadPOSData();
+  if(tab==='promo'){ loadPromos(); initPromoTab(); }
+}
+
+// ── PROMO CALCULATOR ──────────────────────────────────────────────
+let _promosData = [];
+let _pcType = 'pct';
+
+function loadPromos(){
+  try{ _promosData = JSON.parse(localStorage.getItem('glowbar_promos')||'[]'); }catch(e){ _promosData=[]; }
+}
+function savePromosLocally(){
+  localStorage.setItem('glowbar_promos', JSON.stringify(_promosData));
+}
+
+function initPromoTab(){
+  const sel = document.getElementById('pc-svc'); if(!sel) return;
+  let opts = '<option value="">— pick a service —</option>';
+  SVC_CATS.forEach(cat=>{
+    if(cat.excludeFromPOS) return;
+    opts += `<optgroup label="${cat.group||cat.name}">`;
+    cat.services.forEach(svc=>{ opts += `<option value="${svc.id}">${svc.name} (₱${(svc.price||0).toLocaleString()})</option>`; });
+    opts += '</optgroup>';
+  });
+  sel.innerHTML = opts;
+  renderPromos();
+}
+
+function pcSetType(type){
+  _pcType = type;
+  const pb = document.getElementById('pc-pct-btn'), fb = document.getElementById('pc-flat-btn');
+  if(pb){ pb.style.background=type==='pct'?'var(--gold)':'transparent'; pb.style.color=type==='pct'?'#fff':'var(--gold-d)'; }
+  if(fb){ fb.style.background=type==='flat'?'var(--gold)':'transparent'; fb.style.color=type==='flat'?'#fff':'var(--gold-d)'; }
+  pcCalc();
+}
+
+function pcCalc(){
+  const svcId = document.getElementById('pc-svc')?.value;
+  const val   = parseFloat(document.getElementById('pc-val')?.value)||0;
+  const el    = document.getElementById('pc-result'); if(!el) return;
+  if(!svcId||!val){ el.style.display='none'; return; }
+  let foundSvc=null;
+  for(const cat of SVC_CATS){ const s=cat.services.find(x=>x.id===svcId); if(s){foundSvc=s;break;} }
+  if(!foundSvc){ el.style.display='none'; return; }
+
+  const {laborCost,elec,water,consCost,totalCost,price,commission} = calcSvcCost(foundSvc);
+  const discAmt = _pcType==='pct' ? price*Math.min(val,100)/100 : Math.min(val,price);
+  const discPrice = Math.max(0, price - discAmt);
+
+  const commPct = parseFloat(document.getElementById('comm-pct')?.value||10)/100;
+  const profitOrig = price - totalCost - commission;
+  const profitDisc = discPrice - totalCost - discPrice*commPct;
+  const mOrig = price>0 ? Math.round(profitOrig/price*100) : 0;
+  const mDisc = discPrice>0 ? Math.round(profitDisc/discPrice*100) : 0;
+
+  // Break-even: discPrice*(1-commPct) = totalCost → discPrice = totalCost/(1-commPct)
+  const beDiscPrice = totalCost / Math.max(0.01, 1-commPct);
+  const beDiscAmt   = Math.max(0, price - beDiscPrice);
+  const bePct       = price>0 ? Math.min(100, Math.round(beDiscAmt/price*100)) : 0;
+  const overBe      = (_pcType==='pct' ? val : (price>0?val/price*100:0)) > bePct;
+
+  const fmt = n=>'&#8369;'+Math.round(n).toLocaleString();
+  const pc  = n=>n>=0?'var(--green)':'var(--red)';
+
+  el.style.display = 'block';
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      <div style="background:#fff;border-radius:8px;padding:10px;border:0.5px solid var(--border-l)">
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Original price</div>
+        <div style="font-size:20px;font-weight:700;color:var(--gold-d)">${fmt(price)}</div>
+      </div>
+      <div style="background:var(--gold);border-radius:8px;padding:10px">
+        <div style="font-size:9px;color:rgba(255,255,255,.7);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Discounted price</div>
+        <div style="font-size:20px;font-weight:700;color:#fff">${fmt(discPrice)}</div>
+        <div style="font-size:10px;color:rgba(255,255,255,.7)">${_pcType==='pct'?val+'% off':'₱'+Math.round(discAmt).toLocaleString()+' off'}</div>
+      </div>
+    </div>
+    <div style="background:#fff;border-radius:8px;padding:10px;border:0.5px solid var(--border-l);margin-bottom:10px;font-size:11px">
+      <div style="font-weight:600;color:var(--text);margin-bottom:6px">Cost breakdown</div>
+      ${laborCost>0?`<div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:var(--muted)">Labor</span><span>${fmt(laborCost)}</span></div>`:''}
+      ${elec>0?`<div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:var(--muted)">Electricity</span><span>${fmt(elec)}</span></div>`:''}
+      ${water>0?`<div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:var(--muted)">Water</span><span>${fmt(water)}</span></div>`:''}
+      ${consCost>0?`<div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:var(--muted)">Consumables</span><span>${fmt(consCost)}</span></div>`:''}
+      <div style="display:flex;justify-content:space-between;padding:4px 0;font-weight:600;border-top:0.5px solid var(--border-l);margin-top:4px"><span>Total cost</span><span>${fmt(totalCost)}</span></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      <div style="padding:10px;border-radius:8px;background:#fff;border:0.5px solid var(--border-l)">
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Profit at full price</div>
+        <div style="font-size:16px;font-weight:700;color:${pc(profitOrig)}">${fmt(profitOrig)}</div>
+        <div style="font-size:10px;color:var(--muted)">${mOrig}% margin</div>
+      </div>
+      <div style="padding:10px;border-radius:8px;background:${profitDisc>=0?'var(--green-bg, #e8f5e9)':'#fff5f5'};border:0.5px solid ${profitDisc>=0?'var(--green)':'var(--red)'}">
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Profit at discounted</div>
+        <div style="font-size:16px;font-weight:700;color:${pc(profitDisc)}">${fmt(profitDisc)}</div>
+        <div style="font-size:10px;color:var(--muted)">${mDisc}% margin</div>
+      </div>
+    </div>
+    <div style="border-radius:8px;padding:10px;border:0.5px solid ${overBe?'var(--red)':'var(--green)'};background:${overBe?'#fff5f5':'#e8f5e9'}">
+      <div style="font-size:11px;font-weight:600;margin-bottom:4px">Break-even point</div>
+      <div style="font-size:12px">Max discount before loss: <strong>${bePct}% (${fmt(beDiscAmt)} off)</strong></div>
+      <div style="font-size:11px;margin-top:4px;color:${overBe?'var(--red)':'var(--green)'}">${overBe?'⚠ This discount exceeds break-even — you will lose money per sale.':'✓ This discount is still profitable.'}</div>
+    </div>`;
+}
+
+function savePromo(){
+  const name = document.getElementById('pc-name')?.value.trim();
+  if(!name){ alert('Please enter a promo name.'); return; }
+  const svcId  = document.getElementById('pc-svc')?.value;
+  const val    = parseFloat(document.getElementById('pc-val')?.value)||0;
+  if(!val){ alert('Please enter a discount value.'); return; }
+  const applyTo = document.getElementById('pc-apply')?.value||'selected';
+
+  let services=[], serviceNames=[];
+  if(applyTo==='selected' && svcId){
+    services=[svcId];
+    for(const cat of SVC_CATS){ const s=cat.services.find(x=>x.id===svcId); if(s){serviceNames=[s.name];break;} }
+  } else if(applyTo==='category' && svcId){
+    for(const cat of SVC_CATS){
+      if(cat.services.some(x=>x.id===svcId)){
+        services=cat.services.map(s=>s.id); serviceNames=cat.services.map(s=>s.name); break;
+      }
+    }
+  } else if(applyTo==='all'){
+    SVC_CATS.forEach(cat=>{ if(!cat.excludeFromPOS) cat.services.forEach(s=>{services.push(s.id);serviceNames.push(s.name);}); });
+  }
+
+  _promosData.push({
+    id: Date.now(),
+    name,
+    discountType: _pcType,
+    discountValue: val,
+    services, serviceNames,
+    validFrom: document.getElementById('pc-from')?.value||'',
+    validTo:   document.getElementById('pc-to')?.value||'',
+    active: true,
+    terms:   document.getElementById('pc-terms')?.value||'',
+    description: document.getElementById('pc-desc')?.value||'',
+    createdAt: new Date().toISOString()
+  });
+  savePromosLocally();
+  renderPromos();
+  ['pc-name','pc-from','pc-to','pc-terms','pc-desc'].forEach(id=>{ const e=document.getElementById(id); if(e)e.value=''; });
+}
+
+function deletePromo(id){
+  if(!confirm('Remove this promo?')) return;
+  _promosData = _promosData.filter(p=>p.id!==id);
+  savePromosLocally(); renderPromos();
+}
+
+function togglePromoActive(id){
+  const p=_promosData.find(x=>x.id===id); if(!p)return;
+  p.active=!p.active; savePromosLocally(); renderPromos();
+}
+
+function renderPromos(){
+  const el=document.getElementById('promos-list'); if(!el)return;
+  if(!_promosData.length){
+    el.innerHTML='<div style="text-align:center;padding:32px;color:var(--muted);font-size:12px">No promos saved yet. Use the calculator on the left to create one.</div>';
+    return;
+  }
+  const today=new Date().toISOString().slice(0,10);
+  el.innerHTML=_promosData.map(p=>{
+    const isActive=p.active!==false&&(!p.validFrom||p.validFrom<=today)&&(!p.validTo||p.validTo>=today);
+    const statusColor=isActive?'var(--green)':'var(--muted)';
+    const statusLabel=isActive?'● Active':'○ Inactive';
+    const dLabel=p.discountType==='pct'?p.discountValue+'%':'&#8369;'+Number(p.discountValue).toLocaleString();
+    return `<div style="background:#fff;border:0.5px solid var(--border-l);border-radius:10px;padding:14px;margin-bottom:10px">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+        <div>
+          <div style="font-size:14px;font-weight:600;color:var(--gold-d);margin-bottom:4px">${p.name}</div>
+          <div style="font-size:12px;color:var(--text);margin-bottom:3px">Discount: <strong>${dLabel} off</strong></div>
+          <div style="font-size:11px;color:var(--muted)">${p.serviceNames?.length?p.serviceNames.slice(0,3).join(', ')+(p.serviceNames.length>3?' +'+( p.serviceNames.length-3)+' more':''):'All services'}</div>
+          ${p.validFrom||p.validTo?`<div style="font-size:11px;color:var(--muted);margin-top:3px">📅 ${p.validFrom||''}${p.validFrom&&p.validTo?' – ':''}${p.validTo||''}</div>`:''}
+          ${p.terms?`<div style="font-size:10px;color:var(--muted);margin-top:2px;font-style:italic">${p.terms}</div>`:''}
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">
+          <span style="font-size:11px;font-weight:600;color:${statusColor}">${statusLabel}</span>
+          <button class="btn-s" style="font-size:11px;padding:3px 10px" onclick="togglePromoActive(${p.id})">${p.active?'Deactivate':'Activate'}</button>
+          <button class="del-row" onclick="deletePromo(${p.id})" title="Delete">&#10005;</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 

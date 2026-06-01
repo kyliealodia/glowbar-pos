@@ -11,6 +11,9 @@
   <title>GlowBar Beauty Clinic | Nasugbu, Batangas</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <style>
     :root {
       --gold: #C9A84C;
@@ -371,7 +374,7 @@
 <!-- NAV -->
 <nav id="nav">
   <a href="#" class="nav-logo">
-    <img src="https://raw.githubusercontent.com/kyliealodia/glowbar-pos/main/images/email-header.jpg" alt="GlowBar Beauty Clinic" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+    <img src="https://raw.githubusercontent.com/kyliealodia/glowbar-pos/main/images/Main_Logo.png" alt="GlowBar Beauty Clinic" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
     <span style="display:none;font-family:'Cormorant Garamond',serif;font-size:20px;color:var(--text);letter-spacing:2px;">GlowBar</span>
   </a>
   <ul class="nav-links">
@@ -459,7 +462,7 @@
 <!-- ABOUT -->
 <section class="about-section" id="about">
   <div class="about-img reveal">
-    <img src="https://raw.githubusercontent.com/kyliealodia/glowbar-pos/main/images/email-header.jpg" alt="GlowBar Beauty Clinic">
+    <img src="https://raw.githubusercontent.com/kyliealodia/glowbar-pos/main/images/Main_Logo.png" alt="GlowBar Beauty Clinic" style="object-fit:contain;background:var(--cream2);">
     <div class="about-badge">
       <div class="num">2026</div>
       <div class="lbl">Est. Nasugbu</div>
@@ -850,24 +853,140 @@
 </footer>
 
 <script>
-  // Mobile menu
-  function openMenu(){document.getElementById('mobileMenu').classList.add('open');}
-  function closeMenu(){document.getElementById('mobileMenu').classList.remove('open');}
+  // ── FIREBASE SETUP ───────────────────────────────────────────────
+  let db = null;
+  try{
+    if(!firebase.apps.length){
+      firebase.initializeApp({
+        apiKey:'AIzaSyAoSdhij_phFCaKQMWca40x6xXD5hhi7vU',
+        authDomain:'glowbar-pos-a30e2.firebaseapp.com',
+        databaseURL:'https://glowbar-pos-a30e2-default-rtdb.asia-southeast1.firebasedatabase.app',
+        projectId:'glowbar-pos-a30e2',
+        storageBucket:'glowbar-pos-a30e2.firebasestorage.app',
+        messagingSenderId:'399292982876',
+        appId:'1:399292982876:web:fc21e03399a470ee512899'
+      });
+    }
+    db = firebase.database();
+    firebase.auth().signInAnonymously().catch(()=>{});
+  }catch(e){ db = null; }
 
-  // Service filter
+  // Maps website card title → Firebase product name (gb/serviceNames)
+  const SVC_NAME_MAP = {
+    'Rejuvenating Facial':'Regular Facial',
+    'Glass Skin Facial':'HydraFacial',
+    'Acne Control Facial':'Anti-Acne Facial',
+    'Whitening Facial':'Whitening Facial',
+    'Anti-Aging Facial':'Anti-Aging Facial',
+    'Exilis — Full Face with Neck':'Full Face with Neck',
+    'Exilis — Abdomen':'Abdomen Exilis',
+    'Black Doll Carbon Laser':'Black Doll Carbon Laser',
+    'Melasma / Freckles Treatment':'Melasma/Freckles Face',
+    'Scar Lightening':'Scar Lightening Face',
+    'Diode Hair Removal — Underarms':'Underarms Diode',
+    'Diode Hair Removal — Full Legs':'Legs Full Diode',
+    'Underarms Rejuvenation':'Underarms Rejuvenation',
+    'Elbow & Inner Thigh Rejuvenation':'Elbows Rejuvenation',
+    'Tattoo Laser Removal':'Tattoo Laser Removal',
+    'Underarm Wax':'Underarm Wax',
+    'Brazilian Wax':'Brazilian Wax',
+    'Bikini Wax':'Bikini Wax',
+    'Regular Manicure':'Manicure',
+    'Regular Pedicure':'Pedicure',
+    'Gel Manicure':'Gel Manicure',
+    'Gel Pedicure':'Gel Pedicure',
+    'Nail Art':'Nail Art',
+    'Foot Spa Treatment':'Foot Spa',
+    'Hand Spa':'Hand Spa',
+  };
+
+  async function loadPricesFromFirebase(){
+    if(!db) return;
+    try{
+      const snap = await Promise.race([
+        db.ref('gb/serviceNames').once('value'),
+        new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),6000))
+      ]);
+      const raw = snap.val();
+      if(!raw) return;
+      const arr = Array.isArray(raw) ? raw.filter(Boolean) : Object.values(raw).filter(Boolean);
+      const priceByName = {};
+      arr.forEach(p=>{ if(p.name && p.price>0) priceByName[p.name] = p.price; });
+
+      document.querySelectorAll('.svc-card').forEach(card=>{
+        const h3 = card.querySelector('h3'); if(!h3) return;
+        const title = h3.textContent.trim();
+        const fbName = SVC_NAME_MAP[title]; if(!fbName) return;
+        const price = priceByName[fbName]; if(price==null) return;
+        const priceEl = card.querySelector('.svc-price');
+        if(priceEl) priceEl.innerHTML = '₱' + price.toLocaleString('en-PH');
+      });
+    }catch(e){
+      // Firebase unavailable — mark unmatched cards with fallback
+      document.querySelectorAll('.svc-card').forEach(card=>{
+        const priceEl = card.querySelector('.svc-price');
+        if(priceEl && !priceEl.textContent.trim()) priceEl.textContent = 'Contact us for pricing';
+      });
+    }
+  }
+
+  async function loadPromosFromFirebase(){
+    if(!db) return;
+    try{
+      const snap = await Promise.race([
+        db.ref('gb/promos').once('value'),
+        new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),6000))
+      ]);
+      const raw = snap.val();
+      if(!raw) return;
+      const arr = Array.isArray(raw) ? raw.filter(Boolean) : Object.values(raw).filter(Boolean);
+      const today = new Date().toISOString().slice(0,10);
+      const active = arr.filter(p=>
+        p.active!==false &&
+        (!p.validFrom || p.validFrom<=today) &&
+        (!p.validTo   || p.validTo>=today)
+      );
+      if(!active.length) return;
+
+      const container = document.querySelector('.promo-cards');
+      if(container){
+        container.innerHTML = active.map(p=>`
+          <div class="promo-card">
+            <div class="promo-pct">${p.discountType==='pct' ? p.discountValue+'%' : '₱'+Number(p.discountValue).toLocaleString()}</div>
+            <div class="promo-lbl">${p.name}</div>
+            ${p.validTo ? '<div style="font-size:11px;color:rgba(255,255,255,0.7);margin-top:6px">Until '+p.validTo+'</div>' : ''}
+          </div>
+        `).join('');
+      }
+      const dateEl = document.querySelector('.promo-date');
+      if(dateEl && active[0]?.terms) dateEl.textContent = active[0].terms;
+      const desc = document.querySelector('.promo-section .section-body');
+      if(desc && active[0]?.description) desc.textContent = active[0].description;
+    }catch(e){}
+  }
+
+  // ── MOBILE MENU ──────────────────────────────────────────────────
+  function openMenu(){ document.getElementById('mobileMenu').classList.add('open'); }
+  function closeMenu(){ document.getElementById('mobileMenu').classList.remove('open'); }
+
+  // ── SERVICE FILTER ───────────────────────────────────────────────
   function filterSvc(cat,btn){
     document.querySelectorAll('.cat-btn').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
     document.querySelectorAll('.svc-card').forEach(c=>{
-      c.style.display=(cat==='all'||c.dataset.cat===cat)?'block':'none';
+      c.style.display = (cat==='all' || c.dataset.cat===cat) ? 'block' : 'none';
     });
   }
 
-  // Scroll reveal
-  const obs=new IntersectionObserver(entries=>{
-    entries.forEach(e=>{if(e.isIntersecting)e.target.classList.add('visible');});
+  // ── SCROLL REVEAL ────────────────────────────────────────────────
+  const obs = new IntersectionObserver(entries=>{
+    entries.forEach(e=>{ if(e.isIntersecting) e.target.classList.add('visible'); });
   },{threshold:0.08});
   document.querySelectorAll('.reveal').forEach(el=>obs.observe(el));
+
+  // ── BOOT ─────────────────────────────────────────────────────────
+  loadPricesFromFirebase();
+  loadPromosFromFirebase();
 </script>
 </body>
 </html>
