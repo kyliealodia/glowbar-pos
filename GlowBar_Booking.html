@@ -127,12 +127,11 @@ html{height:-webkit-fill-available;}
   /* ── NOTICE ── */
   .notice{background:var(--gold-lt);border:1px solid rgba(201,168,76,0.3);border-radius:10px;padding:12px 14px;font-size:12px;color:var(--ink2);margin-bottom:16px;line-height:1.6;}
 
-  /* ── CATEGORY TABS ── */
-  .cat-tabs{display:flex;gap:0;overflow-x:auto;margin:-28px -28px 20px;padding:0 12px;border-bottom:2px solid var(--cream2);scrollbar-width:none;}
-  .cat-tabs::-webkit-scrollbar{display:none;}
-  .cat-tab{flex-shrink:0;padding:11px 14px;font-size:11px;font-weight:600;color:var(--ink3);cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s;font-family:'DM Sans',sans-serif;white-space:nowrap;letter-spacing:0.3px;}
-  .cat-tab:hover{color:var(--gold-dk);}
-  .cat-tab.active{color:var(--gold-dk);border-bottom-color:var(--gold);}
+  /* ── CATEGORY DROPDOWN ── */
+  .cat-select-wrap{position:relative;margin-bottom:20px;}
+  .cat-select-wrap::after{content:'▾';position:absolute;right:14px;top:50%;transform:translateY(-50%);color:var(--gold-dk);pointer-events:none;font-size:15px;font-weight:700;}
+  .cat-select{width:100%;padding:12px 40px 12px 16px;border:1.5px solid var(--gold);border-radius:12px;background:var(--gold-lt);color:var(--ink);font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;cursor:pointer;outline:none;appearance:none;-webkit-appearance:none;transition:border-color .2s;}
+  .cat-select:focus{border-color:var(--gold-dk);box-shadow:0 0 0 3px rgba(201,168,76,0.15);}
   .subcat-hdr{font-size:10px;color:var(--ink4);text-transform:uppercase;letter-spacing:1px;padding:12px 0 6px;font-weight:600;border-top:1px solid var(--cream2);margin-top:12px;}
   .subcat-hdr:first-child{border-top:none;margin-top:0;padding-top:0;}
   .date-btn.closed{background:#fff0f0;color:var(--danger);opacity:0.55;cursor:not-allowed;}
@@ -519,12 +518,12 @@ function showStep1(){
     // Default active tab
     if(!activeSvcCat||!orderedTabs.find(t=>t.id===activeSvcCat)) activeSvcCat=orderedTabs[0]?.id||null;
 
-    // Tab bar
-    html+=`<div class="cat-tabs">`;
-    orderedTabs.forEach(t=>{
-      html+=`<button class="cat-tab${activeSvcCat===t.id?' active':''}" onclick="selectCat('${t.id}')">${t.icon} ${t.label}</button>`;
-    });
-    html+=`</div>`;
+    // Category dropdown
+    html+=`<div class="cat-select-wrap">
+      <select class="cat-select" onchange="selectCat(this.value)">
+        ${orderedTabs.map(t=>`<option value="${t.id}"${activeSvcCat===t.id?' selected':''}>${t.icon} ${t.label}</option>`).join('')}
+      </select>
+    </div>`;
 
     // Selected services summary bar
     if(booking.services.length){
