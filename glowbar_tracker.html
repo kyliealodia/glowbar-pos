@@ -2137,10 +2137,26 @@ const CONS_DATA = [
 let consState = {};
 
 function loadConsState(){
-  try{ const d=JSON.parse(localStorage.getItem('glowbar_cons')||'{}'); consState=d; }catch(e){ consState={}; }
+  try{
+    const raw=JSON.parse(localStorage.getItem('glowbar_cons')||'{}');
+    if(raw && raw.state!==undefined){
+      // New format: {state, snapshot}
+      consState=raw.state||{};
+      if(Array.isArray(raw.snapshot)){
+        raw.snapshot.forEach(sg=>{
+          const cg=CONS_DATA.find(g=>g.id===sg.id);
+          if(cg&&Array.isArray(sg.items)) cg.items=sg.items;
+        });
+      }
+    } else {
+      consState=raw||{}; // old plain-object format
+    }
+  }catch(e){ consState={}; }
 }
 function saveConsState(){
-  localStorage.setItem('glowbar_cons', JSON.stringify(consState));
+  // Save both edit-state AND the current items list so deletions/additions survive reload
+  const snapshot=CONS_DATA.map(g=>({id:g.id,items:g.items}));
+  localStorage.setItem('glowbar_cons', JSON.stringify({state:consState,snapshot}));
 }
 function getCS(gid,i){ return consState[gid+'_'+i]||{newQty:'',newUnit:'',supplier:''}; }
 function setCS(gid,i,f,v){
@@ -2235,7 +2251,7 @@ function refreshConsGroup(gid){
 }
 
 function delConsItem(gid,idx){
-  if(!confirm('Remove this consumable?')) return;
+  if(!confirm('Remove this consumable item?')) return;
   const group=CONS_DATA.find(g=>g.id===gid); if(!group) return;
   // shift consState keys down
   const ns={};
@@ -2247,6 +2263,15 @@ function delConsItem(gid,idx){
   });
   consState=ns;
   group.items.splice(idx,1);
+  refreshConsGroup(gid);
+  refreshConsSummary();
+  saveConsState();
+}
+
+function addConsItem(gid){
+  const group=CONS_DATA.find(g=>g.id===gid); if(!group) return;
+  const name=prompt('Item name:'); if(!name) return;
+  group.items.push({name,qty:'',unitCost:0,total:0,unitsInPack:1,volPerUnit:1,uom:'pcs',services:[]});
   refreshConsGroup(gid);
   refreshConsSummary();
   saveConsState();
@@ -2356,11 +2381,14 @@ function buildConsumables(){
             <th>Savings / Over</th>
             <th style="text-align:left">Supplier</th>
             <th class="ca">Services</th>
-            <th></th>
+            <th title="Remove item">✕</th>
           </tr></thead>
           <tbody>${rows}</tbody>
           <tfoot><tr id="cg-foot-${group.id}"></tr></tfoot>
         </table>
+        <div style="padding:8px 12px;border-top:0.5px dashed var(--border-l)">
+          <button class="add-row" style="padding:4px 12px;font-size:11px" onclick="addConsItem('${group.id}')">＋ Add item</button>
+        </div>
       </div>
     </div>`;
   }).join('');
