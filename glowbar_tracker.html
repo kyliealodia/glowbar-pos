@@ -319,6 +319,8 @@ window.pushPromosToPOS = async function(){
 };
 
 // ── AUTO-SAVE: patch localStorage.setItem ────────────────────────
+// Debounce is 5s — short enough that edits reach Firebase before any
+// Firebase push can overwrite them, but long enough to batch keystrokes.
 const _origSet = localStorage.setItem.bind(localStorage);
 let _saveTimer = null;
 localStorage.setItem = function(key, value){
@@ -326,9 +328,14 @@ localStorage.setItem = function(key, value){
   if(TRACKED.includes(key)){
     clearTimeout(_saveTimer);
     setSyncStatus('unsaved');
-    _saveTimer = setTimeout(()=>window.saveToFirebase(), 30000);
+    _saveTimer = setTimeout(()=>window.saveToFirebase(), 5000);
   }
 };
+
+// Save on tab close / navigate away so no edits are lost
+window.addEventListener('beforeunload', ()=>{
+  if(window.saveToFirebase) window.saveToFirebase();
+});
 
 // ── BOOT APP ─────────────────────────────────────────────────────
 function bootApp(){
