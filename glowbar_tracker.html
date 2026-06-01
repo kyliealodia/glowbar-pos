@@ -634,6 +634,11 @@ body{font-family:system-ui,sans-serif;background:var(--cream);color:var(--text);
       <option>Marketing</option><option>Commissions</option>
       <option>Taxes &amp; Permits</option><option>Miscellaneous</option>
     </select>
+    <select id="mpaid-filter" class="ii" style="width:140px;font-size:12px;padding:5px 8px" onchange="renderMonthly()">
+      <option value="all">All statuses</option>
+      <option value="unpaid">Unpaid only</option>
+      <option value="paid">Paid only</option>
+    </select>
     <button class="btn-p" style="font-size:12px;padding:6px 14px" onclick="toggleAddEntry()">+ Add expense</button>
   </div>
   <div id="add-entry-form" style="display:none;background:var(--cream2);border:0.5px solid var(--border-l);border-radius:12px;padding:14px 16px;margin-bottom:1rem">
@@ -673,6 +678,7 @@ body{font-family:system-ui,sans-serif;background:var(--cream);color:var(--text);
         <th style="text-align:left">Category</th>
         <th>Amount</th>
         <th style="text-align:left">Notes</th>
+        <th>Status</th>
         <th></th>
       </tr></thead>
       <tbody id="monthly-tbody"></tbody>
@@ -2042,7 +2048,7 @@ function addMonthlyEntry(){
   const notes=document.getElementById('me-notes').value.trim();
   if(!date){alert('Please pick a date.');return;}
   if(amt<=0){alert('Please enter an amount greater than 0.');return;}
-  monthlyLog.push({id:Date.now(),date,cat,amt,notes});
+  monthlyLog.push({id:Date.now(),date,cat,amt,notes,paid:false});
   monthlyLog.sort((a,b)=>b.date.localeCompare(a.date));
   saveMonthlyLog();
   document.getElementById('me-amt').value='';
@@ -2055,6 +2061,12 @@ function delMonthlyEntry(id){
   monthlyLog=monthlyLog.filter(e=>e.id!==id);
   saveMonthlyLog();
   updateMonthFilter();
+  renderMonthly();
+}
+function toggleMonthlyPaid(id){
+  const e=monthlyLog.find(x=>x.id===id); if(!e)return;
+  e.paid=!e.paid;
+  saveMonthlyLog();
   renderMonthly();
 }
 function updateMonthFilter(){
@@ -2070,9 +2082,12 @@ function updateMonthFilter(){
 function renderMonthly(){
   const mf=document.getElementById('month-filter')?.value||'all';
   const cf=document.getElementById('mcat-filter')?.value||'all';
+  const pf=document.getElementById('mpaid-filter')?.value||'all';
   let filtered=monthlyLog;
   if(mf!=='all')filtered=filtered.filter(e=>e.date.startsWith(mf));
   if(cf!=='all')filtered=filtered.filter(e=>e.cat===cf);
+  if(pf==='unpaid')filtered=filtered.filter(e=>!e.paid);
+  if(pf==='paid')filtered=filtered.filter(e=>e.paid);
   const tbody=document.getElementById('monthly-tbody');
   const empty=document.getElementById('monthly-empty');
   if(!tbody)return;
@@ -2082,15 +2097,31 @@ function renderMonthly(){
     tbody.innerHTML=filtered.map(e=>{
       const color=MCOLORS[e.cat]||'var(--muted)';
       const dl=new Date(e.date+'T00:00:00').toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'numeric'});
-      return '<tr><td style="text-align:left;color:var(--muted);white-space:nowrap">'+dl+'</td><td style="text-align:left"><span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:500;background:'+color+'22;color:'+color+'">'+e.cat+'</span></td><td style="font-weight:500">&#8369;'+e.amt.toLocaleString()+'</td><td style="text-align:left;color:var(--muted);font-size:11px">'+(e.notes||'&mdash;')+'</td><td><button class="del-row" onclick="delMonthlyEntry('+e.id+')" title="Remove">&#10005;</button></td></tr>';
+      const isPaid=e.paid===true;
+      const statusBtn='<button onclick="toggleMonthlyPaid('+e.id+')" style="padding:3px 10px;border:none;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;background:'+(isPaid?'#d4edda':'#fff3cd')+';color:'+(isPaid?'#2d6a4f':'#856404')+'">'+(isPaid?'✓ Paid':'○ Not paid')+'</button>';
+      return '<tr style="opacity:'+(isPaid?'0.7':'1')+'"><td style="text-align:left;color:var(--muted);white-space:nowrap">'+dl+'</td><td style="text-align:left"><span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:500;background:'+color+'22;color:'+color+'">'+e.cat+'</span></td><td style="font-weight:500;color:'+(isPaid?'var(--muted)':'var(--text)')+'">&#8369;'+e.amt.toLocaleString()+'</td><td style="text-align:left;color:var(--muted);font-size:11px">'+(e.notes||'&mdash;')+'</td><td>'+statusBtn+'</td><td><button class="del-row" onclick="delMonthlyEntry('+e.id+')" title="Remove">&#10005;</button></td></tr>';
     }).join('');
   }
   const total=filtered.reduce((s,e)=>s+e.amt,0);
+  const totalUnpaid=monthlyLog.filter(e=>{
+    if(mf!=='all'&&!e.date.startsWith(mf))return false;
+    if(cf!=='all'&&e.cat!==cf)return false;
+    return !e.paid;
+  }).reduce((s,e)=>s+e.amt,0);
+  const totalPaid=monthlyLog.filter(e=>{
+    if(mf!=='all'&&!e.date.startsWith(mf))return false;
+    if(cf!=='all'&&e.cat!==cf)return false;
+    return e.paid;
+  }).reduce((s,e)=>s+e.amt,0);
   const months=[...new Set(filtered.map(e=>e.date.slice(0,7)))];
   const avgMonth=months.length>0?total/months.length:0;
   const topCat=MCATS.map(c=>({c,t:filtered.filter(e=>e.cat===c).reduce((s,e)=>s+e.amt,0)})).sort((a,b)=>b.t-a.t)[0];
   const sumEl=document.getElementById('monthly-summary');
-  if(sumEl)sumEl.innerHTML='<div class="metric"><div class="metric-label">Total spent</div><div class="metric-value gd">&#8369;'+Math.round(total).toLocaleString()+'</div></div><div class="metric"><div class="metric-label">Entries</div><div class="metric-value">'+filtered.length+'</div></div><div class="metric"><div class="metric-label">Avg per month</div><div class="metric-value">&#8369;'+Math.round(avgMonth).toLocaleString()+'</div></div>'+(topCat&&topCat.t>0?'<div class="metric"><div class="metric-label">Top category</div><div class="metric-value" style="font-size:14px">'+topCat.c+'</div></div>':'');
+  if(sumEl)sumEl.innerHTML=
+    '<div class="metric"><div class="metric-label">Total</div><div class="metric-value gd">&#8369;'+Math.round(total).toLocaleString()+'</div></div>'+
+    '<div class="metric" style="border:0.5px solid #f5c6cb"><div class="metric-label" style="color:#842029">Not yet paid</div><div class="metric-value" style="color:#842029">&#8369;'+Math.round(totalUnpaid).toLocaleString()+'</div><div style="font-size:10px;color:var(--muted);margin-top:2px">'+monthlyLog.filter(e=>(!mf||mf==='all'||e.date.startsWith(mf))&&(cf==='all'||e.cat===cf)&&!e.paid).length+' entries</div></div>'+
+    '<div class="metric" style="border:0.5px solid #badbcc"><div class="metric-label" style="color:#0f5132">Paid</div><div class="metric-value" style="color:#0f5132">&#8369;'+Math.round(totalPaid).toLocaleString()+'</div><div style="font-size:10px;color:var(--muted);margin-top:2px">'+monthlyLog.filter(e=>(!mf||mf==='all'||e.date.startsWith(mf))&&(cf==='all'||e.cat===cf)&&e.paid).length+' entries</div></div>'+
+    (topCat&&topCat.t>0?'<div class="metric"><div class="metric-label">Top category</div><div class="metric-value" style="font-size:14px">'+topCat.c+'</div></div>':'');
   const catTotals=MCATS.map(c=>({c,t:filtered.filter(e=>e.cat===c).reduce((s,e)=>s+e.amt,0)})).filter(x=>x.t>0).sort((a,b)=>b.t-a.t);
   const catsEl=document.getElementById('monthly-cats');
   if(catsEl)catsEl.innerHTML=catTotals.map(({c,t})=>{
