@@ -589,6 +589,7 @@ html{height:-webkit-fill-available;}
         <div class="nav-item" onclick="goPage('capital')" id="nav-capital" data-role="owner"><span class="ni">🏦</span>Capital Recovery</div>
         <div class="nav-item" onclick="goPage('kpidash')" id="nav-kpidash" data-role="owner"><span class="ni">📊</span>KPI Dashboard</div>
         <div class="nav-item" onclick="goPage('machinroi')" id="nav-machinroi" data-role="owner"><span class="ni">⚡</span>Machine ROI</div>
+        <div class="nav-item" onclick="goPage('clinsettings')" id="nav-clinsettings" data-role="owner"><span class="ni">⚙</span>Clinic Settings</div>
         <div class="nav-item" onclick="goPage('sop')" id="nav-sop"><span class="ni">📖</span>SOPs</div>
         <div class="nav-item" onclick="goPage('manual')" id="nav-manual"><span class="ni">📘</span>POS Manual</div>
         <div class="nav-item" onclick="openKiosk()" id="nav-kiosk"><span class="ni">📋</span>Client Intake Form</div>
@@ -2140,6 +2141,116 @@ html{height:-webkit-fill-available;}
   </div>
 </div>
 
+
+<!-- ══ CLINIC SETTINGS PAGE (owner only) ══ -->
+<div class="page" id="page-clinsettings">
+  <div class="sec-hdr" style="margin-bottom:20px;">
+    <h2 class="sec-title">⚙ Clinic Settings</h2>
+    <button class="btn btn-gold" onclick="saveClinicSettingsPage()">✓ Save All Settings</button>
+  </div>
+
+  <!-- CLINIC INFO -->
+  <div class="card" style="margin-bottom:16px;padding:20px;">
+    <div style="font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:500;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--border);">🏥 Clinic Information</div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Clinic Name</label><input class="form-input" id="ps-clinicName" placeholder="GlowBar Beauty Clinic"></div>
+      <div class="form-group"><label class="form-label">Phone Number</label><input class="form-input" id="ps-phone" type="tel" placeholder="0917 801 3197"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Email Address</label><input class="form-input" id="ps-email" type="email" placeholder="hello@glowbarph.com"></div>
+      <div class="form-group"><label class="form-label">Address</label><input class="form-input" id="ps-address" placeholder="Brgy. Kaylaway, Nasugbu, Batangas"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">TIN Number</label><input class="form-input" id="ps-tin" placeholder="000-000-000-000"></div>
+      <div class="form-group"><label class="form-label">BIR Permit No.</label><input class="form-input" id="ps-birPermit" placeholder="e.g. 12345678"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">LGU Business Permit No.</label><input class="form-input" id="ps-lguPermit" placeholder="e.g. BP-2024-00123"></div>
+    </div>
+  </div>
+
+  <!-- OPERATING HOURS -->
+  <div class="card" style="margin-bottom:16px;padding:20px;">
+    <div style="font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:500;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--border);">🕐 Operating Hours</div>
+    <div class="form-group">
+      <label class="form-label" style="margin-bottom:8px;">Days Open</label>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;max-width:420px;">
+        <label style="display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" id="ps-day-0" style="accent-color:var(--gold);width:18px;height:18px;"><span style="font-size:11px;font-weight:600;color:var(--ink2);">Sun</span></label>
+        <label style="display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" id="ps-day-1" style="accent-color:var(--gold);width:18px;height:18px;"><span style="font-size:11px;font-weight:600;color:var(--ink2);">Mon</span></label>
+        <label style="display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" id="ps-day-2" style="accent-color:var(--gold);width:18px;height:18px;"><span style="font-size:11px;font-weight:600;color:var(--ink2);">Tue</span></label>
+        <label style="display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" id="ps-day-3" style="accent-color:var(--gold);width:18px;height:18px;"><span style="font-size:11px;font-weight:600;color:var(--ink2);">Wed</span></label>
+        <label style="display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" id="ps-day-4" style="accent-color:var(--gold);width:18px;height:18px;"><span style="font-size:11px;font-weight:600;color:var(--ink2);">Thu</span></label>
+        <label style="display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" id="ps-day-5" style="accent-color:var(--gold);width:18px;height:18px;"><span style="font-size:11px;font-weight:600;color:var(--ink2);">Fri</span></label>
+        <label style="display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" id="ps-day-6" style="accent-color:var(--gold);width:18px;height:18px;"><span style="font-size:11px;font-weight:600;color:var(--ink2);">Sat</span></label>
+      </div>
+    </div>
+    <div class="form-row" style="margin-top:12px;">
+      <div class="form-group"><label class="form-label">Opening Time</label><input class="form-input" type="time" id="ps-openTime"></div>
+      <div class="form-group"><label class="form-label">Closing Time</label><input class="form-input" type="time" id="ps-closeTime"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Break Start <span style="color:var(--ink4);font-size:10px;">(optional)</span></label><input class="form-input" type="time" id="ps-breakStart"></div>
+      <div class="form-group"><label class="form-label">Break End <span style="color:var(--ink4);font-size:10px;">(optional)</span></label><input class="form-input" type="time" id="ps-breakEnd"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Max Concurrent Bookings</label>
+        <select class="form-select" id="ps-maxStaff">
+          <option value="1">1 — 1 service at a time</option>
+          <option value="2">2 — 2 concurrent</option>
+          <option value="3">3 — 3 concurrent</option>
+          <option value="4">4 — 4 concurrent</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOOKING SETTINGS -->
+  <div class="card" style="margin-bottom:16px;padding:20px;">
+    <div style="font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:500;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--border);">📅 Booking Settings</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Advance Booking Window (days)</label>
+        <input class="form-input" type="number" id="ps-bookingWindow" placeholder="30" min="1" max="365">
+        <div style="font-size:11px;color:var(--ink3);margin-top:4px;">How many days ahead clients can book online. Default: 30.</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Booking Time Slot Interval</label>
+        <select class="form-select" id="ps-slotDuration">
+          <option value="15">15 minutes</option>
+          <option value="30">30 minutes</option>
+          <option value="60">60 minutes (1 hour)</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group" style="margin-top:8px;">
+      <label class="form-label" style="margin-bottom:8px;">Closed Dates (holidays, rest days)</label>
+      <div id="ps-closedDatesList" style="margin-bottom:10px;display:flex;flex-direction:column;gap:6px;"></div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input class="form-input" type="date" id="ps-newClosedDate" style="flex:1;max-width:200px;">
+        <input class="form-input" type="text" id="ps-newClosedLabel" placeholder="Label (e.g. Christmas)" style="flex:1;">
+        <button class="btn btn-gold btn-sm" onclick="addPsClosedDate()">+ Add</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- OR SETTINGS -->
+  <div class="card" style="margin-bottom:16px;padding:20px;">
+    <div style="font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:500;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--border);">🧾 Official Receipt (OR) Settings</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">OR Prefix</label>
+        <input class="form-input" id="ps-orPrefix" placeholder="e.g. GB- or OR-">
+        <div style="font-size:11px;color:var(--ink3);margin-top:4px;">Prefix appears before the OR number (e.g. GB-00000001).</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">OR Starting Number</label>
+        <input class="form-input" type="number" id="ps-orStart" placeholder="1001" min="1">
+        <div style="font-size:11px;color:var(--ink3);margin-top:4px;">The first OR number issued. Current counter is preserved on save.</div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- Clinic Settings Modal -->
 <div class="overlay hidden" id="clinicSettingsModal">
@@ -3986,11 +4097,11 @@ function snapSelfie(){
 }
 
 // ══ NAV ══
-const pageTitles={dashboard:'Dashboard',pos:'Point of Sale',rooms:'Treatment Rooms',calendar:'Calendar',bookings:'Appointments',clients:'Clients',products:'Products',packages:'Packages',messaging:'Messaging',users:'Users & Roles',attendance:'Attendance Log',payslip:'Payroll & Commission',kiosk:'Client Intake Form',capital:'Capital Recovery',kpidash:'KPI Dashboard',machinroi:'Machine ROI',reports:'Reports',sop:'📖 SOPs',manual:'📘 POS Manual'};
+const pageTitles={dashboard:'Dashboard',pos:'Point of Sale',rooms:'Treatment Rooms',calendar:'Calendar',bookings:'Appointments',clients:'Clients',products:'Products',packages:'Packages',messaging:'Messaging',users:'Users & Roles',attendance:'Attendance Log',payslip:'Payroll & Commission',kiosk:'Client Intake Form',capital:'Capital Recovery',kpidash:'KPI Dashboard',machinroi:'Machine ROI',reports:'Reports',sop:'📖 SOPs',manual:'📘 POS Manual',clinsettings:'⚙ Clinic Settings'};
 function goPage(name){
   const perms=currentUser?.perms||[];
   const isOwner=currentUser?.role==='owner';
-  const ownerOnlyPages=['payslip','capital','kpidash','machinroi'];
+  const ownerOnlyPages=['payslip','capital','kpidash','machinroi','clinsettings'];
   if(ownerOnlyPages.includes(name)&&!isOwner){showToast('Owner access only 🔐','err');return;}
   if(name==='capital'&&!isOwner){showToast('Owner access only 🔐','err');return;}
   const restricted={'users':'users','reports':'reports','products':'products','packages':'packages','attendance':'reports'};
@@ -4015,6 +4126,7 @@ function goPage(name){
   if(name==='sop'){initSOPs();renderSOPs();}
   if(name==='manual'){setManualTab(isOwner?'owner':'staff');}
   if(name==='kiosk')openKiosk();
+  if(name==='clinsettings')loadClinicSettingsPage();
   if(name==='kpidash')renderKPI();
   if(name==='machinroi')renderMachineROI();
   if(window.innerWidth<=768) closeSidebarMobile();
@@ -5884,6 +5996,115 @@ function updateContainerLabel(){
   } else {
     wrap.style.display='none';
   }
+}
+
+// ── CLINIC SETTINGS PAGE ─────────────────────────────────────────
+function loadClinicSettingsPage(){
+  const cfg=S.settings||{};
+  document.getElementById('ps-clinicName').value=cfg.clinicName||'GlowBar Beauty Clinic';
+  document.getElementById('ps-phone').value=cfg.clinicPhone||'';
+  document.getElementById('ps-email').value=cfg.clinicEmail||'';
+  document.getElementById('ps-address').value=cfg.businessAddress||'';
+  document.getElementById('ps-tin').value=cfg.tin||'';
+  document.getElementById('ps-birPermit').value=cfg.birPermit||'';
+  document.getElementById('ps-lguPermit').value=cfg.lguPermit||'';
+  // Operating hours
+  const openDays=cfg.openDays||[1,2,3,4,5,6];
+  for(let i=0;i<7;i++){
+    const cb=document.getElementById('ps-day-'+i);
+    if(cb) cb.checked=openDays.includes(i);
+  }
+  document.getElementById('ps-openTime').value=cfg.openTime||'09:00';
+  document.getElementById('ps-closeTime').value=cfg.closeTime||'19:00';
+  document.getElementById('ps-breakStart').value=cfg.breakStart||'';
+  document.getElementById('ps-breakEnd').value=cfg.breakEnd||'';
+  document.getElementById('ps-maxStaff').value=String(cfg.maxStaff||2);
+  // Booking settings
+  document.getElementById('ps-bookingWindow').value=String(cfg.bookingWindowDays||30);
+  document.getElementById('ps-slotDuration').value=String(cfg.slotDuration||30);
+  renderPsClosedDates();
+  // OR settings
+  document.getElementById('ps-orPrefix').value=cfg.orPrefix||'';
+  document.getElementById('ps-orStart').value=String(cfg.orStart||1);
+}
+
+function renderPsClosedDates(){
+  const el=document.getElementById('ps-closedDatesList'); if(!el)return;
+  const dates=(S.settings?.closedDates||[]).slice().sort();
+  const labels=S.settings?.closedDateLabels||{};
+  if(!dates.length){el.innerHTML='<div style="font-size:12px;color:var(--ink4);padding:4px 0;">No closed dates added yet.</div>';return;}
+  el.innerHTML=dates.map(d=>{
+    const fmt=new Date(d+'T12:00').toLocaleDateString('en-PH',{weekday:'short',month:'short',day:'numeric',year:'numeric'});
+    const lbl=labels[d]||'';
+    return `<div style="display:flex;align-items:center;justify-content:space-between;background:var(--cream2);border-radius:8px;padding:6px 12px;font-size:12px;">
+      <span><strong>${fmt}</strong>${lbl?' — '+lbl:''}</span>
+      <button class="btn btn-outline btn-sm" style="font-size:10px;color:var(--danger);border-color:var(--danger);" onclick="removePsClosedDate('${d}')">✕ Remove</button>
+    </div>`;
+  }).join('');
+}
+
+function addPsClosedDate(){
+  const date=document.getElementById('ps-newClosedDate').value;
+  const label=(document.getElementById('ps-newClosedLabel').value||'').trim();
+  if(!date){showToast('Select a date','err');return;}
+  if(!S.settings) S.settings={};
+  if(!S.settings.closedDates) S.settings.closedDates=[];
+  if(S.settings.closedDates.includes(date)){showToast('Date already added','err');return;}
+  S.settings.closedDates.push(date);
+  if(label){
+    if(!S.settings.closedDateLabels) S.settings.closedDateLabels={};
+    S.settings.closedDateLabels[date]=label;
+  }
+  document.getElementById('ps-newClosedDate').value='';
+  document.getElementById('ps-newClosedLabel').value='';
+  renderPsClosedDates();
+}
+
+function removePsClosedDate(date){
+  if(!S.settings?.closedDates)return;
+  S.settings.closedDates=S.settings.closedDates.filter(d=>d!==date);
+  if(S.settings.closedDateLabels) delete S.settings.closedDateLabels[date];
+  renderPsClosedDates();
+}
+
+function saveClinicSettingsPage(){
+  const openDays=[];
+  for(let i=0;i<7;i++){const cb=document.getElementById('ps-day-'+i);if(cb&&cb.checked)openDays.push(i);}
+  if(!openDays.length){showToast('Please select at least one open day','err');return;}
+  const openTime=document.getElementById('ps-openTime').value||'09:00';
+  const closeTime=document.getElementById('ps-closeTime').value||'19:00';
+  if(openTime>=closeTime){showToast('Closing time must be after opening time','err');return;}
+  const orStartNew=parseInt(document.getElementById('ps-orStart').value)||1;
+  S.settings={
+    ...(S.settings||{}),
+    clinicName:document.getElementById('ps-clinicName').value.trim()||'GlowBar Beauty Clinic',
+    clinicPhone:document.getElementById('ps-phone').value.trim(),
+    clinicEmail:document.getElementById('ps-email').value.trim(),
+    businessAddress:document.getElementById('ps-address').value.trim(),
+    tin:document.getElementById('ps-tin').value.trim(),
+    birPermit:document.getElementById('ps-birPermit').value.trim(),
+    lguPermit:document.getElementById('ps-lguPermit').value.trim(),
+    openDays,
+    openTime,
+    closeTime,
+    breakStart:document.getElementById('ps-breakStart').value||'',
+    breakEnd:document.getElementById('ps-breakEnd').value||'',
+    maxStaff:parseInt(document.getElementById('ps-maxStaff').value)||2,
+    bookingWindowDays:parseInt(document.getElementById('ps-bookingWindow').value)||30,
+    slotDuration:parseInt(document.getElementById('ps-slotDuration').value)||30,
+    orPrefix:document.getElementById('ps-orPrefix').value.trim(),
+    orStart:orStartNew,
+    orCounter:S.settings?.orCounter||orStartNew,
+    // Preserve existing fields not shown on this page
+    closedDates:S.settings?.closedDates||[],
+    closedDateLabels:S.settings?.closedDateLabels||{},
+    gcashQr:S.settings?.gcashQr||'',
+    surgeDates:S.settings?.surgeDates||{},
+    partTimer:S.settings?.partTimer||{},
+    timeoutMins:S.settings?.timeoutMins||10,
+  };
+  sync('settings');
+  showToast('Clinic settings saved ✓','ok');
 }
 
 function openClinicSettings(){

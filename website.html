@@ -769,21 +769,21 @@
         <div class="loc-icon">📍</div>
         <div class="loc-content">
           <h4>Address</h4>
-          <p>Brgy. Kaylaway, Nasugbu<br>Batangas, Philippines</p>
+          <p id="ws-address">Brgy. Kaylaway, Nasugbu<br>Batangas, Philippines</p>
         </div>
       </div>
       <div class="loc-item">
         <div class="loc-icon">🕐</div>
         <div class="loc-content">
           <h4>Clinic Hours</h4>
-          <p>Tuesday – Sunday: 10:00 AM – 7:00 PM<br>Monday: Closed</p>
+          <p id="ws-hours">Tuesday – Sunday: 10:00 AM – 7:00 PM<br>Monday: Closed</p>
         </div>
       </div>
       <div class="loc-item">
         <div class="loc-icon">📧</div>
         <div class="loc-content">
           <h4>Contact Us</h4>
-          <p>hello@glowbarph.com<br>0917 801 3197</p>
+          <p><a id="ws-email" href="mailto:hello@glowbarph.com" style="color:inherit;text-decoration:none;">hello@glowbarph.com</a><br><a id="ws-phone" href="tel:09178013197" style="color:inherit;text-decoration:none;">0917 801 3197</a></p>
         </div>
       </div>
     </div>
@@ -836,8 +836,8 @@
     <div class="footer-col">
       <h4>Contact</h4>
       <ul>
-        <li><a href="mailto:hello@glowbarph.com">hello@glowbarph.com</a></li>
-        <li><a href="tel:09178013197">0917 801 3197</a></li>
+        <li><a id="ws-footer-email" href="mailto:hello@glowbarph.com">hello@glowbarph.com</a></li>
+        <li><a id="ws-footer-phone" href="tel:09178013197">0917 801 3197</a></li>
         <li><a href="#">Facebook</a></li>
         <li><a href="#">Instagram @glowbarph</a></li>
       </ul>
@@ -1007,9 +1007,62 @@
   },{threshold:0.08});
   document.querySelectorAll('.reveal').forEach(el=>obs.observe(el));
 
+  async function loadSettingsFromFirebase(){
+    if(!db) return;
+    try{
+      const snap = await Promise.race([
+        db.ref('gb/settings').once('value'),
+        new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),6000))
+      ]);
+      const cfg = snap.val();
+      if(!cfg) return;
+      // Clinic name in footer brand text
+      const footerBrand = document.querySelector('.footer-brand p');
+      if(footerBrand && cfg.clinicName){
+        footerBrand.innerHTML = `Premium beauty clinic in Nasugbu, Batangas. Your glow is our priority. 💛<br><br>${cfg.openDays ? buildHoursText(cfg) : 'Open Tuesday – Sunday, 10AM – 7PM.'}`;
+      }
+      // Address
+      if(cfg.businessAddress){
+        const el=document.getElementById('ws-address');
+        if(el) el.innerHTML=cfg.businessAddress.replace(/,\s*/g,'<br>');
+      }
+      // Hours
+      const hoursEl=document.getElementById('ws-hours');
+      if(hoursEl && cfg.openDays) hoursEl.innerHTML=buildHoursText(cfg);
+      // Phone
+      if(cfg.clinicPhone){
+        const el=document.getElementById('ws-phone');
+        if(el){el.textContent=cfg.clinicPhone;el.href='tel:'+cfg.clinicPhone.replace(/\s/g,'');}
+      }
+      // Email
+      if(cfg.clinicEmail){
+        ['ws-email','ws-footer-email'].forEach(id=>{
+          const el=document.getElementById(id);
+          if(el){el.textContent=cfg.clinicEmail;el.href='mailto:'+cfg.clinicEmail;}
+        });
+      }
+      // Footer phone
+      if(cfg.clinicPhone){
+        const el=document.getElementById('ws-footer-phone');
+        if(el){el.textContent=cfg.clinicPhone;el.href='tel:'+cfg.clinicPhone.replace(/\s/g,'');}
+      }
+    }catch(e){}
+  }
+
+  function buildHoursText(cfg){
+    const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const open=cfg.openDays||[1,2,3,4,5,6];
+    const closed=days.filter((_,i)=>!open.includes(i));
+    const fmt=t=>{if(!t)return '';const[h,m]=t.split(':');const H=parseInt(h);return (H>12?H-12:H||12)+':'+(m||'00')+(H>=12?'PM':'AM');};
+    const openStr=open.map(i=>days[i]).join(', ');
+    const closedStr=closed.length?closed.join(', ')+': Closed':'';
+    return `${openStr}: ${fmt(cfg.openTime||'09:00')} – ${fmt(cfg.closeTime||'19:00')}`+(closedStr?`<br>${closedStr}`:'');
+  }
+
   // ── BOOT ─────────────────────────────────────────────────────────
   loadPricesFromFirebase();
   loadPromosFromFirebase();
+  loadSettingsFromFirebase();
 </script>
 </body>
 </html>
