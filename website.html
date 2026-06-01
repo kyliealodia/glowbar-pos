@@ -902,28 +902,50 @@
   };
 
   async function loadPricesFromFirebase(){
-    if(!db) return;
+    if(!db){ console.log('[GlowBar] Firebase not initialised — skipping price load'); return; }
     try{
-      const snap = await Promise.race([
-        db.ref('gb/serviceNames').once('value'),
-        new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),6000))
-      ]);
+      // Read from gb/products (full data with price field).
+      // Fall back to gb/serviceNames if products is empty.
+      const timeout = new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),8000));
+      const snap = await Promise.race([ db.ref('gb/products').once('value'), timeout ]);
       const raw = snap.val();
-      if(!raw) return;
-      const arr = Array.isArray(raw) ? raw.filter(Boolean) : Object.values(raw).filter(Boolean);
+      console.log('[GlowBar] gb/products raw:', raw);
+
+      let arr = raw
+        ? (Array.isArray(raw) ? raw.filter(Boolean) : Object.values(raw).filter(Boolean))
+        : [];
+
+      if(!arr.length){
+        // Fallback: try gb/serviceNames
+        console.log('[GlowBar] gb/products empty — trying gb/serviceNames');
+        const snap2 = await Promise.race([ db.ref('gb/serviceNames').once('value'), new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),6000)) ]);
+        const raw2 = snap2.val();
+        console.log('[GlowBar] gb/serviceNames raw:', raw2);
+        arr = raw2
+          ? (Array.isArray(raw2) ? raw2.filter(Boolean) : Object.values(raw2).filter(Boolean))
+          : [];
+      }
+
+      if(!arr.length){ console.log('[GlowBar] No product data found in Firebase'); return; }
+
       const priceByName = {};
       arr.forEach(p=>{ if(p.name && p.price>0) priceByName[p.name] = p.price; });
+      console.log('[GlowBar] Price map built:', priceByName);
 
+      let updated = 0;
       document.querySelectorAll('.svc-card').forEach(card=>{
         const h3 = card.querySelector('h3'); if(!h3) return;
         const title = h3.textContent.trim();
-        const fbName = SVC_NAME_MAP[title]; if(!fbName) return;
-        const price = priceByName[fbName]; if(price==null) return;
+        const fbName = SVC_NAME_MAP[title];
+        if(!fbName){ console.log('[GlowBar] No mapping for card:', title); return; }
+        const price = priceByName[fbName];
+        if(price==null){ console.log('[GlowBar] No price found for:', fbName); return; }
         const priceEl = card.querySelector('.svc-price');
-        if(priceEl) priceEl.innerHTML = '₱' + price.toLocaleString('en-PH');
+        if(priceEl){ priceEl.innerHTML = '₱' + price.toLocaleString('en-PH'); updated++; }
       });
+      console.log('[GlowBar] Prices updated on', updated, 'cards');
     }catch(e){
-      // Firebase unavailable — mark unmatched cards with fallback
+      console.warn('[GlowBar] Price load failed:', e.message);
       document.querySelectorAll('.svc-card').forEach(card=>{
         const priceEl = card.querySelector('.svc-price');
         if(priceEl && !priceEl.textContent.trim()) priceEl.textContent = 'Contact us for pricing';
