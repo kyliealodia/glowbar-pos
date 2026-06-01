@@ -1192,6 +1192,7 @@ function refreshSummary(){
   });
   const paidTotal=mcjamesUsed+kylieUsed;
   const grandTotal=paidTotal+pendingAmt;
+  const contingency=TOTAL_FUNDS-grandTotal;
   const availableCash=TOTAL_FUNDS-paidTotal;
   const mcjamesRemaining=MCJAMES_FUND-mcjamesUsed;
   const kylieRemaining=KYLIE_FUND-kylieUsed;
@@ -1217,6 +1218,11 @@ function refreshSummary(){
       <div class="metric-label">Grand total</div>
       <div class="metric-value">${fmt(grandTotal)}</div>
       <div style="font-size:10px;color:var(--muted);margin-top:3px">Paid + pending</div>
+    </div>
+    <div class="metric" style="border:0.5px solid ${contingency<0?'var(--red)':contingency<50000?'#f0c060':'#badbcc'};background:${contingency<0?'#fff5f5':contingency<50000?'#fffbec':'#f0fff4'}">
+      <div class="metric-label" style="color:${contingency<0?'var(--red)':contingency<50000?'var(--warn)':'#0f5132'}">Contingency Fund</div>
+      <div class="metric-value" style="color:${contingency<0?'var(--red)':contingency<50000?'var(--warn)':'#0f5132'}">${contingency<0?'−':''}${fmt(Math.abs(contingency))}</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:3px">₱500K − paid − pending</div>
     </div>
     <div class="metric" style="border:0.5px solid var(--gold-l);background:var(--cream2)">
       <div class="metric-label" style="color:var(--gold-d)">Available cash</div>
