@@ -30,7 +30,7 @@ const _auth = getAuth(app);
 signInAnonymously(_auth).catch(()=>{});
 const TRACKER_REF = ref(db, 'tracker/glowbar_main');
 const RATES_REF = ref(db, 'tracker/settings');
-const TRACKED = ['glowbar_v4','glowbar_cons','glowbar_svc2','glowbar_svcs','glowbar_staff','glowbar_monthly'];
+const TRACKED = ['glowbar_v4','glowbar_cons','glowbar_svc2','glowbar_svcs','glowbar_staff','glowbar_monthly','glowbar_personal'];
 
 // ── SYNC STATUS ───────────────────────────────────────────────────
 function setSyncStatus(status){
@@ -903,7 +903,7 @@ body{font-family:system-ui,sans-serif;background:var(--cream);color:var(--text);
     </div>
   </div>
   <button class="save-btn" onclick="savePersonal()">Save</button>
-  <p style="margin-top:12px;font-size:11px;color:var(--muted)">Personal expenses are stored locally on this device only — not synced to the clinic or Firebase.</p>
+  <p style="margin-top:12px;font-size:11px;color:var(--muted)">Personal expenses are private and synced to Firebase under your tracker account — they are not visible to clinic staff.</p>
 </div>
 
 <!-- PROMO CALCULATOR TAB -->
