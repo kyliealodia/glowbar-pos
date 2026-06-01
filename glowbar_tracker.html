@@ -1751,7 +1751,25 @@ function buildSvcCardInner(svc, catId){
   </div>`}
   <div style="font-size:10px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.04em;margin-top:8px">Consumables used per session</div>
   ${consRows}
-  <button class="add-row" style="margin:3px 0 8px;padding:3px 8px;font-size:11px" onclick="addSvcCons('${svc.id}')">&#xff0b; Add consumable</button>`;
+  <button class="add-row" style="margin:3px 0 8px;padding:3px 8px;font-size:11px" onclick="addSvcCons('${svc.id}')">&#xff0b; Add consumable</button>
+  ${(()=>{
+    const cat2=SVC_CATS.find(c=>c.id===catId);
+    const grp=cat2?.group||cat2?.name||'';
+    const d=catDiscounts[grp];
+    if(!d||!d.value||!price) return '';
+    const dAmt=d.type==='pct'?price*Math.min(d.value,100)/100:Math.min(d.value,price);
+    const dp=Math.max(0,price-dAmt);
+    const cp=parseFloat(document.getElementById('comm-pct')?.value||10)/100;
+    const dProfit=dp-totalCost-dp*cp;
+    const pColor2=dProfit>=0?'var(--green)':'var(--red)';
+    const bePct=Math.min(100,Math.round(Math.max(0,price-totalCost/Math.max(0.01,1-cp))/price*100));
+    const over=d.value>bePct;
+    return `<div style="margin-top:6px;padding:8px 10px;background:${over?'#fff5f5':'#f0fff4'};border:0.5px solid ${over?'var(--red)':'var(--green)'};border-radius:8px;font-size:11px">
+      <div style="font-weight:600;color:${over?'var(--red)':'var(--green)'};margin-bottom:4px">${d.type==='pct'?d.value+'%':'&#8369;'+Math.round(dAmt).toLocaleString()} discount applied</div>
+      <div style="display:flex;justify-content:space-between;padding:1px 0"><span style="color:var(--muted)">Discounted price</span><span style="font-weight:600">&#8369;${Math.round(dp).toLocaleString()}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:1px 0"><span style="color:var(--muted)">Profit at discount</span><span style="font-weight:600;color:${pColor2}">&#8369;${Math.round(dProfit).toLocaleString()} (${dp>0?Math.round(dProfit/dp*100):0}%)</span></div>
+      ${over?`<div style="color:var(--red);font-size:10px;margin-top:4px">⚠ Below break-even (max ${bePct}%)</div>`:''}</div>`;
+  })()}
 }
 
 function refreshSvcCard(svcId){
@@ -1792,13 +1810,52 @@ function buildSvcContainer(){
   let html='';
   groupMap.forEach((cats,groupName)=>{
     const isMultiSub=cats.length>1;
+    const gk=groupName.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    const disc=catDiscounts[groupName]||{type:'pct',value:0};
+    const commPct=parseFloat(document.getElementById('comm-pct')?.value||10)/100;
+    // Build discount summary across all services in this group
+    let discSummaryHtml='';
+    if(disc.value>0){
+      let tOrig=0,tDisc=0,tProfOrig=0,tProfDisc=0,n=0;
+      cats.forEach(cat=>cat.services.forEach(svc=>{
+        const {price,profit,totalCost}=calcSvcCost(svc);
+        if(!price)return;
+        const dAmt=disc.type==='pct'?price*Math.min(disc.value,100)/100:Math.min(disc.value,price);
+        const dp=Math.max(0,price-dAmt);
+        tOrig+=price; tDisc+=dp; tProfOrig+=profit; tProfDisc+=dp-totalCost-dp*commPct; n++;
+      }));
+      const f=v=>'&#8369;'+Math.round(v).toLocaleString();
+      const mg=tDisc>0?Math.round(tProfDisc/tDisc*100):0;
+      const pc=v=>v>=0?'var(--green)':'var(--red)';
+      const bePrice=tOrig>0?(cats.reduce((s,c)=>s+c.services.reduce((ss,sv)=>{const{totalCost}=calcSvcCost(sv);return ss+totalCost/Math.max(0.01,1-commPct);},0),0)):0;
+      const bePct=tOrig>0?Math.min(100,Math.round((tOrig-bePrice)/tOrig*100)):0;
+      discSummaryHtml=`<div style="margin-top:8px;padding:8px 10px;background:rgba(255,255,255,0.6);border-radius:8px;font-size:11px;display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:6px">
+        <div><div style="color:var(--muted);margin-bottom:2px">Total revenue</div><div style="font-weight:600">${f(tOrig)} → ${f(tDisc)}</div></div>
+        <div><div style="color:var(--muted);margin-bottom:2px">Profit at full price</div><div style="font-weight:600;color:${pc(tProfOrig)}">${f(tProfOrig)}</div></div>
+        <div><div style="color:var(--muted);margin-bottom:2px">Profit at discount</div><div style="font-weight:600;color:${pc(tProfDisc)}">${f(tProfDisc)} (${mg}%)</div></div>
+        <div><div style="color:var(--muted);margin-bottom:2px">Break-even max</div><div style="font-weight:600;color:${disc.value>bePct?'var(--red)':'var(--green)'}">${bePct}% ${disc.value>bePct?'⚠ losing money':'✓ profitable'}</div></div>
+      </div>`;
+    }
+    const discBox=`<div style="background:#f8f5ed;border:0.5px solid var(--gold-l);border-radius:10px;padding:10px 14px;margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span style="font-size:11px;font-weight:600;color:var(--gold-d)">Discount simulation:</span>
+        <div style="display:flex;border:0.5px solid var(--gold);border-radius:7px;overflow:hidden">
+          <button onclick="setCatDiscType('${gk}','pct')" style="padding:3px 8px;font-size:11px;font-weight:600;border:none;cursor:pointer;background:${disc.type==='pct'?'var(--gold)':'transparent'};color:${disc.type==='pct'?'#fff':'var(--gold-d)'}">%</button>
+          <button onclick="setCatDiscType('${gk}','flat')" style="padding:3px 8px;font-size:11px;font-weight:600;border:none;cursor:pointer;background:${disc.type==='flat'?'var(--gold)':'transparent'};color:${disc.type==='flat'?'#fff':'var(--gold-d)'}">&#8369;</button>
+        </div>
+        <input type="number" min="0" placeholder="0" value="${disc.value||''}" oninput="applyCatDiscount('${gk}',this.value)" style="width:72px;padding:3px 8px;border:0.5px solid var(--gold);border-radius:7px;font-size:12px;font-family:inherit;background:var(--cream2);outline:none">
+        ${disc.value>0?`<button onclick="clearCatDiscount('${gk}')" style="font-size:11px;color:var(--muted);background:none;border:none;cursor:pointer;text-decoration:underline;padding:0">Clear</button>`:''}
+      </div>
+      ${discSummaryHtml}
+    </div>`;
     // Group header (only when multiple sub-sections)
     if(isMultiSub){
       html+=`<div style="margin-bottom:1.8rem">
         <div style="font-size:16px;font-weight:700;color:var(--gold-d);padding-bottom:10px;border-bottom:2px solid var(--gold-l);margin-bottom:14px;display:flex;align-items:center;gap:10px">
           ${groupName}
           <button class="add-row" style="margin-left:auto;padding:3px 10px;font-size:11px" onclick="addSvcCatInGroup('${groupName}')">&#xff0b; Add sub-section</button>
-        </div>`;
+        </div>
+        ${discBox}`;
     }
     cats.forEach(cat=>{
       const cards=cat.services.map(svc=>`<div class="svc-card" id="svc-card-${svc.id}" ondragover="event.preventDefault()" ondrop="onSvcDrop(event,'${cat.id}','${svc.id}')">${buildSvcCardInner(svc,cat.id)}</div>`).join('');
@@ -1811,6 +1868,7 @@ function buildSvcContainer(){
           <button class="add-row" style="margin-left:auto;padding:3px 10px;font-size:11px" onclick="addSvcChoice('${cat.id}')">&#xff0b; Add service</button>
           <button class="del-cat" onclick="delSvcCat('${cat.id}')">&#10005; Remove</button>
         </div>
+        ${!isMultiSub?discBox:''}
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px" id="svc-cat-grid-${cat.id}">${cards}</div>
       </div>`;
     });
@@ -1827,6 +1885,22 @@ function addSvcCatInGroup(groupName){
 }
 
 function buildServices(){ buildSvcCatTabs(); buildSvcContainer(); }
+
+// ── CATEGORY DISCOUNT SIMULATION ──────────────────────────────────
+let catDiscounts={}; // { groupName: { type:'pct'|'flat', value:number } }
+
+function setCatDiscType(g,type){
+  if(!catDiscounts[g]) catDiscounts[g]={type:'pct',value:0};
+  catDiscounts[g].type=type; buildSvcContainer();
+}
+function applyCatDiscount(g,val){
+  if(!catDiscounts[g]) catDiscounts[g]={type:'pct',value:0};
+  catDiscounts[g].value=parseFloat(val)||0;
+  debounce('catdisc_'+g,()=>buildSvcContainer(),400);
+}
+function clearCatDiscount(g){
+  delete catDiscounts[g]; buildSvcContainer();
+}
 
 // ── ADD / REMOVE SERVICES & CATEGORIES ───────────────────────────
 function addSvc(catId){

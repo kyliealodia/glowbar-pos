@@ -229,7 +229,7 @@ let DATA = { products:[], packages:[], users:[], bookings:[], settings:{
   breakEnd:'',
   partTimer:{name:'',workDays:[],startTime:'09:00',endTime:'17:00'}
 }};
-let booking = { services:[], service:'', serviceId:null, servicePrice:0, finalPrice:0, discountType:'pct', discountValue:0, discountAmt:0, duration:60, staff:'', staffColor:'', aesthetician:'', nailTech:'', date:'', time:'', name:'', phone:'', email:'', notes:'', groupSize:1 };
+let booking = { services:[], service:'', serviceId:null, servicePrice:0, duration:60, staff:'', staffColor:'', aesthetician:'', nailTech:'', date:'', time:'', name:'', phone:'', email:'', notes:'', groupSize:1 };
 let calYear, calMonth;
 let activeSvcCat = null; // currently active category tab id
 const TIMES = ['09:00','09:30','10:00','10:30','11:00','11:30','12:00','12:30','13:00','13:30','14:00','14:30','15:00','15:30','16:00','16:30','17:00','17:30','18:00'];
@@ -279,29 +279,6 @@ function isComboBooking(){
 function fmtPrice(n){ return '₱'+(Math.round((n||0)*100)/100).toLocaleString('en-PH'); }
 function initials(n){ return (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase(); }
 
-function getTotalCost(){
-  return booking.services.reduce((t,s)=>{
-    const p=DATA.products.find(x=>x.id===s.id||String(x.id)===String(s.id));
-    return t+(parseFloat(p?.cost)||0);
-  },0);
-}
-function recalcDiscount(){
-  const base=booking.servicePrice;
-  if(!booking.discountValue){ booking.discountAmt=0; booking.finalPrice=base; return; }
-  if(booking.discountType==='pct'){
-    booking.discountAmt=Math.round(base*Math.min(booking.discountValue,100)/100*100)/100;
-  } else {
-    booking.discountAmt=Math.min(parseFloat(booking.discountValue)||0,base);
-  }
-  booking.finalPrice=Math.max(0,Math.round((base-booking.discountAmt)*100)/100);
-}
-function applyDiscount(){
-  const v=parseFloat(document.getElementById('disc-val')?.value)||0;
-  booking.discountValue=v; recalcDiscount(); showStep1();
-}
-function clearDiscount(){
-  booking.discountValue=0; booking.discountAmt=0; booking.finalPrice=booking.servicePrice; showStep1();
-}
 function setStep(n){
   [1,2,3,4].forEach(i=>{
     const el=document.getElementById('step'+i);
@@ -551,24 +528,6 @@ function showStep1(){
 
     // Selected services summary bar
     if(booking.services.length){
-      const _base=booking.servicePrice||booking.services.reduce((s,x)=>s+x.price,0);
-      const _hasDsc=booking.discountAmt>0;
-      const _fp=_hasDsc?booking.finalPrice:_base;
-      const _tc=getTotalCost();
-      const _prof=Math.round((_fp-_tc)*100)/100;
-      const _mg=_fp>0?Math.round(_prof/_fp*100):0;
-      const _dLabel=booking.discountType==='pct'?booking.discountValue+'%':'₱'+booking.discountAmt.toLocaleString('en-PH');
-      const _discBreakdown=_hasDsc?`
-        <div style="margin-top:10px;padding:10px 12px;background:rgba(255,255,255,0.6);border-radius:8px;font-size:12px;">
-          <div style="display:flex;justify-content:space-between;padding:2px 0;color:var(--ink3)"><span>Subtotal</span><span>${fmtPrice(_base)}</span></div>
-          <div style="display:flex;justify-content:space-between;padding:2px 0;color:var(--danger)"><span>Discount (${_dLabel})</span><span>−${fmtPrice(booking.discountAmt)}</span></div>
-          <div style="display:flex;justify-content:space-between;padding:5px 0;font-weight:700;font-size:13px;border-top:1px solid rgba(201,168,76,0.3);margin-top:4px"><span style="color:var(--ink)">You pay</span><span style="color:var(--gold-dk)">${fmtPrice(_fp)}</span></div>
-          ${_tc>0?`<div style="border-top:1px dashed rgba(201,168,76,0.3);margin-top:4px;padding-top:6px">
-          <div style="display:flex;justify-content:space-between;padding:2px 0;color:var(--ink3)"><span>Est. cost</span><span>${fmtPrice(_tc)}</span></div>
-          <div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:var(--ink3)">Est. profit</span><span style="font-weight:600;color:${_prof>=0?'var(--success)':'var(--danger)'}">${fmtPrice(_prof)} · ${_mg}%</span></div>
-          </div>`:''}
-        </div>
-        <button onclick="clearDiscount()" style="margin-top:6px;font-size:11px;color:var(--ink3);background:none;border:none;cursor:pointer;text-decoration:underline;padding:2px 0">✕ Clear discount</button>`:'';
       html+=`<div style="background:var(--gold-lt);border:1.5px solid var(--gold);border-radius:12px;padding:12px 16px;margin-bottom:16px;">
         <div style="font-size:10px;font-weight:700;color:var(--gold-dk);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">✓ Selected</div>
         <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;">${booking.services.map(s=>`
@@ -581,20 +540,8 @@ function showStep1(){
           </div>`).join('')}
         </div>
         <div style="display:flex;justify-content:space-between;border-top:1px solid rgba(201,168,76,0.3);padding-top:8px;">
-          <span style="font-size:13px;font-weight:600;color:var(--ink);">${_hasDsc?'Subtotal':'Total'}</span>
-          <span style="font-size:15px;font-weight:700;color:var(--gold-dk);">${fmtPrice(_base)}</span>
-        </div>
-        <div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(201,168,76,0.3);">
-          <div style="font-size:10px;font-weight:700;color:var(--gold-dk);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Apply Discount</div>
-          <div style="display:flex;gap:6px;align-items:center;">
-            <div style="display:flex;border:1.5px solid var(--gold);border-radius:8px;overflow:hidden;flex-shrink:0">
-              <button onclick="booking.discountType='pct';document.getElementById('disc-val').focus()" style="padding:5px 10px;font-size:12px;font-weight:600;border:none;cursor:pointer;background:${booking.discountType==='pct'?'var(--gold)':'transparent'};color:${booking.discountType==='pct'?'#fff':'var(--gold-dk)'}">%</button>
-              <button onclick="booking.discountType='flat';document.getElementById('disc-val').focus()" style="padding:5px 10px;font-size:12px;font-weight:600;border:none;cursor:pointer;background:${booking.discountType==='flat'?'var(--gold)':'transparent'};color:${booking.discountType==='flat'?'#fff':'var(--gold-dk)'}">₱</button>
-            </div>
-            <input type="number" id="disc-val" min="0" step="any" placeholder="0" value="${booking.discountValue||''}" onkeydown="if(event.key==='Enter')applyDiscount()" style="flex:1;padding:6px 10px;border:1.5px solid var(--gold);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;background:var(--gold-lt);color:var(--ink);outline:none;min-width:0">
-            <button onclick="applyDiscount()" style="padding:6px 14px;background:var(--gold-dk);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0">Apply</button>
-          </div>
-          ${_discBreakdown}
+          <span style="font-size:13px;font-weight:600;color:var(--ink);">Total</span>
+          <span style="font-size:15px;font-weight:700;color:var(--gold-dk);">${fmtPrice(booking.servicePrice)}</span>
         </div>
       </div>`;
     }
@@ -663,7 +610,6 @@ function selectService(id, name, price, durationMins){
   booking.servicePrice=booking.services.reduce((t,s)=>t+s.price,0);
   booking.serviceId=booking.services.length===1?booking.services[0].id:null;
   booking.duration=Math.max(booking.services.reduce((t,s)=>t+(s.durationMins||60),0),30);
-  recalcDiscount();
   showStep1();
 }
 
@@ -672,7 +618,6 @@ function removeService(id){
   booking.service=booking.services.map(s=>s.name).join(', ');
   booking.servicePrice=booking.services.reduce((t,s)=>t+s.price,0);
   booking.duration=Math.max(booking.services.reduce((t,s)=>t+(s.durationMins||60),0),30);
-  recalcDiscount();
   showStep1();
 }
 
@@ -842,7 +787,6 @@ function pickDate(ds){
   const surgeEl=document.getElementById('surgeNote');
   const basePrice=booking.services.reduce((t,s)=>t+s.price,0);
   booking.servicePrice=surge?Math.round(basePrice*(1+surge.pct/100)*100)/100:basePrice;
-  recalcDiscount();
   if(surgeEl){
     if(surge){
       surgeEl.style.display='block';
@@ -1038,23 +982,11 @@ function goStep4(){
   setStep(4);
   const d=new Date(booking.date+'T00:00');
   const dateStr=d.toLocaleDateString('en-PH',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
-  const _fp=booking.discountAmt>0?booking.finalPrice:booking.servicePrice;
-  const _tc=getTotalCost();
-  const _prof=Math.round((_fp-_tc)*100)/100;
-  const _mg=_fp>0?Math.round(_prof/_fp*100):0;
-  const _dLabel=booking.discountType==='pct'?booking.discountValue+'%':'₱'+booking.discountAmt.toLocaleString('en-PH');
-  const _profColor=_prof>=0?'var(--success)':'var(--danger)';
-  const _discRows=booking.discountAmt>0?`
-    <div class="summary-row"><span class="summary-lbl">Subtotal</span><span class="summary-val">${fmtPrice(booking.servicePrice)}</span></div>
-    <div class="summary-row"><span class="summary-lbl">Discount (${_dLabel})</span><span class="summary-val" style="color:var(--danger)">−${fmtPrice(booking.discountAmt)}</span></div>
-    <div class="summary-row"><span class="summary-lbl" style="font-weight:700;color:var(--ink)">You Pay</span><span class="summary-val" style="color:var(--gold-dk);font-weight:700;font-size:15px;">${fmtPrice(_fp)}</span></div>
-    ${_tc>0?`<div class="summary-row"><span class="summary-lbl">Est. profit</span><span class="summary-val" style="font-weight:600;color:${_profColor}">${fmtPrice(_prof)} · ${_mg}%</span></div>`:''}
-  `:`<div class="summary-row"><span class="summary-lbl">Total</span><span class="summary-val" style="color:var(--gold-dk);font-weight:600;">${fmtPrice(booking.servicePrice)}</span></div>`;
   show(`<div class="card">
     <div class="card-title">Confirm Your Booking</div>
     <div class="card-sub">Please review the details below before confirming.</div>
     <div class="summary-row"><span class="summary-lbl">Service${booking.services.length>1?'s':''}</span><span class="summary-val">${booking.services.map(s=>`${s.name} — ${fmtPrice(s.price)}`).join('<br>')}</span></div>
-    ${_discRows}
+    <div class="summary-row"><span class="summary-lbl">Total</span><span class="summary-val" style="color:var(--gold-dk);font-weight:600;">${fmtPrice(booking.servicePrice)}</span></div>
     <div class="summary-row"><span class="summary-lbl">Date</span><span class="summary-val">${dateStr}</span></div>
     <div class="summary-row"><span class="summary-lbl">Time</span><span class="summary-val">${booking.time}${booking.duration?' ('+booking.duration+' min)':''}</span></div>
     ${booking.groupSize>1?`<div class="summary-row"><span class="summary-lbl">Group</span><span class="summary-val">👥 ${booking.groupSize} clients</span></div>`:''}
@@ -1090,11 +1022,7 @@ async function submitBooking(){
     email:booking.email||'',
     service:booking.service,
     services:booking.services,
-    totalPrice:booking.discountAmt>0?booking.finalPrice:booking.servicePrice,
-    originalPrice:booking.servicePrice,
-    discountAmt:booking.discountAmt||0,
-    discountType:booking.discountAmt>0?booking.discountType:'',
-    discountValue:booking.discountAmt>0?booking.discountValue:0,
+    totalPrice:booking.servicePrice,
     staff:booking.staff||'',
     aesthetician:combo?(booking.aesthetician||''):undefined,
     nailTech:combo?(booking.nailTech||''):undefined,
@@ -1144,7 +1072,7 @@ function showSuccess(ref){
         <div style="font-size:20px;font-weight:700;color:var(--gold-dk);letter-spacing:2px;">${ref}</div>
       </div>
       <div class="summary-row" style="text-align:left;"><span class="summary-lbl">Service${booking.services.length>1?'s':''}</span><span class="summary-val">${booking.services.map(s=>s.name).join(', ')}</span></div>
-      ${booking.discountAmt>0?`<div class="summary-row" style="text-align:left;"><span class="summary-lbl">Total (after discount)</span><span class="summary-val" style="color:var(--gold-dk);font-weight:600;">${fmtPrice(booking.finalPrice)}</span></div>`:`<div class="summary-row" style="text-align:left;"><span class="summary-lbl">Total</span><span class="summary-val" style="color:var(--gold-dk);font-weight:600;">${fmtPrice(booking.servicePrice)}</span></div>`}
+      <div class="summary-row" style="text-align:left;"><span class="summary-lbl">Total</span><span class="summary-val" style="color:var(--gold-dk);font-weight:600;">${fmtPrice(booking.servicePrice)}</span></div>
       <div class="summary-row" style="text-align:left;"><span class="summary-lbl">Date</span><span class="summary-val">${dateStr}</span></div>
       <div class="summary-row" style="text-align:left;"><span class="summary-lbl">Time</span><span class="summary-val">${booking.time}</span></div>
       ${isComboBooking()
