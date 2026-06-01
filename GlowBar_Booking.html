@@ -64,6 +64,7 @@ html{height:-webkit-fill-available;}
   .svc-btn.sel{border-color:var(--gold);background:var(--gold-lt);box-shadow:0 0 0 3px rgba(201,168,76,0.15);}
   .svc-btn.sel .svc-name{color:var(--gold-dk);}
   .svc-name{font-size:13px;font-weight:500;color:var(--ink);display:block;margin-bottom:3px;}
+  .svc-desc{font-size:11px;color:var(--ink3);display:block;margin-bottom:4px;line-height:1.4;font-weight:300;}
   .svc-price{font-size:12px;color:var(--gold-dk);font-weight:600;}
   .svc-cat{font-size:10px;color:var(--ink4);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px;}
 
@@ -246,7 +247,7 @@ const CATEGORY_TABS = [
       return s.includes('rejuven')||n.includes('rejuven')||n.includes('rejuve'); }},
   {id:'tattoo',  label:'Tattoo Laser',         icon:'🖋',
     test:p=>{ const c=(p.cat||'').toLowerCase(),n=(p.name||'').toLowerCase();
-      return c.includes('ink')||c.includes('clear')||n.includes('tattoo')||n.includes('wart'); }},
+      return c.includes('ink')||n.includes('tattoo'); }},
   {id:'exilis',  label:'Exilis',               icon:'⚡',
     test:p=>{ const c=(p.cat||'').toLowerCase(),n=(p.name||'').toLowerCase();
       return c.includes('exilis')||n.includes('exilis')||c.includes('body contour'); }},
@@ -291,94 +292,84 @@ function show(html){ document.getElementById('mainContent').innerHTML=html; }
 const DEMO_DATA = {
   products:[
     // ── GLOW NAILS — Manicure & Pedicure ──
-    {id:101,name:'Manicure',cat:'Glow Nails',subcat:'Manicure & Pedicure',price:249,durationMins:45,inPOS:true},
-    {id:102,name:'Pedicure',cat:'Glow Nails',subcat:'Manicure & Pedicure',price:299,durationMins:60,inPOS:true},
-    {id:103,name:'Gel Manicure',cat:'Glow Nails',subcat:'Manicure & Pedicure',price:399,durationMins:60,inPOS:true},
-    {id:104,name:'Gel Pedicure',cat:'Glow Nails',subcat:'Manicure & Pedicure',price:449,durationMins:75,inPOS:true},
-    {id:105,name:'Hand Spa',cat:'Glow Nails',subcat:'Manicure & Pedicure',price:349,durationMins:60,inPOS:true},
-    {id:106,name:'Foot Spa',cat:'Glow Nails',subcat:'Manicure & Pedicure',price:499,durationMins:75,inPOS:true},
+    {id:101,name:'Manicure',cat:'Glow Nails',subcat:'Manicure & Pedicure',price:249,durationMins:45,inPOS:true,description:'Classic nail care with cuticle shaping, filing, and polish'},
+    {id:102,name:'Pedicure',cat:'Glow Nails',subcat:'Manicure & Pedicure',price:299,durationMins:60,inPOS:true,description:'Foot soak, cuticle care, nail shaping, and polish'},
+    {id:103,name:'Gel Manicure',cat:'Glow Nails',subcat:'Manicure & Pedicure',price:399,durationMins:60,inPOS:true,description:'Long-lasting gel nail color with cuticle care and shaping'},
+    {id:104,name:'Gel Pedicure',cat:'Glow Nails',subcat:'Manicure & Pedicure',price:449,durationMins:75,inPOS:true,description:'Gel nail color for toes with soak and cuticle treatment'},
+    {id:105,name:'Hand Spa',cat:'Glow Nails',subcat:'Manicure & Pedicure',price:349,durationMins:60,inPOS:true,description:'Nourishing scrub, mask, and massage for soft, smooth hands'},
+    {id:106,name:'Foot Spa',cat:'Glow Nails',subcat:'Manicure & Pedicure',price:499,durationMins:75,inPOS:true,description:'Soak, exfoliation, mask, and massage for tired feet'},
     // ── GLOW NAILS — Extensions ──
-    {id:107,name:'Nail Extensions',cat:'Glow Nails',subcat:'Extensions',price:800,durationMins:90,inPOS:true},
+    {id:107,name:'Nail Extensions',cat:'Glow Nails',subcat:'Extensions',price:800,durationMins:90,inPOS:true,description:'Acrylic or gel nail extensions for added length and strength'},
     // ── GLOW NAILS — Nail Art ──
-    {id:108,name:'Nail Art',cat:'Glow Nails',subcat:'Nail Art',price:50,durationMins:5,inPOS:true},
-    {id:109,name:'Glitter / Foil',cat:'Glow Nails',subcat:'Nail Art',price:100,durationMins:10,inPOS:true},
-    {id:110,name:'Chrome Powder',cat:'Glow Nails',subcat:'Nail Art',price:150,durationMins:10,inPOS:true},
-    {id:111,name:'Nail Stickers',cat:'Glow Nails',subcat:'Nail Art',price:80,durationMins:5,inPOS:true},
+    {id:108,name:'Nail Art',cat:'Glow Nails',subcat:'Nail Art',price:50,durationMins:5,inPOS:true,description:'Custom hand-painted nail design per nail'},
+    {id:109,name:'Glitter / Foil',cat:'Glow Nails',subcat:'Nail Art',price:100,durationMins:10,inPOS:true,description:'Sparkle glitter or metallic foil accent per nail'},
+    {id:110,name:'Chrome Powder',cat:'Glow Nails',subcat:'Nail Art',price:150,durationMins:10,inPOS:true,description:'High-shine chrome mirror finish per nail'},
+    {id:111,name:'Nail Stickers',cat:'Glow Nails',subcat:'Nail Art',price:80,durationMins:5,inPOS:true,description:'Cute nail art stickers or decals per nail'},
     // ── GLOW NAILS — Packages ──
-    {id:112,name:'Mani + Pedi Package',cat:'Glow Nails',subcat:'Packages',price:499,durationMins:90,inPOS:true},
-    {id:113,name:'Gel Mani + Pedi Package',cat:'Glow Nails',subcat:'Packages',price:699,durationMins:120,inPOS:true},
-    // ── GLOW WAX ──
-    {id:201,name:'Face Wax',cat:'Glow Wax',price:200,durationMins:10,inPOS:true},
-    {id:202,name:'Underarm Wax',cat:'Glow Wax',price:300,durationMins:20,inPOS:true},
-    {id:203,name:'Arms & Legs Wax',cat:'Glow Wax',price:650,durationMins:40,inPOS:true},
-    {id:204,name:'Bikini Wax',cat:'Glow Wax',price:900,durationMins:40,inPOS:true},
-    {id:205,name:'Full Body Wax',cat:'Glow Wax',price:2500,durationMins:90,inPOS:true},
+    {id:112,name:'Mani + Pedi Package',cat:'Glow Nails',subcat:'Packages',price:499,durationMins:90,inPOS:true,description:'Classic manicure and pedicure combined at a bundled rate'},
+    {id:113,name:'Gel Mani + Pedi Package',cat:'Glow Nails',subcat:'Packages',price:699,durationMins:120,inPOS:true,description:'Gel manicure and gel pedicure for long-lasting color'},
     // ── HAIR WAXING ──
-    {id:211,name:'Underarm Wax',cat:'Hair Waxing',price:500,durationMins:30,inPOS:true},
-    {id:212,name:'Upper Lip Wax',cat:'Hair Waxing',price:400,durationMins:20,inPOS:true},
-    {id:213,name:'Lower Lip Wax',cat:'Hair Waxing',price:400,durationMins:20,inPOS:true},
-    {id:214,name:'Half Arms Wax',cat:'Hair Waxing',price:600,durationMins:30,inPOS:true},
-    {id:215,name:'Full Arms Wax',cat:'Hair Waxing',price:850,durationMins:40,inPOS:true},
-    {id:216,name:'Half Legs Wax',cat:'Hair Waxing',price:700,durationMins:30,inPOS:true},
-    {id:217,name:'Full Legs Wax',cat:'Hair Waxing',price:1000,durationMins:40,inPOS:true},
-    {id:218,name:'Brazilian Wax',cat:'Hair Waxing',price:800,durationMins:30,inPOS:true},
-    {id:219,name:'Bikini Line Wax',cat:'Hair Waxing',price:600,durationMins:20,inPOS:true},
+    {id:211,name:'Underarm Wax',cat:'Hair Waxing',price:500,durationMins:30,inPOS:true,description:'Smooth underarm hair removal with warm wax'},
+    {id:212,name:'Upper Lip Wax',cat:'Hair Waxing',price:400,durationMins:20,inPOS:true,description:'Quick and gentle upper lip hair removal'},
+    {id:213,name:'Lower Lip Wax',cat:'Hair Waxing',price:400,durationMins:20,inPOS:true,description:'Clean lower lip hair removal using warm wax'},
+    {id:214,name:'Half Arms Wax',cat:'Hair Waxing',price:600,durationMins:30,inPOS:true,description:'Wrist to elbow hair removal with warm wax'},
+    {id:215,name:'Full Arms Wax',cat:'Hair Waxing',price:850,durationMins:40,inPOS:true,description:'Complete arm hair removal from wrists to shoulders'},
+    {id:216,name:'Half Legs Wax',cat:'Hair Waxing',price:700,durationMins:30,inPOS:true,description:'Ankle to knee hair removal for smooth legs'},
+    {id:217,name:'Full Legs Wax',cat:'Hair Waxing',price:1000,durationMins:40,inPOS:true,description:'Full leg hair removal from ankles to upper thighs'},
+    {id:218,name:'Brazilian Wax',cat:'Hair Waxing',price:800,durationMins:30,inPOS:true,description:'Complete intimate area hair removal for lasting smoothness'},
+    {id:219,name:'Bikini Wax',cat:'Hair Waxing',price:600,durationMins:20,inPOS:true,description:'Bikini line cleanup for a neat, clean result'},
     // ── GLOW FACIALS ──
-    {id:301,name:'Regular Facial',cat:'Glow Facials',subcat:'Facials',price:699,durationMins:60,inPOS:true},
-    {id:302,name:'Whitening Facial',cat:'Glow Facials',subcat:'Facials',price:999,durationMins:75,inPOS:true},
-    {id:303,name:'Anti-Acne Facial',cat:'Glow Facials',subcat:'Facials',price:999,durationMins:75,inPOS:true},
-    {id:304,name:'Anti-Aging Facial',cat:'Glow Facials',subcat:'Facials',price:1099,durationMins:75,inPOS:true},
-    {id:305,name:'HydraFacial',cat:'Glow Facials',subcat:'Facials',price:2000,durationMins:90,inPOS:true},
+    {id:301,name:'Regular Facial',cat:'Glow Facials',subcat:'Facials',price:699,durationMins:60,inPOS:true,description:'Deep cleansing with steam, extractions, and moisturizing'},
+    {id:302,name:'Whitening Facial',cat:'Glow Facials',subcat:'Facials',price:999,durationMins:75,inPOS:true,description:'Brightening treatment to even skin tone and lighten dark spots'},
+    {id:303,name:'Anti-Acne Facial',cat:'Glow Facials',subcat:'Facials',price:999,durationMins:75,inPOS:true,description:'Clarifying facial to target breakouts, excess oil, and blemishes'},
+    {id:304,name:'Anti-Aging Facial',cat:'Glow Facials',subcat:'Facials',price:1099,durationMins:75,inPOS:true,description:'Firming and lifting facial to reduce fine lines and wrinkles'},
+    {id:305,name:'HydraFacial',cat:'Glow Facials',subcat:'Facials',price:2000,durationMins:90,inPOS:true,description:'Multi-step facial with deep cleansing, exfoliation, and serum infusion'},
     // ── GLOW FACIALS — Add-ons ──
-    {id:306,name:'LED Therapy',cat:'Glow Facials',subcat:'Add-ons',price:200,durationMins:15,inPOS:true},
-    {id:307,name:'High Frequency',cat:'Glow Facials',subcat:'Add-ons',price:150,durationMins:10,inPOS:true},
-    {id:308,name:'Collagen Mask',cat:'Glow Facials',subcat:'Add-ons',price:250,durationMins:20,inPOS:true},
+    {id:306,name:'LED Therapy',cat:'Glow Facials',subcat:'Add-ons',price:200,durationMins:15,inPOS:true,description:'Light therapy to boost collagen and calm inflammation'},
+    {id:307,name:'High Frequency',cat:'Glow Facials',subcat:'Add-ons',price:150,durationMins:10,inPOS:true,description:'Skin renewal treatment to combat acne and stimulate cell turnover'},
+    {id:308,name:'Collagen Mask',cat:'Glow Facials',subcat:'Add-ons',price:250,durationMins:20,inPOS:true,description:'Intensive collagen mask for deep hydration and firmness'},
     // ── GLOW SKIN — Skin Rejuvenation ──
-    {id:401,name:'Skin Rejuvenation — Single',cat:'Glow Skin',subcat:'Skin Rejuvenation',price:1000,durationMins:45,inPOS:true},
-    {id:402,name:'Underarms Rejuvenation',cat:'Glow Skin',subcat:'Skin Rejuvenation',price:1200,durationMins:20,inPOS:true},
-    {id:403,name:'Elbows Rejuvenation',cat:'Glow Skin',subcat:'Skin Rejuvenation',price:1000,durationMins:40,inPOS:true},
-    {id:404,name:'Inner Thighs Rejuvenation',cat:'Glow Skin',subcat:'Skin Rejuvenation',price:1300,durationMins:40,inPOS:true},
-    {id:405,name:'Remove & Rejuve Combo Underarms',cat:'Glow Skin',subcat:'Skin Rejuvenation',price:2200,durationMins:60,inPOS:true},
+    {id:401,name:'Skin Rejuvenation — Single',cat:'Glow Skin',subcat:'Skin Rejuvenation',price:1000,durationMins:45,inPOS:true,description:'Laser-assisted treatment to lighten, smooth, and rejuvenate skin'},
+    {id:402,name:'Underarms Rejuvenation',cat:'Glow Skin',subcat:'Skin Rejuvenation',price:1200,durationMins:20,inPOS:true,description:'Skin lightening and smoothing treatment for underarms'},
+    {id:403,name:'Elbows Rejuvenation',cat:'Glow Skin',subcat:'Skin Rejuvenation',price:1000,durationMins:40,inPOS:true,description:'Brightening treatment to reduce darkness and roughness on elbows'},
+    {id:404,name:'Inner Thighs Rejuvenation',cat:'Glow Skin',subcat:'Skin Rejuvenation',price:1300,durationMins:40,inPOS:true,description:'Lightening and evening treatment for inner thigh skin'},
+    {id:405,name:'Remove & Rejuve Combo Underarms',cat:'Glow Skin',subcat:'Skin Rejuvenation',price:2200,durationMins:60,inPOS:true,description:'Combo laser hair removal and skin rejuvenation for underarms'},
     // ── GLOW SKIN — Diode Laser ──
-    {id:411,name:'Underarms Diode',cat:'Glow Skin',subcat:'Diode Laser',price:1200,durationMins:20,inPOS:true},
-    {id:412,name:'Upper Lip Diode',cat:'Glow Skin',subcat:'Diode Laser',price:800,durationMins:20,inPOS:true},
-    {id:413,name:'Lower Lip Diode',cat:'Glow Skin',subcat:'Diode Laser',price:800,durationMins:20,inPOS:true},
-    {id:414,name:'Cheeks Diode',cat:'Glow Skin',subcat:'Diode Laser',price:1000,durationMins:30,inPOS:true},
-    {id:415,name:'Arms Full Diode',cat:'Glow Skin',subcat:'Diode Laser',price:2200,durationMins:60,inPOS:true},
-    {id:416,name:'Arms Half Diode',cat:'Glow Skin',subcat:'Diode Laser',price:1500,durationMins:40,inPOS:true},
-    {id:417,name:'Legs Full Diode',cat:'Glow Skin',subcat:'Diode Laser',price:3500,durationMins:60,inPOS:true},
-    {id:418,name:'Legs Half Diode',cat:'Glow Skin',subcat:'Diode Laser',price:2500,durationMins:60,inPOS:true},
+    {id:411,name:'Underarms Diode',cat:'Glow Skin',subcat:'Diode Laser',price:1200,durationMins:20,inPOS:true,description:'Permanent hair reduction for the underarm area'},
+    {id:412,name:'Upper Lip Diode',cat:'Glow Skin',subcat:'Diode Laser',price:800,durationMins:20,inPOS:true,description:'Targeted diode laser for upper lip hair removal'},
+    {id:413,name:'Lower Lip Diode',cat:'Glow Skin',subcat:'Diode Laser',price:800,durationMins:20,inPOS:true,description:'Diode laser treatment for lower lip hair removal'},
+    {id:414,name:'Cheeks Diode',cat:'Glow Skin',subcat:'Diode Laser',price:1000,durationMins:30,inPOS:true,description:'Diode laser hair removal for the cheek area'},
+    {id:415,name:'Arms Full Diode',cat:'Glow Skin',subcat:'Diode Laser',price:2200,durationMins:60,inPOS:true,description:'Complete arm hair reduction with diode laser'},
+    {id:416,name:'Arms Half Diode',cat:'Glow Skin',subcat:'Diode Laser',price:1500,durationMins:40,inPOS:true,description:'Diode laser hair removal from wrist to elbow'},
+    {id:417,name:'Legs Full Diode',cat:'Glow Skin',subcat:'Diode Laser',price:3500,durationMins:60,inPOS:true,description:'Full leg diode laser hair removal for lasting smoothness'},
+    {id:418,name:'Legs Half Diode',cat:'Glow Skin',subcat:'Diode Laser',price:2500,durationMins:60,inPOS:true,description:'Diode laser hair removal from ankle to knee'},
     // ── GLOW SKIN — Pico Laser ──
-    {id:421,name:'Black Doll Carbon Laser',cat:'Glow Skin',subcat:'Pico Laser',price:1500,durationMins:60,inPOS:true},
-    {id:422,name:'Melasma/Freckles Face',cat:'Glow Skin',subcat:'Pico Laser',price:1600,durationMins:30,inPOS:true},
-    {id:423,name:'Melasma/Freckles Shoulders',cat:'Glow Skin',subcat:'Pico Laser',price:1900,durationMins:40,inPOS:true},
-    {id:424,name:'Melasma/Freckles Back',cat:'Glow Skin',subcat:'Pico Laser',price:2500,durationMins:60,inPOS:true},
-    {id:425,name:'Scar Lightening Face',cat:'Glow Skin',subcat:'Pico Laser',price:1500,durationMins:30,inPOS:true},
-    {id:426,name:'Scar Lightening Arms',cat:'Glow Skin',subcat:'Pico Laser',price:1000,durationMins:30,inPOS:true},
-    {id:427,name:'Scar Lightening Legs',cat:'Glow Skin',subcat:'Pico Laser',price:1500,durationMins:40,inPOS:true},
-    {id:428,name:'Scar Lightening Knees',cat:'Glow Skin',subcat:'Pico Laser',price:1300,durationMins:40,inPOS:true},
+    {id:421,name:'Black Doll Carbon Laser',cat:'Glow Skin',subcat:'Pico Laser',price:1500,durationMins:60,inPOS:true,description:'Carbon peel laser to refine pores, brighten, and smooth skin'},
+    {id:422,name:'Melasma/Freckles Face',cat:'Glow Skin',subcat:'Pico Laser',price:1600,durationMins:30,inPOS:true,description:'Pico laser to fade melasma, freckles, and pigmentation on the face'},
+    {id:423,name:'Melasma/Freckles Shoulders',cat:'Glow Skin',subcat:'Pico Laser',price:1900,durationMins:40,inPOS:true,description:'Pico laser for melasma and freckle treatment on the shoulders'},
+    {id:424,name:'Melasma/Freckles Back',cat:'Glow Skin',subcat:'Pico Laser',price:2500,durationMins:60,inPOS:true,description:'Pico laser pigmentation treatment for the back'},
+    {id:425,name:'Scar Lightening Face',cat:'Glow Skin',subcat:'Pico Laser',price:1500,durationMins:30,inPOS:true,description:'Pico laser to lighten and fade facial scars'},
+    {id:426,name:'Scar Lightening Arms',cat:'Glow Skin',subcat:'Pico Laser',price:1000,durationMins:30,inPOS:true,description:'Pico laser scar fading treatment for the arms'},
+    {id:427,name:'Scar Lightening Legs',cat:'Glow Skin',subcat:'Pico Laser',price:1500,durationMins:40,inPOS:true,description:'Pico laser to lighten scars on the legs'},
+    {id:428,name:'Scar Lightening Knees',cat:'Glow Skin',subcat:'Pico Laser',price:1300,durationMins:40,inPOS:true,description:'Targeted pico laser for darkened knee scars'},
     // ── GLOW INK — Tattoo Removal ──
-    {id:501,name:'Tattoo Removal — Small',cat:'Glow Ink',price:500,durationMins:20,inPOS:true},
-    {id:502,name:'Tattoo Removal — Medium',cat:'Glow Ink',price:1000,durationMins:30,inPOS:true},
-    {id:503,name:'Tattoo Removal — Large',cat:'Glow Ink',price:2000,durationMins:45,inPOS:true},
-    {id:504,name:'Tattoo Laser Removal',cat:'Glow Ink',price:1500,durationMins:60,inPOS:true},
-    // ── GLOW CLEAR — Wart Removal ──
-    {id:511,name:'Wart Removal — Small',cat:'Glow Clear',price:300,durationMins:20,inPOS:true},
-    {id:512,name:'Wart Removal — Medium',cat:'Glow Clear',price:500,durationMins:30,inPOS:true},
-    {id:513,name:'Wart Removal — Large',cat:'Glow Clear',price:800,durationMins:45,inPOS:true},
+    {id:501,name:'Tattoo Removal — Small',cat:'Glow Ink',price:500,durationMins:20,inPOS:true,description:'Laser removal for small tattoos'},
+    {id:502,name:'Tattoo Removal — Medium',cat:'Glow Ink',price:1000,durationMins:30,inPOS:true,description:'Laser removal for medium-sized tattoos'},
+    {id:503,name:'Tattoo Removal — Large',cat:'Glow Ink',price:2000,durationMins:45,inPOS:true,description:'Laser removal for large or complex tattoos'},
+    {id:504,name:'Tattoo Laser Removal',cat:'Glow Ink',price:1500,durationMins:60,inPOS:true,description:'Professional tattoo laser removal per session'},
     // ── EXILIS GLOW ──
-    {id:601,name:'Fat Reduction',cat:'Exilis Glow',price:2800,durationMins:60,inPOS:true},
-    {id:602,name:'Lifting',cat:'Exilis Glow',price:1800,durationMins:45,inPOS:true},
-    {id:603,name:'Full Face with Neck',cat:'Exilis Glow',price:3200,durationMins:60,inPOS:true},
-    {id:604,name:'Full Face',cat:'Exilis Glow',price:2800,durationMins:40,inPOS:true},
-    {id:605,name:'Double Chin with Neck',cat:'Exilis Glow',price:2000,durationMins:40,inPOS:true},
-    {id:606,name:'Face Per Area',cat:'Exilis Glow',price:1500,durationMins:20,inPOS:true},
-    {id:607,name:'Arms Exilis',cat:'Exilis Glow',price:1800,durationMins:40,inPOS:true},
-    {id:608,name:'Abdomen Exilis',cat:'Exilis Glow',price:2500,durationMins:60,inPOS:true},
-    {id:609,name:'Inner Thigh Exilis',cat:'Exilis Glow',price:2400,durationMins:40,inPOS:true},
-    {id:610,name:'Love Handle Exilis',cat:'Exilis Glow',price:2200,durationMins:40,inPOS:true},
-    {id:611,name:'Buttocks Exilis',cat:'Exilis Glow',price:2400,durationMins:40,inPOS:true},
-    {id:612,name:'Lower Leg Exilis',cat:'Exilis Glow',price:1600,durationMins:40,inPOS:true},
+    {id:601,name:'Fat Reduction',cat:'Exilis Glow',price:2800,durationMins:60,inPOS:true,description:'Radiofrequency body contouring to reduce stubborn fat'},
+    {id:602,name:'Lifting',cat:'Exilis Glow',price:1800,durationMins:45,inPOS:true,description:'RF skin tightening and lifting treatment'},
+    {id:603,name:'Full Face with Neck',cat:'Exilis Glow',price:3200,durationMins:60,inPOS:true,description:'RF tightening and lifting for the full face and neck'},
+    {id:604,name:'Full Face',cat:'Exilis Glow',price:2800,durationMins:40,inPOS:true,description:'Exilis radiofrequency treatment for full face firming'},
+    {id:605,name:'Double Chin with Neck',cat:'Exilis Glow',price:2000,durationMins:40,inPOS:true,description:'RF treatment to reduce double chin and firm the neck'},
+    {id:606,name:'Face Per Area',cat:'Exilis Glow',price:1500,durationMins:20,inPOS:true,description:'Focused Exilis RF for a specific facial area'},
+    {id:607,name:'Arms Exilis',cat:'Exilis Glow',price:1800,durationMins:40,inPOS:true,description:'RF body contouring to tighten and tone the arms'},
+    {id:608,name:'Abdomen Exilis',cat:'Exilis Glow',price:2500,durationMins:60,inPOS:true,description:'Exilis RF for abdominal fat reduction and skin tightening'},
+    {id:609,name:'Inner Thigh Exilis',cat:'Exilis Glow',price:2400,durationMins:40,inPOS:true,description:'RF contouring to firm and tone the inner thighs'},
+    {id:610,name:'Love Handle Exilis',cat:'Exilis Glow',price:2200,durationMins:40,inPOS:true,description:'Targeted RF to reduce love handles and flanks'},
+    {id:611,name:'Buttocks Exilis',cat:'Exilis Glow',price:2400,durationMins:40,inPOS:true,description:'Exilis RF lifting and firming for the buttocks'},
+    {id:612,name:'Lower Leg Exilis',cat:'Exilis Glow',price:1600,durationMins:40,inPOS:true,description:'RF contouring and tightening for the lower legs'},
   ],
   packages:[
     // ── Diode Hair Removal ──
@@ -517,13 +508,7 @@ function showStep1(){
     const pkgs=DATA.packages.filter(p=>p.active!==false);
     const orderedTabs=[];
     CATEGORY_TABS.forEach(t=>{ if(tabMap[t.id]) orderedTabs.push({...t,services:tabMap[t.id]}); });
-    // Extra cats not in CATEGORY_TABS
-    Object.keys(tabMap).forEach(id=>{
-      if(!CATEGORY_TABS.find(t=>t.id===id)){
-        const label=id.startsWith('other_')?id.slice(6):id;
-        orderedTabs.push({id,label,icon:'◆',services:tabMap[id]});
-      }
-    });
+    // Only show defined category tabs — uncategorized services are intentionally hidden
     if(pkgs.length) orderedTabs.push({id:'packages',label:'Packages',icon:'📦',services:[]});
 
     // Default active tab
@@ -589,6 +574,7 @@ function showStep1(){
             html+=`<button class="svc-btn ${sel}" onclick="selectService('${p.id}','${p.name.replace(/'/g,"\\'")}',${p.price},${p.durationMins||60})">
               ${sel?'<span style="float:right;color:var(--gold-dk);font-size:14px;">✓</span>':''}
               <span class="svc-name">${p.name}</span>
+              ${p.description?`<span class="svc-desc">${p.description}</span>`:''}
               <span class="svc-price">${fmtPrice(p.price)}</span>
             </button>`;
           });
