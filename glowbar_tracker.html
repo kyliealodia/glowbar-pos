@@ -1770,6 +1770,7 @@ function buildSvcCardInner(svc, catId){
       <div style="display:flex;justify-content:space-between;padding:1px 0"><span style="color:var(--muted)">Profit at discount</span><span style="font-weight:600;color:${pColor2}">&#8369;${Math.round(dProfit).toLocaleString()} (${dp>0?Math.round(dProfit/dp*100):0}%)</span></div>
       ${over?`<div style="color:var(--red);font-size:10px;margin-top:4px">⚠ Below break-even (max ${bePct}%)</div>`:''}</div>`;
   })()}
+`;
 }
 
 function refreshSvcCard(svcId){
