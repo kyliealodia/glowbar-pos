@@ -3159,26 +3159,48 @@ function renderPersonal(){
   const container = document.getElementById('personal-cats-container');
   if(!container) return;
 
-  let grandTotal = 0;
-  personalCats.forEach(cat => cat.items.forEach(it => grandTotal += parseFloat(it.amt)||0));
+  let grandTotal=0, paidSum=0, unpaidSum=0;
+  personalCats.forEach(cat=>cat.items.forEach(it=>{
+    const amt=parseFloat(it.amt)||0;
+    grandTotal+=amt;
+    if(it.paid) paidSum+=amt; else unpaidSum+=amt;
+  }));
 
-  // Summary
-  const sumEl = document.getElementById('personal-summary');
-  if(sumEl) sumEl.innerHTML = `
-    <div class="metric"><div class="metric-label">Total spent</div><div class="metric-value gd">₱${Math.round(grandTotal).toLocaleString()}</div></div>
-    <div class="metric"><div class="metric-label">Categories</div><div class="metric-value">${personalCats.length}</div></div>
-    <div class="metric"><div class="metric-label">Entries</div><div class="metric-value">${personalCats.reduce((s,c)=>s+c.items.length,0)}</div></div>
-  `;
+  // Available cash from expense tracker (paid only) minus personal spend
+  let mcUsed=0, kyUsed=0;
+  CATS.forEach(cat=>cat.items.forEach((item,i)=>{
+    const s=getS(cat.id,i), paidBy=s.paidBy||'', eff=effV(s,item.p);
+    if(!eff)return;
+    if(paidBy==='mcjames')mcUsed+=eff; else if(paidBy==='kylie')kyUsed+=eff;
+  }));
+  const availCash=TOTAL_FUNDS-(mcUsed+kyUsed);
+  const remaining=availCash-grandTotal;
+  const remColor=remaining<0?'var(--red)':remaining<50000?'var(--warn)':'#0f5132';
+
+  const sumEl=document.getElementById('personal-summary');
+  if(sumEl) sumEl.innerHTML=`
+    <div class="metric"><div class="metric-label">Total personal spend</div><div class="metric-value gd">₱${Math.round(grandTotal).toLocaleString()}</div></div>
+    <div class="metric" style="border:0.5px solid #f5c6cb"><div class="metric-label" style="color:#842029">Not yet paid</div><div class="metric-value" style="color:#842029">₱${Math.round(unpaidSum).toLocaleString()}</div></div>
+    <div class="metric" style="border:0.5px solid #badbcc"><div class="metric-label" style="color:#0f5132">Paid</div><div class="metric-value" style="color:#0f5132">₱${Math.round(paidSum).toLocaleString()}</div></div>
+    <div class="metric" style="border:0.5px solid ${remaining<0?'#f5c6cb':remaining<50000?'#f0c060':'#badbcc'};background:${remaining<0?'#fff5f5':remaining<50000?'#fffbec':'#f0fff4'}">
+      <div class="metric-label" style="color:${remColor}">Remaining balance</div>
+      <div class="metric-value" style="color:${remColor}">${remaining<0?'−':''}₱${Math.abs(Math.round(remaining)).toLocaleString()}</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:2px">Expense tracker available − personal</div>
+    </div>`;
 
   container.innerHTML = personalCats.map((cat, ci) => {
     const catTotal = cat.items.reduce((s,it)=>s+(parseFloat(it.amt)||0),0);
-    const rows = cat.items.map((it, ii) => `
-      <tr>
+    const rows = cat.items.map((it, ii) => {
+      const isPaid=it.paid===true;
+      const statusBtn=`<button onclick="togglePersonalPaid(${ci},${ii})" style="padding:3px 10px;border:none;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;background:${isPaid?'#d4edda':'#fff3cd'};color:${isPaid?'#2d6a4f':'#856404'}">${isPaid?'✓ Paid':'○ Not paid'}</button>`;
+      return `
+      <tr style="opacity:${isPaid?'0.7':'1'}">
         <td><input class="ni" value="${escHtml(it.name)}" placeholder="Description" oninput="personalCats[${ci}].items[${ii}].name=this.value" style="width:100%"></td>
         <td><input class="ni" type="date" value="${it.date||''}" oninput="personalCats[${ci}].items[${ii}].date=this.value" style="width:130px"></td>
         <td><input class="ni" type="number" value="${it.amt||''}" placeholder="0" oninput="personalCats[${ci}].items[${ii}].amt=parseFloat(this.value)||0;refreshPersonalTotals(${ci})" style="width:110px;text-align:right"></td>
+        <td>${statusBtn}</td>
         <td><button class="del-row" onclick="deletePersonalItem(${ci},${ii})">✕</button></td>
-      </tr>`).join('');
+      </tr>`;}).join('');
 
     return `
     <div class="cat-block" id="pcat-${ci}" style="margin-bottom:1.2rem;background:#fff;border:0.5px solid var(--border-l);border-radius:12px;overflow:hidden">
@@ -3194,6 +3216,7 @@ function renderPersonal(){
           <th style="text-align:left">Description</th>
           <th style="text-align:left">Date</th>
           <th style="text-align:right">Amount (₱)</th>
+          <th>Status</th>
           <th></th>
         </tr></thead>
         <tbody id="pcat-rows-${ci}">${rows}</tbody>
@@ -3205,23 +3228,41 @@ function renderPersonal(){
   }).join('');
 }
 
+function togglePersonalPaid(ci, ii){
+  const it=personalCats[ci]?.items[ii]; if(!it)return;
+  it.paid=!it.paid;
+  savePersonal(); renderPersonal();
+}
+
 function refreshPersonalTotals(ci){
-  const cat = personalCats[ci];
-  if(!cat) return;
-  const total = cat.items.reduce((s,it)=>s+(parseFloat(it.amt)||0),0);
-  const el = document.getElementById('pcat-total-'+ci);
-  if(el) el.textContent = '₱'+Math.round(total).toLocaleString();
-  let grandTotal = 0;
-  personalCats.forEach(c=>c.items.forEach(it=>grandTotal+=parseFloat(it.amt)||0));
-  const sumEl = document.getElementById('personal-summary');
+  const cat=personalCats[ci]; if(!cat)return;
+  const total=cat.items.reduce((s,it)=>s+(parseFloat(it.amt)||0),0);
+  const el=document.getElementById('pcat-total-'+ci);
+  if(el) el.textContent='₱'+Math.round(total).toLocaleString();
+  let grandTotal=0, paidSum=0, unpaidSum=0;
+  personalCats.forEach(c=>c.items.forEach(it=>{
+    const amt=parseFloat(it.amt)||0; grandTotal+=amt;
+    if(it.paid) paidSum+=amt; else unpaidSum+=amt;
+  }));
+  let mcUsed=0, kyUsed=0;
+  CATS.forEach(cat2=>cat2.items.forEach((item,i)=>{
+    const s=getS(cat2.id,i), paidBy=s.paidBy||'', eff=effV(s,item.p);
+    if(!eff)return;
+    if(paidBy==='mcjames')mcUsed+=eff; else if(paidBy==='kylie')kyUsed+=eff;
+  }));
+  const remaining=(TOTAL_FUNDS-(mcUsed+kyUsed))-grandTotal;
+  const sumEl=document.getElementById('personal-summary');
   if(sumEl){
-    const metrics = sumEl.querySelectorAll('.metric-value');
-    if(metrics[0]) metrics[0].textContent = '₱'+Math.round(grandTotal).toLocaleString();
+    const m=sumEl.querySelectorAll('.metric-value');
+    if(m[0]) m[0].textContent='₱'+Math.round(grandTotal).toLocaleString();
+    if(m[1]) m[1].textContent='₱'+Math.round(unpaidSum).toLocaleString();
+    if(m[2]) m[2].textContent='₱'+Math.round(paidSum).toLocaleString();
+    if(m[3]) m[3].textContent=(remaining<0?'−':'')+'₱'+Math.abs(Math.round(remaining)).toLocaleString();
   }
 }
 
 function addPersonalItem(ci){
-  personalCats[ci].items.push({id:'pi_'+Date.now(), name:'', amt:0, date:new Date().toISOString().split('T')[0]});
+  personalCats[ci].items.push({id:'pi_'+Date.now(), name:'', amt:0, date:new Date().toISOString().split('T')[0], paid:false});
   renderPersonal();
   // focus the new row's description input
   const rows = document.querySelectorAll(`#pcat-rows-${ci} tr`);
