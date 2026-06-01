@@ -2552,6 +2552,11 @@ function toggleConsPaid(gid,i){
   refreshConsGroup(gid);
   refreshConsSummary();
 }
+function updConsName(gid,i,v){
+  const group=CONS_DATA.find(g=>g.id===gid); if(!group) return;
+  if(group.items[i]) group.items[i].name=v;
+  saveConsState();
+}
 
 let activeConsFilter='all';
 let openConsGroups=new Set();
@@ -2646,7 +2651,7 @@ function consRowHtml(group,item,i){
   const newCpuHtml=newCpu?`<span style="color:var(--green);font-size:11px">₱${newCpu<1?newCpu.toFixed(4):newCpu.toFixed(2)}/${uom}</span>`:'<span style="color:var(--muted)">—</span>';
 
   return `<tr>
-    <td>${item.name}</td>
+    <td><input class="ni" type="text" value="${item.name.replace(/"/g,'&quot;')}" style="min-width:120px" oninput="updConsName('${group.id}',${i},this.value)" title="Click to edit item name"></td>
     <td style="color:var(--muted);font-size:11px">${item.qty}</td>
     <td>
       <div style="font-size:11px;color:var(--muted)">Units in pack:</div>
