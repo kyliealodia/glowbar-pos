@@ -2521,15 +2521,36 @@ function refreshConsSummary(){
   const el=document.getElementById('cons-summary');
   if(!el) return;
   const {origTotal,newTotalAll,savings,hasNew}=getConsTotals();
-  const savClass = savings>0?'g':savings<0?'r':'';
+
+  // Paid / unpaid breakdown
+  let paidTotal=0, unpaidTotal=0, unpaidCount=0, paidCount=0;
+  CONS_DATA.forEach(group=>{
+    group.items.forEach((item,i)=>{
+      const s=getCS(group.id,i);
+      const nt=newTotal(item,group.id,i);
+      const eff=nt!==null?nt:(item.total||0);
+      if(s.paid){ paidTotal+=eff; paidCount++; }
+      else { unpaidTotal+=eff; unpaidCount++; }
+    });
+  });
+
+  const savClass=savings>0?'g':savings<0?'r':'';
   el.innerHTML=`
-    <div class="metric"><div class="metric-label">Original total</div><div class="metric-value gd">₱${Math.round(origTotal).toLocaleString()}</div></div>
-    <div class="metric"><div class="metric-label">New total (with updates)</div><div class="metric-value">₱${Math.round(newTotalAll).toLocaleString()}</div></div>
-    <div class="metric" style="border:0.5px solid ${savings>0?'var(--border-l)':'var(--border-l)'}"><div class="metric-label">${savings>=0?'Total savings':'Extra cost'}</div><div class="metric-value ${savClass}">${savings!==0?(savings>0?'-':'+'): ''}₱${Math.abs(Math.round(savings)).toLocaleString()}</div></div>
-    ${hasNew?`<div class="metric" style="border:0.5px solid var(--gold-l);background:var(--cream2)"><div class="metric-label" style="color:var(--gold-d)">Consumable saving (main budget)</div><div class="metric-value ${savClass}">${savings>=0?'-':'+'}<span style="font-size:12px">₱</span>${Math.abs(Math.round(savings)).toLocaleString()}</div></div>`:''}
+    <div class="metric"><div class="metric-label">Total (orig)</div><div class="metric-value gd">₱${Math.round(origTotal).toLocaleString()}</div></div>
+    <div class="metric" style="border:0.5px solid #f5c6cb"><div class="metric-label" style="color:#842029">Not yet paid</div><div class="metric-value" style="color:#842029">₱${Math.round(unpaidTotal).toLocaleString()}</div><div style="font-size:10px;color:var(--muted);margin-top:2px">${unpaidCount} item${unpaidCount!==1?'s':''}</div></div>
+    <div class="metric" style="border:0.5px solid #badbcc"><div class="metric-label" style="color:#0f5132">Paid</div><div class="metric-value" style="color:#0f5132">₱${Math.round(paidTotal).toLocaleString()}</div><div style="font-size:10px;color:var(--muted);margin-top:2px">${paidCount} item${paidCount!==1?'s':''}</div></div>
+    ${hasNew?`<div class="metric"><div class="metric-label">${savings>=0?'Savings':'Extra cost'}</div><div class="metric-value ${savClass}">${savings!==0?(savings>0?'-':'+'): ''}₱${Math.abs(Math.round(savings)).toLocaleString()}</div></div>`:''}
   `;
-  // also refresh main summary to reflect consumable savings
   refreshSummary();
+}
+
+function toggleConsPaid(gid,i){
+  const k=gid+'_'+i;
+  if(!consState[k]) consState[k]={newQty:'',newUnit:'',supplier:''};
+  consState[k].paid=!consState[k].paid;
+  saveConsState();
+  refreshConsGroup(gid);
+  refreshConsSummary();
 }
 
 let activeConsFilter='all';
@@ -2658,6 +2679,7 @@ function consRowHtml(group,item,i){
     <td>${newCpuHtml}</td>
     <td>${diffHtml}</td>
     <td><input class="nti" style="width:90px" type="text" placeholder="supplier" value="${s.supplier||''}" oninput="setCS('${group.id}',${i},'supplier',this.value)"></td>
+    <td><button onclick="toggleConsPaid('${group.id}',${i})" style="padding:3px 10px;border:none;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;background:${s.paid?'#d4edda':'#fff3cd'};color:${s.paid?'#2d6a4f':'#856404'}">${s.paid?'✓ Paid':'○ Not paid'}</button></td>
     <td class="ca">${tags}</td>
     <td><button class="del-row" onclick="delConsItem('${group.id}',${i})" title="Remove">✕</button></td>
   </tr>`;
@@ -2699,6 +2721,7 @@ function buildConsumables(){
             <th>New cost/use</th>
             <th>Savings / Over</th>
             <th style="text-align:left">Supplier</th>
+            <th>Status</th>
             <th class="ca">Services</th>
             <th title="Remove item">✕</th>
           </tr></thead>
