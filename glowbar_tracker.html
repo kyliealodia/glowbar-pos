@@ -321,6 +321,72 @@ window.pushPromosToPOS = async function(){
   }catch(e){ console.error('pushPromosToPOS error:',e); alert('Error pushing promos: '+e.message); }
 };
 
+// ── PUSH CONSUMABLES → gb/products (POS inventory sync) ──────────
+window.pushConsumablesToPOS = async function(){
+  // Build tracker consumables list from in-memory CONS_DATA + consState
+  const trackerProducts = [];
+  if(typeof CONS_DATA === 'undefined'){ alert('Consumables not loaded yet.'); return null; }
+  CONS_DATA.forEach(group=>{
+    group.items.forEach((item,i)=>{
+      const s=(typeof getCS==='function')?getCS(group.id,i):{};
+      const uom=s.uom||item.uom||'pcs';
+      const unitsInPack=parseFloat(s.unitsInPack||item.unitsInPack||1)||1;
+      const volPerUnit=parseFloat(s.volPerUnit||item.volPerUnit||1)||1;
+      const costPerUnit=(typeof getConsUnitCost==='function')?getConsUnitCost(group.id,i):0;
+      // Stock = number of smallest units available (packs × units/pack)
+      const qtyPacks=parseFloat(s.newQty)||parseFloat(item.qty)||1;
+      const stock=Math.max(0,Math.round(qtyPacks*unitsInPack));
+      trackerProducts.push({
+        id:'cons_'+group.id+'_'+i,
+        name:item.name,
+        cat:'Consumables',
+        group:group.name,
+        unit:uom,
+        volPerUnit:volPerUnit,
+        stock:stock,
+        lowAt:Math.max(1,Math.ceil(stock*0.15)),
+        cost:Math.round(costPerUnit*10000)/10000,
+        price:0,
+        inPOS:false,
+        isConsumable:true,
+      });
+    });
+  });
+
+  // Fetch existing gb/products to detect removals and preserve non-consumables
+  const posRef=ref(db,'gb/products');
+  const snap=await get(posRef);
+  const existing=snap.exists()
+    ?(Array.isArray(snap.val())?snap.val().filter(Boolean):Object.values(snap.val()).filter(Boolean))
+    :[];
+
+  const trackerNames=new Set(trackerProducts.map(p=>p.name));
+  const toRemove=existing.filter(p=>p&&p.isConsumable&&!trackerNames.has(p.name));
+
+  // Confirm with full summary
+  const addedCount=trackerProducts.filter(p=>!existing.find(x=>x&&x.isConsumable&&x.name===p.name)).length;
+  const updatedCount=trackerProducts.length-addedCount;
+  const msg=
+    `Consumable sync summary:\n\n`+
+    `  • ${addedCount} new consumable(s) will be added to POS inventory\n`+
+    `  • ${updatedCount} existing consumable(s) will be updated\n`+
+    (toRemove.length?`  • ${toRemove.length} obsolete consumable(s) will be removed from POS inventory\n`:'')+
+    `\nNon-consumable products are not affected.\nContinue?`;
+  if(!confirm(msg)) return null;
+
+  // Build merged list: non-consumables untouched, consumables replaced
+  const nonConsumables=existing.filter(p=>p&&!p.isConsumable);
+  const merged=[...nonConsumables];
+  trackerProducts.forEach(p=>{
+    const ex=existing.find(x=>x&&x.isConsumable&&x.name===p.name);
+    merged.push(ex?{...ex,...p,id:ex.id}:{...p});
+  });
+
+  await set(posRef,merged);
+  console.log('GlowBar Tracker: pushed',trackerProducts.length,'consumables;',toRemove.length,'removed.');
+  return{added:addedCount,updated:updatedCount,removed:toRemove.length};
+};
+
 // ── AUTO-SAVE: patch localStorage.setItem ────────────────────────
 // Debounce is 5s — short enough that edits reach Firebase before any
 // Firebase push can overwrite them, but long enough to batch keystrokes.
@@ -627,7 +693,15 @@ body{font-family:system-ui,sans-serif;background:var(--cream);color:var(--text);
     </div>
   </div>
   <div id="cons-container"></div>
-  <button class="save-btn" id="cons-save-btn" onclick="trackerSave(this,saveConsState)" style="margin-top:14px">Save consumables</button>
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px">
+    <button class="save-btn" id="cons-save-btn" onclick="trackerSave(this,saveConsState)">Save consumables</button>
+    <button class="save-btn" id="cons-push-btn" onclick="doPushConsumablesToPOS(this)" style="background:var(--green);font-size:12px;" title="Syncs all consumables to POS inventory. Removes obsolete entries.">
+      📦 Sync to POS Inventory
+    </button>
+  </div>
+  <div style="margin-top:6px;font-size:10px;color:var(--muted);">
+    "Sync to POS Inventory" adds/updates all consumables in <strong>gb/products</strong> and removes any that no longer exist in the tracker. Non-consumable products are not affected.
+  </div>
 </div>
 
 <div id="tab-monthly" class="section">
@@ -2230,6 +2304,21 @@ function showTab(tab){
   if(tab==='staffing' && window.loadStaffingData) window.loadStaffingData();
   if(tab==='pos' && window.loadPOSData) window.loadPOSData();
   if(tab==='promo'){ loadPromos(); initPromoTab(); }
+}
+
+async function doPushConsumablesToPOS(btn){
+  if(!window.pushConsumablesToPOS){ alert('Firebase not ready yet. Please wait a moment and try again.'); return; }
+  btn.disabled=true; btn.textContent='⟳ Checking…';
+  try{
+    const result=await window.pushConsumablesToPOS();
+    if(!result){ btn.disabled=false; btn.innerHTML='📦 Sync to POS Inventory'; return; } // user cancelled
+    btn.textContent='✓ Done!';
+    setTimeout(()=>{ btn.disabled=false; btn.innerHTML='📦 Sync to POS Inventory'; },3000);
+    alert(`✓ Sync complete!\n\n  • ${result.added} consumable(s) added\n  • ${result.updated} consumable(s) updated\n  • ${result.removed} obsolete consumable(s) removed`);
+  }catch(e){
+    btn.disabled=false; btn.innerHTML='📦 Sync to POS Inventory';
+    alert('Error syncing consumables: '+e.message);
+  }
 }
 
 function trackerSave(btn, fn){
