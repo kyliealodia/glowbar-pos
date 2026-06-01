@@ -56,6 +56,9 @@ window.saveToFirebase = async function(){
     const payload = {};
     TRACKED.forEach(key => { payload[key] = localStorage.getItem(key) || (key.endsWith('[]')?'[]':'{}'); });
     payload.updatedAt = new Date().toISOString();
+    // Pre-stamp lastSync so the onValue listener recognises this as OUR
+    // own save and skips the full UI rebuild (prevents input focus loss).
+    _origSet('glowbar_lastSync', payload.updatedAt);
     await set(TRACKER_REF, payload);
     setSyncStatus('saved');
   } catch(e) {
