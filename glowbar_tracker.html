@@ -2565,6 +2565,33 @@ function updConsName(gid,i,v){
   saveConsState();
 }
 
+function moveConsToExpenses(gid,i){
+  const group=CONS_DATA.find(g=>g.id===gid); if(!group) return;
+  const item=group.items[i]; if(!item) return;
+
+  // Use updated supplier total if available, otherwise original cost
+  const nt=newTotal(item,gid,i);
+  const cost=nt!==null?Math.round(nt):Math.round(item.total||0);
+
+  // Find the Consumables & tools category in the Expense Tracker
+  const cat=CATS.find(c=>c.id==='consumables');
+  if(!cat){ alert('Could not find "Consumables & tools" in the Expense List.\nMake sure that category exists.'); return; }
+
+  if(!confirm(`Add "${item.name}" (₱${cost.toLocaleString()}) to the Expense List under Consumables & tools?`)) return;
+
+  cat.items.push({name:item.name, p:cost});
+  openSet.add(cat.id); // expand the category so the user sees it
+  saveData();
+  buildCats();
+  showTab('expenses');
+
+  // Scroll to and highlight the new row
+  setTimeout(()=>{
+    const rows=document.querySelectorAll(`#body-${cat.id} .ni`);
+    if(rows.length){ rows[rows.length-1].scrollIntoView({behavior:'smooth',block:'center'}); rows[rows.length-1].focus(); }
+  },200);
+}
+
 let activeConsFilter='all';
 let openConsGroups=new Set();
 
@@ -2693,7 +2720,10 @@ function consRowHtml(group,item,i){
     <td><input class="nti" style="width:90px" type="text" placeholder="supplier" value="${s.supplier||''}" oninput="setCS('${group.id}',${i},'supplier',this.value)"></td>
     <td><button onclick="toggleConsPaid('${group.id}',${i})" style="padding:3px 10px;border:none;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;background:${s.paid?'#d4edda':'#fff3cd'};color:${s.paid?'#2d6a4f':'#856404'}">${s.paid?'✓ Paid':'○ Not paid'}</button></td>
     <td class="ca">${tags}</td>
-    <td><button class="del-row" onclick="delConsItem('${group.id}',${i})" title="Remove">✕</button></td>
+    <td style="white-space:nowrap">
+      <button onclick="moveConsToExpenses('${group.id}',${i})" title="Add to Expense List" style="padding:2px 7px;font-size:10px;border:0.5px solid var(--gold);border-radius:6px;background:var(--cream2);color:var(--gold-d);cursor:pointer;font-family:inherit;margin-right:4px">→ Expenses</button>
+      <button class="del-row" onclick="delConsItem('${group.id}',${i})" title="Remove">✕</button>
+    </td>
   </tr>`;
 }
 
