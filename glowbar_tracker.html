@@ -412,6 +412,7 @@ function bootApp(){
     loadState(); loadConsState(); loadStaff(); loadSvcState(); loadMonthlyLog();
     buildCats(); refreshSummary(); buildServices(); buildConsumables();
     updateMonthFilter(); renderMonthly();
+    if(typeof loadPersonal === 'function') loadPersonal();
     setTimeout(()=>{if(window.pushCapitalToPOS)window.pushCapitalToPOS();},1000);
   }
 }
@@ -3236,6 +3237,7 @@ function loadPersonal(){
   }catch(e){
     personalCats = JSON.parse(JSON.stringify(PERSONAL_DEFAULT_CATS));
   }
+  applyPersonalMigrations();
   renderPersonal();
 }
 
@@ -3243,6 +3245,34 @@ function savePersonal(){
   localStorage.setItem('glowbar_personal', JSON.stringify({cats: personalCats}));
   const btn = document.querySelector('#tab-personal .save-btn');
   if(btn){btn.textContent='✦ Saved!'; setTimeout(()=>btn.textContent='Save',1500);}
+}
+
+function applyPersonalMigrations(){
+  // Items identified by id prefix 'hs2606_' — skipped if any already exist
+  const alreadySeeded = personalCats.some(cat => cat.items.some(it => it.id && it.id.startsWith('hs2606_')));
+  if(alreadySeeded) return;
+  const homeItems = [
+    {id:'hs2606_01', name:'Sampayan',                    amt:217,    date:'2026-06-01', paid:false},
+    {id:'hs2606_02', name:'Kettle SPL',                  amt:334.5,  date:'2026-06-01', paid:false},
+    {id:'hs2606_03', name:'Dish Rack',                   amt:250.5,  date:'2026-06-01', paid:false},
+    {id:'hs2606_04', name:'Spatula SPL',                 amt:237.5,  date:'2026-06-01', paid:false},
+    {id:'hs2606_05', name:'Dining Table and Chairs SPL', amt:1526.5, date:'2026-06-01', paid:false},
+    {id:'hs2606_06', name:'Rice Cooker',                 amt:512.5,  date:'2026-06-01', paid:false},
+    {id:'hs2606_07', name:'Mattress',                    amt:3443,   date:'2026-06-01', paid:false},
+    {id:'hs2606_08', name:'Fan',                         amt:903,    date:'2026-06-01', paid:false},
+    {id:'hs2606_09', name:'Pan',                         amt:825,    date:'2026-06-01', paid:false},
+    {id:'hs2606_10', name:'Dishes',                      amt:271,    date:'2026-06-01', paid:false},
+    {id:'hs2606_11', name:'Knife Set',                   amt:280,    date:'2026-06-01', paid:false},
+    {id:'hs2606_12', name:'Bed Sheet',                   amt:387,    date:'2026-06-01', paid:false},
+    {id:'hs2606_13', name:'Curtain',                     amt:348.25, date:'2026-06-01', paid:false},
+  ];
+  let homeCat = personalCats.find(c => c.id === 'p_homesetup_jun2026');
+  if(!homeCat){
+    homeCat = {id:'p_homesetup_jun2026', name:'Home Setup', items:[]};
+    personalCats.push(homeCat);
+  }
+  homeCat.items.push(...homeItems);
+  localStorage.setItem('glowbar_personal', JSON.stringify({cats: personalCats}));
 }
 
 function renderPersonal(){
