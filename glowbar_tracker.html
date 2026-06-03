@@ -2715,12 +2715,10 @@ function refreshConsSummary(){
     });
   });
 
-  const savClass=savings>0?'g':savings<0?'r':'';
   el.innerHTML=`
-    <div class="metric"><div class="metric-label">Total (orig)</div><div class="metric-value gd">₱${Math.round(origTotal).toLocaleString()}</div></div>
+    <div class="metric"><div class="metric-label">Total consumables</div><div class="metric-value gd">₱${Math.round(paidTotal+unpaidTotal).toLocaleString()}</div></div>
     <div class="metric" style="border:0.5px solid #f5c6cb"><div class="metric-label" style="color:#842029">Not yet paid</div><div class="metric-value" style="color:#842029">₱${Math.round(unpaidTotal).toLocaleString()}</div><div style="font-size:10px;color:var(--muted);margin-top:2px">${unpaidCount} item${unpaidCount!==1?'s':''}</div></div>
     <div class="metric" style="border:0.5px solid #badbcc"><div class="metric-label" style="color:#0f5132">Paid</div><div class="metric-value" style="color:#0f5132">₱${Math.round(paidTotal).toLocaleString()}</div><div style="font-size:10px;color:var(--muted);margin-top:2px">${paidCount} item${paidCount!==1?'s':''}</div></div>
-    ${hasNew?`<div class="metric"><div class="metric-label">${savings>=0?'Savings':'Extra cost'}</div><div class="metric-value ${savClass}">${savings!==0?(savings>0?'-':'+'): ''}₱${Math.abs(Math.round(savings)).toLocaleString()}</div></div>`:''}
   `;
   refreshSummary();
 }
@@ -2790,17 +2788,12 @@ function refreshConsGroup(gid){
   tbody.innerHTML = group.items.map((item,i)=>consRowHtml(group,item,i)).join('');
   // update group footer
   const foot=document.getElementById('cg-foot-'+gid); if(!foot) return;
-  const origGT=group.items.reduce((s,it)=>s+(it.total||0),0);
   let newGT=0;
   group.items.forEach((it,i)=>{ const nt=newTotal(it,gid,i); newGT+=nt!==null?nt:(it.total||0); });
-  const gSave=origGT-newGT;
   foot.innerHTML=`
-    <td colspan="2" style="text-align:left;font-weight:600;color:var(--gold-d)">Group total</td>
-    <td style="font-weight:600;color:var(--gold-d)">₱${origGT.toLocaleString()}</td>
-    <td></td><td></td>
+    <td colspan="3" style="text-align:left;font-weight:600;color:var(--gold-d)">Group total</td>
     <td style="font-weight:600;color:var(--gold-d)">₱${Math.round(newGT).toLocaleString()}</td>
-    <td style="font-weight:600;color:${gSave>0?'var(--green)':gSave<0?'var(--red)':'var(--muted)'}">${gSave!==0?(gSave>0?'-':'+'): '—'}${gSave!==0?'₱'+Math.abs(Math.round(gSave)).toLocaleString():''}</td>
-    <td></td><td></td>`;
+    <td colspan="4"></td>`;
 }
 
 function delConsItem(gid,idx){
@@ -2830,43 +2823,34 @@ function addConsItem(gid){
   saveConsState();
 }
 
+function updConsTotal(gid,i,v){
+  const group=CONS_DATA.find(g=>g.id===gid); if(!group) return;
+  if(group.items[i]) group.items[i].total=parseFloat(v)||0;
+  // clear newQty/newUnit so effective total is now driven by item.total
+  const k=gid+'_'+i;
+  if(consState[k]){consState[k].newQty='';consState[k].newUnit='';}
+  saveConsState();
+  debounce('cons_'+gid+'_'+i,()=>{refreshConsGroup(gid);refreshConsSummary();},500);
+}
+
 function consRowHtml(group,item,i){
   const s=getCS(group.id,i);
   const nt=newTotal(item,group.id,i);
-  const diff = nt!==null ? item.total - nt : null;
   const tags=item.services.map(sv=>`<span class="svc-tag">${sv}</span>`).join('');
-  const diffHtml = diff===null
-    ? '<span style="color:var(--muted)">—</span>'
-    : diff===0
-      ? '<span style="color:var(--muted)">No change</span>'
-      : `<span style="color:${diff>0?'var(--green)':'var(--red)'};font-weight:600">${diff>0?'-':'+'}<span style="font-size:10px">₱</span>${Math.abs(Math.round(diff)).toLocaleString()}</span>`;
-  const newTotalHtml = nt!==null
-    ? `<span style="font-weight:600;color:${diff>0?'var(--green)':diff<0?'var(--red)':'var(--text)'}">₱${Math.round(nt).toLocaleString()}</span>`
-    : `<span style="color:var(--muted)">—</span>`;
 
-  // cost-per-use calculation
   const unitsInPack=parseFloat(s.unitsInPack||item.unitsInPack||1)||1;
   const volPerUnit=parseFloat(s.volPerUnit||item.volPerUnit||1)||1;
-  const total=item.total||0;
-  const costPerSmallUnit=total/(unitsInPack*volPerUnit);
   const uom=s.uom||item.uom||'pcs';
+  const effectiveTotal=nt!==null?nt:(item.total||0);
+  const costPerSmallUnit=effectiveTotal/(unitsInPack*volPerUnit);
   const cpu=costPerSmallUnit>0?`₱${costPerSmallUnit<1?costPerSmallUnit.toFixed(4):costPerSmallUnit.toFixed(2)}/${uom}`:'—';
-
-  // new supplier cost per unit
-  const nu=parseFloat(s.newUnit);
-  const nvpu=parseFloat(s.newVolPerUnit||item.volPerUnit||1)||1;
-  const newCpu=(!isNaN(nu)&&nu>0)?(nu/nvpu):null;
-  const newCpuHtml=newCpu?`<span style="color:var(--green);font-size:11px">₱${newCpu<1?newCpu.toFixed(4):newCpu.toFixed(2)}/${uom}</span>`:'<span style="color:var(--muted)">—</span>';
 
   return `<tr>
     <td><input class="ni" type="text" value="${item.name.replace(/"/g,'&quot;')}" style="min-width:120px" oninput="updConsName('${group.id}',${i},this.value)" title="Click to edit item name"></td>
-    <td style="color:var(--muted);font-size:11px">${item.qty}</td>
     <td>
-      <div style="font-size:11px;color:var(--muted)">Units in pack:</div>
+      <div style="font-size:10px;color:var(--muted)">In pack:</div>
       <input class="ii" type="number" style="width:72px;font-size:11px" placeholder="${item.unitsInPack||1}" value="${s.unitsInPack||''}" oninput="setCS('${group.id}',${i},'unitsInPack',this.value)" title="How many units in the pack (e.g. 48 bottles)">
-    </td>
-    <td>
-      <div style="font-size:11px;color:var(--muted)">Vol/unit (${uom}):</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:3px">Vol/unit (${uom}):</div>
       <input class="ii" type="number" style="width:72px;font-size:11px" placeholder="${item.volPerUnit||1}" value="${s.volPerUnit||''}" oninput="setCS('${group.id}',${i},'volPerUnit',this.value)" title="Volume or qty per unit (e.g. 15ml per bottle)">
     </td>
     <td>
@@ -2877,21 +2861,8 @@ function consRowHtml(group,item,i){
         <option${uom==='L'?' selected':''}>L</option>
       </select>
     </td>
-    <td style="font-weight:500">₱${(item.total||0).toLocaleString()}</td>
+    <td><input class="ii" type="number" style="width:90px" value="${effectiveTotal>0?Math.round(effectiveTotal):''}" oninput="updConsTotal('${group.id}',${i},this.value)" title="Total cost paid" placeholder="0"></td>
     <td style="font-size:11px;font-weight:600;color:var(--gold-d)">${cpu}</td>
-    <td><input class="ii" style="width:78px" type="text" placeholder="${item.qty}" value="${s.newQty}" oninput="setCS('${group.id}',${i},'newQty',this.value)" title="New quantity"></td>
-    <td>
-      <div style="font-size:11px;color:var(--muted)">Cost/unit:</div>
-      <input class="ii" style="width:78px" type="number" placeholder="${item.unitCost}" value="${s.newUnit}" oninput="setCS('${group.id}',${i},'newUnit',this.value)" title="New cost per unit (e.g. cost per bottle)">
-    </td>
-    <td>
-      <div style="font-size:11px;color:var(--muted)">Vol/unit:</div>
-      <input class="ii" style="width:72px;font-size:11px" type="number" placeholder="${item.volPerUnit||1}" value="${s.newVolPerUnit||''}" oninput="setCS('${group.id}',${i},'newVolPerUnit',this.value)" title="New volume per unit">
-    </td>
-    <td>${newTotalHtml}</td>
-    <td>${newCpuHtml}</td>
-    <td>${diffHtml}</td>
-    <td><input class="nti" style="width:90px" type="text" placeholder="supplier" value="${s.supplier||''}" oninput="setCS('${group.id}',${i},'supplier',this.value)"></td>
     <td><button onclick="toggleConsPaid('${group.id}',${i})" style="padding:3px 10px;border:none;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;background:${s.paid?'#d4edda':'#fff3cd'};color:${s.paid?'#2d6a4f':'#856404'}">${s.paid?'✓ Paid':'○ Not paid'}</button></td>
     <td class="ca">${tags}</td>
     <td style="white-space:nowrap">
@@ -2906,17 +2877,14 @@ function buildConsumables(){
   const filtered=activeConsFilter==='all'?CONS_DATA:CONS_DATA.filter(g=>g.cat===activeConsFilter);
   con.innerHTML=filtered.map(group=>{
     const isOpen=openConsGroups.has(group.id);
-    const origGT=group.items.reduce((s,it)=>s+(it.total||0),0);
     let newGT=0;
     group.items.forEach((it,i)=>{ const nt=newTotal(it,group.id,i); newGT+=nt!==null?nt:(it.total||0); });
-    const gSave=origGT-newGT;
     const rows=group.items.map((item,i)=>consRowHtml(group,item,i)).join('');
     return `<div class="cons-group">
       <div class="cons-group-hdr" onclick="toggleConsGroup('${group.id}')">
         <span><span id="cg-ch-${group.id}" style="margin-right:6px">${isOpen?'▾':'▸'}</span>${group.name}</span>
         <span style="display:flex;align-items:center;gap:12px;font-size:12px">
-          <span style="color:var(--muted)">₱${origGT.toLocaleString()} orig</span>
-          ${gSave!==0?`<span style="color:${gSave>0?'var(--green)':'var(--red)'};font-weight:600">${gSave>0?'-':'+'}<span style="font-size:10px">₱</span>${Math.abs(Math.round(gSave)).toLocaleString()} ${gSave>0?'saved':'over'}</span>`:''}
+          <span style="color:var(--muted)">₱${Math.round(newGT).toLocaleString()}</span>
           <span style="color:var(--muted)">${group.items.length} items</span>
         </span>
       </div>
@@ -2924,19 +2892,10 @@ function buildConsumables(){
         <table class="cons-tbl">
           <thead><tr>
             <th style="text-align:left">Item</th>
-            <th style="text-align:left">Orig qty</th>
-            <th>Units in pack</th>
-            <th>Vol/unit</th>
+            <th>Qty</th>
             <th>UOM</th>
-            <th>Orig total</th>
+            <th>Total paid</th>
             <th>Cost/use unit</th>
-            <th>New qty</th>
-            <th>New unit cost</th>
-            <th>New vol/unit</th>
-            <th>New total</th>
-            <th>New cost/use</th>
-            <th>Savings / Over</th>
-            <th style="text-align:left">Supplier</th>
             <th>Status</th>
             <th class="ca">Services</th>
             <th title="Remove item">✕</th>
