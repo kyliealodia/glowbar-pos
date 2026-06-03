@@ -8774,10 +8774,11 @@ function renderPayrollSummary(staffList, txns, period){
     const daysPresent=new Set(inLogs.map(l=>l.time.split('T')[0])).size;
     const leaveDays=(S.leaveRequests||[]).filter(l=>l.userId===u.id&&l.status==='approved'&&l.from?.startsWith(period)).reduce((s,l)=>s+(l.days||1),0);
     const today=new Date(); today.setHours(23,59,59,0);
-const staffStart=u.startDate?new Date(u.startDate):new Date('2026-06-02');
-const [py2,pm2]=period.split('-').map(Number);
-const actualWorkingDays=getWorkingDays(py2,pm2,staffStart,today);
-const daysAbsent=Math.max(0,actualWorkingDays-daysPresent-leaveDays);
+const monthEndS=new Date(py,pm,0);
+const effectiveEndS=today<monthEndS?today:monthEndS;
+const elapsedWorkingDays=getWorkingDays(py,pm,null,effectiveEndS);
+const hasClockData=inLogs.length>0;
+const daysAbsent=hasClockData?Math.max(0,elapsedWorkingDays-daysPresent-leaveDays):0;
     const dailyRate=workingDays>0?salary/workingDays:0;
     const earnedBasic=salary-Math.round(dailyRate*daysAbsent);
     const grossPay=Math.max(0,earnedBasic)+commAmt;
@@ -8967,12 +8968,13 @@ function renderPayslip(){
     const leaveDays=approvedLeave.reduce((s,l)=>s+(l.days||1),0);
 
     const today=new Date(); today.setHours(23,59,59,0);
-const staffStart=u.startDate?new Date(u.startDate):new Date('2026-06-02');
-const [py2,pm2]=period.split('-').map(Number);
-const actualWorkingDays=getWorkingDays(py2,pm2,staffStart,today);
-const daysAbsent=Math.max(0,actualWorkingDays-daysPresent-leaveDays);
+const monthEnd=new Date(py,pm,0);
+const effectiveEnd=today<monthEnd?today:monthEnd;
+const elapsedWorkingDays=getWorkingDays(py,pm,null,effectiveEnd);
+const hasClockData=inLogs.length>0;
+const daysAbsent=hasClockData?Math.max(0,elapsedWorkingDays-daysPresent-leaveDays):0;
 const salary=u.salary||0;
-const dailyRate=actualWorkingDays>0?salary/actualWorkingDays:0;
+const dailyRate=workingDays>0?salary/workingDays:0;
     const absenceDeduction=Math.round(dailyRate*daysAbsent);
     const earnedBasic=salary-absenceDeduction;
 
@@ -10299,8 +10301,8 @@ function renderSponsor(records){
 
   // Update summary cards
   const roiAchievedEl=document.getElementById('sponsorRoiAchieved');
-  const roiPctAmt=Math.min(cumNet,roiTarget);
-  const roiPctVal=Math.min(100,(cumNet/roiTarget)*100);
+  const roiPctAmt=Math.min(Math.max(0,cumNet),roiTarget);
+  const roiPctVal=Math.min(100,Math.max(0,(cumNet/roiTarget)*100));
   if(roiAchievedEl){
     roiAchievedEl.textContent=fp(roiPctAmt);
     roiAchievedEl.style.color=cumNet>=roiTarget?'var(--success)':'var(--ink)';
