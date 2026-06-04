@@ -693,6 +693,7 @@ body{font-family:system-ui,sans-serif;background:var(--cream);color:var(--text);
       <button class="cf-btn" onclick="filterCons('machine')">Machine</button>
     </div>
   </div>
+  <div id="cons-spl-summary" style="display:none;margin-bottom:1rem"></div>
   <div id="cons-container"></div>
   <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px">
     <button class="save-btn" id="cons-save-btn" onclick="trackerSave(this,saveConsState)">Save consumables</button>
@@ -728,7 +729,7 @@ body{font-family:system-ui,sans-serif;background:var(--cream);color:var(--text);
     <button class="btn-p" style="font-size:12px;padding:6px 14px" onclick="toggleAddEntry()">+ Add expense</button>
   </div>
   <div id="add-entry-form" style="display:none;background:var(--cream2);border:0.5px solid var(--border-l);border-radius:12px;padding:14px 16px;margin-bottom:1rem">
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1.3fr;gap:10px;margin-bottom:10px">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:10px">
       <div>
         <div style="font-size:10px;color:var(--muted);margin-bottom:3px;text-transform:uppercase">Date</div>
         <input id="me-date" class="ii" type="date" style="width:100%">
@@ -751,15 +752,15 @@ body{font-family:system-ui,sans-serif;background:var(--cream);color:var(--text);
         <div style="font-size:10px;color:var(--muted);margin-bottom:3px;text-transform:uppercase">Notes</div>
         <input id="me-notes" class="ni" type="text" placeholder="optional" style="width:100%">
       </div>
-      <div>
-        <div style="font-size:10px;color:var(--muted);margin-bottom:3px;text-transform:uppercase">Payment method</div>
-        <select id="me-payment" class="ii" style="width:100%;font-size:12px;padding:5px 8px">
-          <option value="unpaid">Not yet paid</option>
-          <option value="paid">Paid</option>
-          <option value="shopee1">🛒 Shopee Pay Later — 1 mo</option>
-          <option value="shopee3">🛒 Shopee Pay Later — 3 mo</option>
-        </select>
-      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;padding:8px 12px;background:#fff8ed;border:0.5px solid #f0a500;border-radius:8px">
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;white-space:nowrap">Payment method</div>
+      <select id="me-payment" class="ii" style="font-size:12px;padding:5px 10px;min-width:240px">
+        <option value="unpaid">○ Not yet paid</option>
+        <option value="paid">✓ Paid</option>
+        <option value="shopee1">🛒 Shopee Pay Later — 1 month (full amount due next month)</option>
+        <option value="shopee3">🛒 Shopee Pay Later — 3 months (split into 3 equal payments)</option>
+      </select>
     </div>
     <div style="display:flex;gap:8px">
       <button class="btn-p" onclick="addMonthlyEntry()">Add entry</button>
@@ -2770,13 +2771,17 @@ function loadConsState(){
       consState=raw||{}; // old plain-object format
     }
   }catch(e){ consState={}; }
+  // Migrate old paid boolean to paymentStatus
+  Object.values(consState).forEach(s=>{
+    if(!s.paymentStatus) s.paymentStatus=s.paid?'paid':'unpaid';
+  });
 }
 function saveConsState(){
   // Save both edit-state AND the current items list so deletions/additions survive reload
   const snapshot=CONS_DATA.map(g=>({id:g.id,items:g.items}));
   localStorage.setItem('glowbar_cons', JSON.stringify({state:consState,snapshot}));
 }
-function getCS(gid,i){ return consState[gid+'_'+i]||{newQty:'',newUnit:'',supplier:''}; }
+function getCS(gid,i){ return consState[gid+'_'+i]||{newQty:'',newUnit:'',supplier:'',paymentStatus:'unpaid'}; }
 function setCS(gid,i,f,v){
   const k=gid+'_'+i;
   if(!consState[k]) consState[k]={newQty:'',newUnit:'',supplier:''};
@@ -2821,30 +2826,105 @@ function refreshConsSummary(){
   if(!el) return;
   const {origTotal,newTotalAll,savings,hasNew}=getConsTotals();
 
-  // Paid / unpaid breakdown
-  let paidTotal=0, unpaidTotal=0, unpaidCount=0, paidCount=0;
+  let paidTotal=0,unpaidTotal=0,splTotal=0,unpaidCount=0,paidCount=0,splCount=0;
   CONS_DATA.forEach(group=>{
     group.items.forEach((item,i)=>{
       const s=getCS(group.id,i);
       const nt=newTotal(item,group.id,i);
       const eff=nt!==null?nt:(item.total||0);
-      if(s.paid){ paidTotal+=eff; paidCount++; }
+      const ps=s.paymentStatus||'unpaid';
+      if(ps==='paid'){ paidTotal+=eff; paidCount++; }
+      else if(ps==='shopee1'||ps==='shopee3'){ splTotal+=eff; splCount++; }
       else { unpaidTotal+=eff; unpaidCount++; }
     });
   });
 
   el.innerHTML=`
-    <div class="metric"><div class="metric-label">Total consumables</div><div class="metric-value gd">₱${Math.round(paidTotal+unpaidTotal).toLocaleString()}</div></div>
+    <div class="metric"><div class="metric-label">Total consumables</div><div class="metric-value gd">₱${Math.round(paidTotal+unpaidTotal+splTotal).toLocaleString()}</div></div>
     <div class="metric" style="border:0.5px solid #f5c6cb"><div class="metric-label" style="color:#842029">Not yet paid</div><div class="metric-value" style="color:#842029">₱${Math.round(unpaidTotal).toLocaleString()}</div><div style="font-size:10px;color:var(--muted);margin-top:2px">${unpaidCount} item${unpaidCount!==1?'s':''}</div></div>
     <div class="metric" style="border:0.5px solid #badbcc"><div class="metric-label" style="color:#0f5132">Paid</div><div class="metric-value" style="color:#0f5132">₱${Math.round(paidTotal).toLocaleString()}</div><div style="font-size:10px;color:var(--muted);margin-top:2px">${paidCount} item${paidCount!==1?'s':''}</div></div>
+    ${splTotal>0?`<div class="metric" style="border:0.5px solid #f0a500"><div class="metric-label" style="color:#c96b00">🛒 Shopee Pay Later</div><div class="metric-value" style="color:#c96b00">₱${Math.round(splTotal).toLocaleString()}</div><div style="font-size:10px;color:var(--muted);margin-top:2px">${splCount} item${splCount!==1?'s':''}</div></div>`:''}
   `;
   refreshSummary();
+  renderConsSplSummary();
 }
 
-function toggleConsPaid(gid,i){
+function renderConsSplSummary(){
+  const el=document.getElementById('cons-spl-summary');if(!el)return;
+  const today=todayStr();
+  const thisMonth=today.slice(0,7);
+  const nm=new Date();nm.setMonth(nm.getMonth()+1);
+  const nextMonth=nm.toISOString().slice(0,7);
+  let thisMoDue=0,nextMoDue=0,overdueAmt=0,totalBal=0;
+  const overdueItems=[];
+  CONS_DATA.forEach(group=>{
+    group.items.forEach((item,i)=>{
+      const s=getCS(group.id,i);
+      const nt=newTotal(item,group.id,i);
+      const eff=nt!==null?nt:(item.total||0);
+      const ps=s.paymentStatus||'unpaid';
+      const splDate=s.splDate||todayStr();
+      if(ps==='shopee1'){
+        const due=addMonths(splDate,1);
+        totalBal+=eff;
+        if(due<today){overdueAmt+=eff;overdueItems.push({label:item.name,amt:eff,due});}
+        else if(due.startsWith(thisMonth))thisMoDue+=eff;
+        else if(due.startsWith(nextMonth))nextMoDue+=eff;
+      } else if(ps==='shopee3'){
+        const paid=s.installmentsPaid||0;
+        const monthly=Math.round(eff/3);
+        for(let ii=paid+1;ii<=3;ii++){
+          const due=addMonths(splDate,ii);
+          totalBal+=monthly;
+          if(due<today){overdueAmt+=monthly;overdueItems.push({label:item.name+' (inst '+ii+')',amt:monthly,due});}
+          else if(due.startsWith(thisMonth))thisMoDue+=monthly;
+          else if(due.startsWith(nextMonth))nextMoDue+=monthly;
+        }
+      }
+    });
+  });
+  if(totalBal===0){el.style.display='none';return;}
+  el.style.display='block';
+  const fmt=n=>'&#8369;'+Math.round(n).toLocaleString();
+  el.innerHTML='<div style="background:linear-gradient(135deg,#fff8ed,#fffbf0);border:1.5px solid #f0a500;border-radius:14px;padding:14px 16px">'
+    +'<div style="font-size:12px;font-weight:700;color:#c96b00;margin-bottom:10px">🛒 Shopee Pay Later — Consumables Balance</div>'
+    +'<div style="display:flex;gap:10px;flex-wrap:wrap">'
+    +'<div class="metric" style="flex:1;min-width:120px;border:0.5px solid #f0a500"><div class="metric-label">Total outstanding</div><div class="metric-value" style="color:#c96b00">'+fmt(totalBal)+'</div></div>'
+    +'<div class="metric" style="flex:1;min-width:120px;border:0.5px solid #4A9EC9"><div class="metric-label">Due this month</div><div class="metric-value" style="color:#4A9EC9">'+fmt(thisMoDue)+'</div></div>'
+    +'<div class="metric" style="flex:1;min-width:120px;border:0.5px solid #9C7E4A"><div class="metric-label">Due next month</div><div class="metric-value" style="color:#9C7E4A">'+fmt(nextMoDue)+'</div></div>'
+    +(overdueAmt>0?'<div class="metric" style="flex:1;min-width:120px;border:0.5px solid #842029"><div class="metric-label" style="color:#842029">⚠ Overdue</div><div class="metric-value" style="color:#842029">'+fmt(overdueAmt)+'</div><div style="font-size:10px;color:#842029;margin-top:3px">'+overdueItems.length+' payment'+(overdueItems.length!==1?'s':'')+'</div></div>':'')
+    +'</div>'
+    +(overdueItems.length>0?'<div style="margin-top:10px;font-size:11px;color:#842029;font-weight:600">Overdue:</div>'
+      +'<div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:5px">'+overdueItems.map(x=>'<span style="background:#f5c6cb;color:#842029;border-radius:8px;padding:2px 8px;font-size:10px;font-weight:600">'+x.label+' — '+fmt(x.amt)+' (was due '+fmtDue(x.due)+')</span>').join('')+'</div>':'')
+    +'</div>';
+}
+
+function setConsStatus(gid,i,status){
   const k=gid+'_'+i;
-  if(!consState[k]) consState[k]={newQty:'',newUnit:'',supplier:''};
-  consState[k].paid=!consState[k].paid;
+  if(!consState[k]) consState[k]={newQty:'',newUnit:'',supplier:'',paymentStatus:'unpaid'};
+  consState[k].paymentStatus=status;
+  consState[k].paid=(status==='paid');
+  if((status==='shopee1'||status==='shopee3')&&!consState[k].splDate)
+    consState[k].splDate=todayStr();
+  if(status==='shopee3'&&consState[k].installmentsPaid===undefined)
+    consState[k].installmentsPaid=0;
+  saveConsState();
+  refreshConsGroup(gid);
+  refreshConsSummary();
+}
+function setConsSplDate(gid,i,date){
+  const k=gid+'_'+i;
+  if(!consState[k]) consState[k]={newQty:'',newUnit:'',supplier:'',paymentStatus:'unpaid'};
+  consState[k].splDate=date;
+  saveConsState();
+  refreshConsGroup(gid);
+  renderConsSplSummary();
+}
+function bumpConsInstallment(gid,i){
+  const k=gid+'_'+i;
+  if(!consState[k]||consState[k].paymentStatus!=='shopee3') return;
+  consState[k].installmentsPaid=Math.min(3,(consState[k].installmentsPaid||0)+1);
+  if(consState[k].installmentsPaid>=3){consState[k].paymentStatus='paid';consState[k].paid=true;}
   saveConsState();
   refreshConsGroup(gid);
   refreshConsSummary();
@@ -2963,6 +3043,47 @@ function consRowHtml(group,item,i){
   const costPerSmallUnit=effectiveTotal/(unitsInPack*volPerUnit);
   const cpu=costPerSmallUnit>0?`₱${costPerSmallUnit<1?costPerSmallUnit.toFixed(4):costPerSmallUnit.toFixed(2)}/${uom}`:'—';
 
+  const ps=s.paymentStatus||'unpaid';
+  const splDate=s.splDate||todayStr();
+  let statusCell='',dueCell='<span style="color:var(--muted);font-size:11px">—</span>';
+  if(ps==='paid'){
+    statusCell='<span style="display:inline-block;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:600;background:#d4edda;color:#2d6a4f;white-space:nowrap">✓ Paid</span>'
+      +'<br><button onclick="setConsStatus(\''+group.id+'\','+i+',\'unpaid\')" style="font-size:10px;color:var(--muted);background:none;border:none;cursor:pointer;padding:0;margin-top:2px">↩ Undo</button>';
+  } else if(ps==='unpaid'){
+    statusCell='<select style="border:0.5px solid var(--border);border-radius:8px;padding:3px 5px;font-size:11px;background:#fff8ed;color:#856404;font-family:inherit;cursor:pointer;max-width:130px" onchange="setConsStatus(\''+group.id+'\','+i+',this.value);this.value=\'unpaid\'">'
+      +'<option value="unpaid" selected>○ Not yet paid</option>'
+      +'<option value="paid">✓ Mark paid</option>'
+      +'<option value="shopee1">🛒 Shopee — 1 mo</option>'
+      +'<option value="shopee3">🛒 Shopee — 3 mo</option>'
+      +'</select>';
+  } else if(ps==='shopee1'){
+    const due=addMonths(splDate,1);
+    const overdue=isOverdue(due);
+    statusCell='<span style="display:inline-block;padding:3px 6px;border-radius:20px;font-size:11px;font-weight:600;background:#fff3e0;color:#c96b00;white-space:nowrap">🛒 Shopee 1 mo</span>'
+      +'<br><button onclick="setConsStatus(\''+group.id+'\','+i+',\'paid\')" style="font-size:10px;color:#2d6a4f;background:none;border:none;cursor:pointer;padding:0;margin-top:2px">✓ Mark paid</button>';
+    dueCell='<div style="font-size:10px;color:var(--muted);margin-bottom:2px">Purchase date:</div>'
+      +'<input type="date" value="'+splDate+'" style="font-size:10px;border:0.5px solid var(--border);border-radius:5px;padding:2px 4px;width:110px;font-family:inherit" onchange="setConsSplDate(\''+group.id+'\','+i+',this.value)">'
+      +'<div style="font-size:11px;font-weight:600;color:'+(overdue?'#842029':'#2d6a4f')+';margin-top:4px">'+(overdue?'⚠ OVERDUE — ':'')+fmtDue(due)+'</div>';
+  } else if(ps==='shopee3'){
+    const instPaid=s.installmentsPaid||0;
+    const remaining=3-instPaid;
+    const monthly=Math.round(effectiveTotal/3);
+    if(instPaid>=3){
+      statusCell='<span style="display:inline-block;padding:3px 6px;border-radius:20px;font-size:11px;font-weight:600;background:#d4edda;color:#2d6a4f;white-space:nowrap">🛒 Shopee 3 mo ✓</span>';
+      dueCell='<span style="font-size:11px;color:#2d6a4f">All 3 paid</span>';
+    } else {
+      const nextDue=addMonths(splDate,instPaid+1);
+      const overdue=isOverdue(nextDue);
+      statusCell='<span style="display:inline-block;padding:3px 6px;border-radius:20px;font-size:11px;font-weight:600;background:#fff3e0;color:#c96b00;white-space:nowrap">🛒 Shopee 3 mo</span>'
+        +'<br><button onclick="bumpConsInstallment(\''+group.id+'\','+i+')" style="font-size:10px;color:#2d6a4f;background:none;border:none;cursor:pointer;padding:0;margin-top:2px">✓ Mark installment paid</button>';
+      dueCell='<div style="font-size:10px;color:var(--muted);margin-bottom:2px">Purchase date:</div>'
+        +'<input type="date" value="'+splDate+'" style="font-size:10px;border:0.5px solid var(--border);border-radius:5px;padding:2px 4px;width:110px;font-family:inherit" onchange="setConsSplDate(\''+group.id+'\','+i+',this.value)">'
+        +'<div style="font-size:11px;font-weight:600;margin-top:4px">'+instPaid+'/3 paid · ₱'+monthly.toLocaleString()+'/mo</div>'
+        +'<div style="font-size:10px;color:'+(overdue?'#842029':'var(--muted)')+';margin-top:2px">'+(overdue?'⚠ OVERDUE — ':'Next due: ')+fmtDue(nextDue)+'</div>'
+        +'<div style="font-size:10px;color:var(--muted)">Balance: ₱'+(monthly*remaining).toLocaleString()+'</div>';
+    }
+  }
+
   return `<tr>
     <td><input class="ni" type="text" value="${item.name.replace(/"/g,'&quot;')}" style="min-width:120px" oninput="updConsName('${group.id}',${i},this.value)" title="Click to edit item name"></td>
     <td>
@@ -2981,7 +3102,8 @@ function consRowHtml(group,item,i){
     </td>
     <td><input class="ii" type="number" style="width:90px" value="${effectiveTotal>0?Math.round(effectiveTotal):''}" oninput="updConsTotal('${group.id}',${i},this.value)" title="Total cost paid" placeholder="0"></td>
     <td style="font-size:11px;font-weight:600;color:var(--gold-d)">${cpu}</td>
-    <td><button onclick="toggleConsPaid('${group.id}',${i})" style="padding:3px 10px;border:none;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;background:${s.paid?'#d4edda':'#fff3cd'};color:${s.paid?'#2d6a4f':'#856404'}">${s.paid?'✓ Paid':'○ Not paid'}</button></td>
+    <td>${statusCell}</td>
+    <td style="min-width:130px">${dueCell}</td>
     <td class="ca">${tags}</td>
     <td style="white-space:nowrap">
       <button onclick="moveConsToExpenses('${group.id}',${i})" title="Add to Expense List" style="padding:2px 7px;font-size:10px;border:0.5px solid var(--gold);border-radius:6px;background:var(--cream2);color:var(--gold-d);cursor:pointer;font-family:inherit;margin-right:4px">→ Expenses</button>
@@ -3015,6 +3137,7 @@ function buildConsumables(){
             <th>Total paid</th>
             <th>Cost/use unit</th>
             <th>Status</th>
+            <th style="text-align:left">Due / Info</th>
             <th class="ca">Services</th>
             <th title="Remove item">✕</th>
           </tr></thead>
