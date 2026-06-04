@@ -1041,8 +1041,8 @@ function debounce(key, fn, delay){
 }
 
 const BUDGET=400000;
-const MCJAMES_FUND=100000;
-const KYLIE_FUND=400000;
+const MCJAMES_FUND=30000;
+const KYLIE_FUND=470000;
 const TOTAL_FUNDS=MCJAMES_FUND+KYLIE_FUND;
 let CATS=[
   {id:'permits',name:'Permits & licenses',items:[
@@ -2008,7 +2008,13 @@ function buildSvcContainer(){
   // Group cats by their group property
   const groupMap=new Map();
   filteredCats.forEach(cat=>{ if(!groupMap.has(cat.group))groupMap.set(cat.group,[]); groupMap.get(cat.group).push(cat); });
-  const typeTag=t=>({standard:'',addon:'<span style="font-size:10px;background:#E8F3EC;color:var(--green);padding:2px 7px;border-radius:10px;margin-left:4px;font-weight:500">Add-on</span>',laser:'<span style="font-size:10px;background:#EEE8F8;color:#7B6BA8;padding:2px 7px;border-radius:10px;margin-left:4px;font-weight:500">Laser</span>',package:'<span style="font-size:10px;background:var(--warn-bg);color:var(--warn);padding:2px 7px;border-radius:10px;margin-left:4px;font-weight:500">Package</span>'}[t]||'');
+  const typeColors={standard:'#888',addon:'var(--green)',laser:'#7B6BA8',package:'var(--warn)'};
+  const typeSelectHtml=(catId,t)=>`<select onchange="updSvcCatType('${catId}',this.value)" style="font-size:10px;padding:2px 5px;border:0.5px solid ${typeColors[t]||'#ccc'};border-radius:8px;background:transparent;color:${typeColors[t]||'#888'};font-family:inherit;cursor:pointer;margin-left:4px" title="Change service type">
+    <option value="standard"${t==='standard'?' selected':''}>Standard</option>
+    <option value="addon"${t==='addon'?' selected':''}>Add-on</option>
+    <option value="laser"${t==='laser'?' selected':''}>Laser</option>
+    <option value="package"${t==='package'?' selected':''}>Package</option>
+  </select>`;
 
   let html='';
   groupMap.forEach((cats,groupName)=>{
@@ -2077,7 +2083,7 @@ function buildSvcContainer(){
           <input type="text" value="${dispSafe}" title="Click to rename"
             style="${nameInputStyle(isMultiSub?'13px':'15px',isMultiSub?'var(--text)':'var(--gold-d)')}"
             onfocus="this.style.borderBottomColor='${isMultiSub?'var(--border)':'var(--gold)'}'"
-            onblur="this.style.borderBottomColor='transparent';${onBlurFn}">${typeTag(cat.type)}
+            onblur="this.style.borderBottomColor='transparent';${onBlurFn}">${typeSelectHtml(cat.id,cat.type)}
           <span style="font-size:11px;color:var(--muted)">${cat.services.length} services</span>
           <button class="add-row" style="margin-left:auto;padding:3px 10px;font-size:11px" onclick="addSvcChoice('${cat.id}')">&#xff0b; Add service</button>
           <button class="del-cat" onclick="delSvcCat('${cat.id}')">&#10005; Remove</button>
@@ -2106,6 +2112,11 @@ function updSvcCatSubName(catId,newSub){
   newSub=newSub.trim(); if(!newSub)return;
   const cat=SVC_CATS.find(c=>c.id===catId); if(!cat)return;
   cat.name=cat.group+' — '+newSub;
+  saveSvcState(); buildSvcContainer();
+}
+function updSvcCatType(catId,type){
+  const cat=SVC_CATS.find(c=>c.id===catId); if(!cat)return;
+  cat.type=type;
   saveSvcState(); buildSvcContainer();
 }
 function addSvcCatInGroup(groupName){
