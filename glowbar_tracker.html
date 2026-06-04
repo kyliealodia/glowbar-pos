@@ -1931,7 +1931,11 @@ function buildSvcCardInner(svc, catId){
     <div><div style="font-size:10px;color:var(--muted);margin-bottom:2px">Sessions (paid)</div><input class="ii" type="number" style="width:100%" value="${svc.sessions||1}" oninput="updSvcProp('${catId}','${svc.id}','sessions',+this.value)"></div>
     <div><div style="font-size:10px;color:var(--muted);margin-bottom:2px">Free sessions</div><input class="ii" type="number" style="width:100%" value="${svc.freeSessions||0}" oninput="updSvcProp('${catId}','${svc.id}','freeSessions',+this.value)"></div>
   </div>`:''}
-  ${isPkg?`<div style="margin-bottom:8px"><div style="font-size:10px;color:var(--muted);margin-bottom:2px">Discount (&#8369;)</div><input class="ii" type="number" style="width:100%" value="${discount}" oninput="debounce('disc_${svc.id}',()=>{setSvcStateField('${svc.id}','discount',+this.value);refreshSvcCard('${svc.id}');},400)"></div>`:''}
+  ${isPkg?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+    <div><div style="font-size:10px;color:var(--muted);margin-bottom:2px">Sessions (paid)</div><input class="ii" type="number" style="width:100%" value="${svc.sessions||''}" placeholder="1" oninput="updSvcProp('${catId}','${svc.id}','sessions',+this.value)"></div>
+    <div><div style="font-size:10px;color:var(--muted);margin-bottom:2px">Free sessions</div><input class="ii" type="number" style="width:100%" value="${svc.freeSessions||''}" placeholder="0" oninput="updSvcProp('${catId}','${svc.id}','freeSessions',+this.value)"></div>
+  </div>
+  <div style="margin-bottom:8px"><div style="font-size:10px;color:var(--muted);margin-bottom:2px">Discount (&#8369;)</div><input class="ii" type="number" style="width:100%" value="${discount}" oninput="debounce('disc_${svc.id}',()=>{setSvcStateField('${svc.id}','discount',+this.value);refreshSvcCard('${svc.id}');},400)"></div>`:''}
   <div style="display:flex;gap:14px;margin-bottom:6px;font-size:11px;flex-wrap:wrap;">
     <label style="display:flex;align-items:center;gap:4px;cursor:pointer;color:var(--ink2);">
       <input type="checkbox" ${!st.noElec?'checked':''} onchange="setSvcStateField('${svc.id}','noElec',!this.checked);refreshSvcCard('${svc.id}')">
