@@ -662,6 +662,7 @@ body{font-family:system-ui,sans-serif;background:var(--cream);color:var(--text);
 
 <div id="tab-expenses" class="section active">
   <div id="alert-el" class="alert"></div>
+  <div id="expenses-spl-summary" style="display:none;margin-bottom:1rem"></div>
   <div class="summary" id="summary-grid"></div>
   <div class="bar-wrap">
     <div class="bar-bg"><div class="bar-fill" id="budget-bar" style="width:0%"></div></div>
@@ -1265,8 +1266,66 @@ function totals(cat){let pl=0,ef=0,ac=0,dp=0;
   return{pl,ef,ac,dp};}
 function sc(ef,pl){if(!pl)return 'ok';const r=ef/pl;return r>1?'over':r>0.9?'warn-b':'ok'}
 
+function setSplStatus(catId,i,status){
+  setS(catId,i,'paidBy',status);
+  if((status==='shopee1'||status==='shopee3')&&!getS(catId,i).splDate)
+    setS(catId,i,'splDate',todayStr());
+  if(status==='shopee3'&&!getS(catId,i).splInst)
+    setS(catId,i,'splInst',0);
+}
+
+function renderExpensesSplSummary(){
+  const el=document.getElementById('expenses-spl-summary');if(!el)return;
+  const today=todayStr();
+  const thisMonth=today.slice(0,7);
+  const nm=new Date();nm.setMonth(nm.getMonth()+1);
+  const nextMonth=nm.toISOString().slice(0,7);
+  let thisMoDue=0,nextMoDue=0,overdueAmt=0,totalBal=0;
+  const overdueItems=[];
+  CATS.forEach(cat=>{
+    cat.items.forEach((item,i)=>{
+      const s=getS(cat.id,i);
+      const pb=s.paidBy||'';
+      const eff=effV(s,item.p);
+      if(!eff)return;
+      const splDate=s.splDate||todayStr();
+      if(pb==='shopee1'){
+        const due=addMonths(splDate,1);
+        totalBal+=eff;
+        if(due<today){overdueAmt+=eff;overdueItems.push({label:item.name,amt:eff,due});}
+        else if(due.startsWith(thisMonth))thisMoDue+=eff;
+        else if(due.startsWith(nextMonth))nextMoDue+=eff;
+      } else if(pb==='shopee3'){
+        const paid=s.splInst||0;
+        const monthly=Math.round(eff/3);
+        for(let ii=paid+1;ii<=3;ii++){
+          const due=addMonths(splDate,ii);
+          totalBal+=monthly;
+          if(due<today){overdueAmt+=monthly;overdueItems.push({label:item.name+' (inst '+ii+')',amt:monthly,due});}
+          else if(due.startsWith(thisMonth))thisMoDue+=monthly;
+          else if(due.startsWith(nextMonth))nextMoDue+=monthly;
+        }
+      }
+    });
+  });
+  if(totalBal===0){el.style.display='none';return;}
+  el.style.display='block';
+  const fmtR=n=>'&#8369;'+Math.round(n).toLocaleString();
+  el.innerHTML='<div style="background:linear-gradient(135deg,#fff8ed,#fffbf0);border:1.5px solid #f0a500;border-radius:14px;padding:14px 16px">'
+    +'<div style="font-size:12px;font-weight:700;color:#c96b00;margin-bottom:10px">🛒 Shopee Pay Later — Outstanding Balance</div>'
+    +'<div style="display:flex;gap:10px;flex-wrap:wrap">'
+    +'<div class="metric" style="flex:1;min-width:120px;border:0.5px solid #f0a500"><div class="metric-label">Total outstanding</div><div class="metric-value" style="color:#c96b00">'+fmtR(totalBal)+'</div></div>'
+    +'<div class="metric" style="flex:1;min-width:120px;border:0.5px solid #4A9EC9"><div class="metric-label">Due this month</div><div class="metric-value" style="color:#4A9EC9">'+fmtR(thisMoDue)+'</div></div>'
+    +'<div class="metric" style="flex:1;min-width:120px;border:0.5px solid #9C7E4A"><div class="metric-label">Due next month</div><div class="metric-value" style="color:#9C7E4A">'+fmtR(nextMoDue)+'</div></div>'
+    +(overdueAmt>0?'<div class="metric" style="flex:1;min-width:120px;border:0.5px solid #842029"><div class="metric-label" style="color:#842029">⚠ Overdue</div><div class="metric-value" style="color:#842029">'+fmtR(overdueAmt)+'</div><div style="font-size:10px;color:#842029;margin-top:3px">'+overdueItems.length+' payment'+(overdueItems.length!==1?'s':'')+'</div></div>':'')
+    +'</div>'
+    +(overdueItems.length>0?'<div style="margin-top:10px;font-size:11px;color:#842029;font-weight:600">Overdue:</div>'
+      +'<div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:5px">'+overdueItems.map(x=>'<span style="background:#f5c6cb;color:#842029;border-radius:8px;padding:2px 8px;font-size:10px;font-weight:600">'+x.label+' — '+fmtR(x.amt)+' (was due '+fmtDue(x.due)+')</span>').join('')+'</div>':'')
+    +'</div>';
+}
+
 function refreshSummary(){
-  let mcjamesUsed=0,kylieUsed=0,pendingAmt=0;
+  let mcjamesUsed=0,kylieUsed=0,pendingAmt=0,splAmt=0;
   CATS.forEach(cat=>{
     cat.items.forEach((item,i)=>{
       const s=getS(cat.id,i);
@@ -1275,11 +1334,13 @@ function refreshSummary(){
       if(!eff)return;
       if(paidBy==='mcjames')mcjamesUsed+=eff;
       else if(paidBy==='kylie')kylieUsed+=eff;
+      else if(paidBy==='shopee1'||paidBy==='shopee3')splAmt+=eff;
       else if(paidBy==='pending')pendingAmt+=eff;
     });
   });
+  renderExpensesSplSummary();
   const paidTotal=mcjamesUsed+kylieUsed;
-  const grandTotal=paidTotal+pendingAmt;
+  const grandTotal=paidTotal+pendingAmt+splAmt;
   const contingency=TOTAL_FUNDS-grandTotal;
   const availableCash=TOTAL_FUNDS-paidTotal;
   const mcjamesRemaining=MCJAMES_FUND-mcjamesUsed;
@@ -1302,6 +1363,11 @@ function refreshSummary(){
       <div class="metric-value a">${fmt(pendingAmt)}</div>
       <div style="font-size:10px;color:var(--muted);margin-top:3px">Not deducted from any fund</div>
     </div>
+    ${splAmt>0?`<div class="metric" style="border:0.5px solid #f0a500">
+      <div class="metric-label" style="color:#c96b00">🛒 Shopee Pay Later</div>
+      <div class="metric-value" style="color:#c96b00">${fmt(splAmt)}</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:3px">See SPL card above for due dates</div>
+    </div>`:''}
     <div class="metric">
       <div class="metric-label">Grand total</div>
       <div class="metric-value">${fmt(grandTotal)}</div>
@@ -1363,16 +1429,64 @@ function rowHtml(cat,item,i){
       :`<span style="color:${unp>0?'var(--red)':'var(--green)'}">${unp>0?'-':''}₱${Math.abs(Math.round(unp)).toLocaleString()}</span>`;
   const nm=item.name.replace(/"/g,'&quot;');
   const pb=s.paidBy||'';
+  const splDate=s.splDate||todayStr();
+  const splInst=s.splInst||0;
+  const isSpl=pb==='shopee1'||pb==='shopee3';
+  // Build payment cell
+  let payCell='';
+  if(pb==='shopee1'){
+    const due=addMonths(splDate,1);
+    const overdue=isOverdue(due);
+    payCell=`<div>
+      <span style="display:inline-block;padding:2px 7px;border-radius:20px;font-size:10px;font-weight:600;background:#fff3e0;color:#c96b00">🛒 Shopee 1 mo</span>
+      <select style="display:block;margin-top:4px;border:0.5px solid var(--border);border-radius:6px;padding:2px 4px;font-size:10px;background:#fff;color:var(--text);font-family:inherit;width:100%" onchange="setS('${cat.id}',${i},'paidBy',this.value)">
+        <option value="shopee1" selected>🛒 Shopee — 1 month</option>
+        <option value="shopee3">🛒 Shopee — 3 months</option>
+        <option value="kylie">Kylie (Paid)</option>
+        <option value="mcjames">Kuya Mcjames (Paid)</option>
+        <option value="pending">Not yet paid</option>
+      </select>
+      <div style="font-size:10px;color:var(--muted);margin-top:4px">Purchase date:</div>
+      <input type="date" value="${splDate}" style="font-size:10px;border:0.5px solid var(--border);border-radius:5px;padding:2px 4px;width:100%;font-family:inherit;box-sizing:border-box" onchange="setS('${cat.id}',${i},'splDate',this.value)">
+      <div style="font-size:10px;font-weight:600;color:${overdue?'#842029':'#2d6a4f'};margin-top:4px">${overdue?'⚠ OVERDUE — ':''}<span style="white-space:nowrap">${fmtDue(due)}</span></div>
+      <button onclick="setS('${cat.id}',${i},'paidBy','kylie')" style="margin-top:4px;font-size:10px;color:#2d6a4f;background:none;border:none;cursor:pointer;padding:0">✓ Mark paid</button>
+    </div>`;
+  } else if(pb==='shopee3'){
+    const remaining=3-splInst;
+    const monthly=Math.round(actualVal/3)||Math.round((item.p||0)/3);
+    const nextDue=splInst<3?addMonths(splDate,splInst+1):null;
+    const overdue=nextDue?isOverdue(nextDue):false;
+    payCell=`<div>
+      <span style="display:inline-block;padding:2px 7px;border-radius:20px;font-size:10px;font-weight:600;background:#fff3e0;color:#c96b00">🛒 Shopee 3 mo</span>
+      <select style="display:block;margin-top:4px;border:0.5px solid var(--border);border-radius:6px;padding:2px 4px;font-size:10px;background:#fff;color:var(--text);font-family:inherit;width:100%" onchange="setS('${cat.id}',${i},'paidBy',this.value)">
+        <option value="shopee3" selected>🛒 Shopee — 3 months</option>
+        <option value="shopee1">🛒 Shopee — 1 month</option>
+        <option value="kylie">Kylie (Paid)</option>
+        <option value="mcjames">Kuya Mcjames (Paid)</option>
+        <option value="pending">Not yet paid</option>
+      </select>
+      <div style="font-size:10px;color:var(--muted);margin-top:4px">Purchase date:</div>
+      <input type="date" value="${splDate}" style="font-size:10px;border:0.5px solid var(--border);border-radius:5px;padding:2px 4px;width:100%;font-family:inherit;box-sizing:border-box" onchange="setS('${cat.id}',${i},'splDate',this.value)">
+      <div style="font-size:10px;font-weight:600;margin-top:4px">${splInst}/3 paid · ₱${monthly.toLocaleString()}/mo</div>
+      ${nextDue?`<div style="font-size:10px;color:${overdue?'#842029':'var(--muted)'};margin-top:2px">${overdue?'⚠ OVERDUE — ':'Next due: '}${fmtDue(nextDue)}</div>`:''}
+      <div style="font-size:10px;color:var(--muted)">Balance: ₱${(monthly*remaining).toLocaleString()}</div>
+      ${splInst<3?`<button onclick="const s=getS('${cat.id}',${i});setS('${cat.id}',${i},'splInst',Math.min(3,(s.splInst||0)+1))" style="margin-top:4px;font-size:10px;color:#2d6a4f;background:none;border:none;cursor:pointer;padding:0">✓ Mark installment paid</button>`:'<div style="font-size:10px;color:#2d6a4f;margin-top:4px">All 3 paid ✓</div>'}
+    </div>`;
+  } else {
+    payCell=`<select style="border:0.5px solid var(--border);border-radius:7px;padding:3px 4px;font-size:11px;background:#fff;color:var(--text);font-family:inherit;max-width:130px" onchange="setSplStatus('${cat.id}',${i},this.value)">
+      <option value=""${pb===''?' selected':''}>— payment status —</option>
+      <option value="kylie"${pb==='kylie'?' selected':''}>✓ Paid — Kylie</option>
+      <option value="mcjames"${pb==='mcjames'?' selected':''}>✓ Paid — Kuya Mcjames</option>
+      <option value="shopee1">🛒 Shopee Pay Later — 1 month</option>
+      <option value="shopee3">🛒 Shopee Pay Later — 3 months</option>
+      <option value="pending"${pb==='pending'?' selected':''}>○ Not yet paid</option>
+    </select>`;
+  }
   return `<tr>
     <td><input class="ni" type="text" value="${nm}" oninput="updN('${cat.id}',${i},this.value)"></td>
     <td><input class="ii" type="number" placeholder="0" value="${item.p||''}" oninput="updP('${cat.id}',${i},this.value)"></td>
     <td><input class="ii" type="number" placeholder="0" value="${s.actual}" oninput="setS('${cat.id}',${i},'actual',this.value)"></td>
-    <td style="text-align:left"><select style="border:0.5px solid var(--border);border-radius:7px;padding:3px 4px;font-size:11px;background:#fff;color:var(--text);font-family:inherit;max-width:110px" onchange="setS('${cat.id}',${i},'paidBy',this.value)">
-      <option value=""${pb===''?' selected':''}>— who paid? —</option>
-      <option value="mcjames"${pb==='mcjames'?' selected':''}>Kuya Mcjames</option>
-      <option value="kylie"${pb==='kylie'?' selected':''}>Kylie</option>
-      <option value="pending"${pb==='pending'?' selected':''}>Not yet paid</option>
-    </select></td>
+    <td style="text-align:left;min-width:140px">${payCell}</td>
     <td id="eff-${cat.id}-${i}">${isA?fmt(actualVal):'<span style="color:var(--muted)">—</span>'}</td>
     <td id="vsp-${cat.id}-${i}">${isA?(d===0?'<span style="color:var(--muted)">On budget</span>':fmtD(d)):(isNotBought&&planned>0?fmtD(-planned):'<span style="color:var(--muted)">—</span>')}</td>
     <td><input class="ii" type="number" placeholder="0" value="${s.dp||''}" oninput="setS('${cat.id}',${i},'dp',+this.value)"></td>
