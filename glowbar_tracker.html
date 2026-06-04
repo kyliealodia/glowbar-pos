@@ -1601,33 +1601,39 @@ function getHourlyRate(roleId){ const r=staffRoles.find(x=>x.id===roleId); retur
 
 // ── SERVICE STATE ─────────────────────────────────────────────────
 let svcCatState = {}; // stores per-service edits keyed by service id
+let deletedSvcIds = new Set();  // tracks explicitly deleted service IDs
+let deletedCatIds = new Set();  // tracks explicitly deleted category IDs
 function loadSvcState(){
   try{
     const d=JSON.parse(localStorage.getItem('glowbar_svc2')||'{}');
     svcCatState=d.state||{};
+    deletedSvcIds=new Set(d.deletedSvcIds||[]);
+    deletedCatIds=new Set(d.deletedCatIds||[]);
     if(d.cats&&d.cats.length){
-      // Merge saved cats with code: keep user edits, add new categories/services from code
+      // Merge saved cats with code: keep user edits, add genuinely new categories/services from code
+      // but never re-add anything the user has explicitly deleted
       const savedCats=d.cats;
       const savedCatIds=new Set(savedCats.map(c=>c.id));
       const mergedCats=savedCats.map(savedCat=>{
         const codeCat=SVC_CATS.find(c=>c.id===savedCat.id);
         if(!codeCat)return savedCat;
         const savedIds=new Set((savedCat.services||[]).map(s=>s.id));
-        const newSvcs=(codeCat.services||[]).filter(s=>!savedIds.has(s.id));
-        // Backfill desc from code for any service that doesn't have it yet
+        // Only add services from code that are genuinely new (not deleted, not already saved)
+        const newSvcs=(codeCat.services||[]).filter(s=>!savedIds.has(s.id)&&!deletedSvcIds.has(s.id));
         const mergedSvcs=(savedCat.services||[]).map(s=>{
           if(!s.desc){const cs=codeCat.services?.find(x=>x.id===s.id);if(cs?.desc)return{...s,desc:cs.desc};}
           return s;
         });
         return{...savedCat,services:[...mergedSvcs,...newSvcs]};
       });
-      SVC_CATS.forEach(codeCat=>{ if(!savedCatIds.has(codeCat.id)) mergedCats.push(codeCat); });
+      // Only add new code categories the user hasn't explicitly deleted
+      SVC_CATS.forEach(codeCat=>{ if(!savedCatIds.has(codeCat.id)&&!deletedCatIds.has(codeCat.id)) mergedCats.push(codeCat); });
       SVC_CATS=mergedCats;
     }
   }catch(e){ svcCatState={}; }
 }
 function saveSvcState(){
-  localStorage.setItem('glowbar_svc2',JSON.stringify({state:svcCatState,cats:SVC_CATS}));
+  localStorage.setItem('glowbar_svc2',JSON.stringify({state:svcCatState,cats:SVC_CATS,deletedSvcIds:[...deletedSvcIds],deletedCatIds:[...deletedCatIds]}));
   // Sync to POS — debounced so it doesn't fire on every keystroke
   clearTimeout(window._posSvcTimer);
   window._posSvcTimer = setTimeout(()=>{
@@ -2156,6 +2162,7 @@ function delSvc(catId,svcId){
   if(!confirm('Remove this service?'))return;
   const cat=SVC_CATS.find(c=>c.id===catId); if(!cat)return;
   cat.services=cat.services.filter(s=>s.id!==svcId);
+  deletedSvcIds.add(svcId);
   delete svcCatState[svcId]; saveSvcState(); buildSvcContainer();
 }
 function updSvcName(catId,svcId,v){ const cat=SVC_CATS.find(c=>c.id===catId); if(!cat)return; const s=cat.services.find(x=>x.id===svcId); if(s)s.name=v; saveSvcState(); }
@@ -2293,7 +2300,8 @@ function rebuildComboFromMembers(catId,svcId){
 function delSvcCat(id){
   if(!confirm('Remove this entire service category?'))return;
   const cat=SVC_CATS.find(c=>c.id===id);
-  if(cat) cat.services.forEach(s=>delete svcCatState[s.id]);
+  if(cat) cat.services.forEach(s=>{ deletedSvcIds.add(s.id); delete svcCatState[s.id]; });
+  deletedCatIds.add(id);
   SVC_CATS=SVC_CATS.filter(c=>c.id!==id);
   saveSvcState(); buildSvcCatTabs(); buildSvcContainer();
 }
