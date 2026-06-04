@@ -2051,12 +2051,17 @@ function buildSvcContainer(){
       </div>
       ${discSummaryHtml}
     </div>`;
+    const nameInputStyle=(sz,clr)=>`font-size:${sz};font-weight:600;color:${clr};border:none;background:transparent;outline:none;border-bottom:1.5px dashed transparent;padding:0 2px;font-family:inherit;cursor:text;min-width:80px`;
     // Group header (only when multiple sub-sections)
     if(isMultiSub){
+      const gkSafe=groupName.replace(/"/g,'&quot;');
       html+=`<div style="margin-bottom:1.8rem">
         <div style="font-size:16px;font-weight:700;color:var(--gold-d);padding-bottom:10px;border-bottom:2px solid var(--gold-l);margin-bottom:14px;display:flex;align-items:center;gap:10px">
-          ${groupName}
-          <button class="add-row" style="margin-left:auto;padding:3px 10px;font-size:11px" onclick="addSvcCatInGroup('${groupName}')">&#xff0b; Add sub-section</button>
+          <input type="text" value="${gkSafe}" title="Click to rename group"
+            style="${nameInputStyle('16px','var(--gold-d)')}"
+            onfocus="this.style.borderBottomColor='var(--gold)'"
+            onblur="this.style.borderBottomColor='transparent';updSvcGroupName('${gk}',this.value)">
+          <button class="add-row" style="margin-left:auto;padding:3px 10px;font-size:11px" onclick="addSvcCatInGroup('${gk}')">&#xff0b; Add sub-section</button>
         </div>
         ${discBox}`;
     }
@@ -2064,9 +2069,15 @@ function buildSvcContainer(){
       const cards=cat.services.map(svc=>`<div class="svc-card" id="svc-card-${svc.id}" ondragover="event.preventDefault()" ondrop="onSvcDrop(event,'${cat.id}','${svc.id}')">${buildSvcCardInner(svc,cat.id)}</div>`).join('');
       // Sub-section name: strip group prefix if present
       const subName=cat.name.includes(' — ')?cat.name.split(' — ')[1]:cat.name;
+      const dispName=isMultiSub?subName:groupName;
+      const dispSafe=dispName.replace(/"/g,'&quot;');
+      const onBlurFn=isMultiSub?`updSvcCatSubName('${cat.id}',this.value)`:`updSvcGroupName('${gk}',this.value)`;
       html+=`<div style="margin-bottom:${isMultiSub?'1.2':'1.8'}rem">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:6px;border-bottom:${isMultiSub?'0.5px dashed var(--border-l)':'1px solid var(--border-l)'}">
-          <span style="font-size:${isMultiSub?'13':'15'}px;font-weight:600;color:${isMultiSub?'var(--text)':'var(--gold-d)'}">${isMultiSub?subName:groupName}</span>${typeTag(cat.type)}
+          <input type="text" value="${dispSafe}" title="Click to rename"
+            style="${nameInputStyle(isMultiSub?'13px':'15px',isMultiSub?'var(--text)':'var(--gold-d)')}"
+            onfocus="this.style.borderBottomColor='${isMultiSub?'var(--border)':'var(--gold)'}'"
+            onblur="this.style.borderBottomColor='transparent';${onBlurFn}">${typeTag(cat.type)}
           <span style="font-size:11px;color:var(--muted)">${cat.services.length} services</span>
           <button class="add-row" style="margin-left:auto;padding:3px 10px;font-size:11px" onclick="addSvcChoice('${cat.id}')">&#xff0b; Add service</button>
           <button class="del-cat" onclick="delSvcCat('${cat.id}')">&#10005; Remove</button>
@@ -2080,6 +2091,23 @@ function buildSvcContainer(){
   el.innerHTML=html;
 }
 
+function updSvcGroupName(oldGroup,newName){
+  newName=newName.trim(); if(!newName||newName===oldGroup)return;
+  SVC_CATS.forEach(cat=>{
+    if(cat.group===oldGroup){
+      const sub=cat.name.includes(' — ')?cat.name.split(' — ').slice(1).join(' — '):'';
+      cat.group=newName;
+      cat.name=sub?newName+' — '+sub:newName;
+    }
+  });
+  saveSvcState(); buildSvcCatTabs(); buildSvcContainer();
+}
+function updSvcCatSubName(catId,newSub){
+  newSub=newSub.trim(); if(!newSub)return;
+  const cat=SVC_CATS.find(c=>c.id===catId); if(!cat)return;
+  cat.name=cat.group+' — '+newSub;
+  saveSvcState(); buildSvcContainer();
+}
 function addSvcCatInGroup(groupName){
   const name=prompt('Sub-section name:'); if(!name)return;
   const id='cat'+Date.now();
