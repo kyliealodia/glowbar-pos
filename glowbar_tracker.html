@@ -719,15 +719,16 @@ body{font-family:system-ui,sans-serif;background:var(--cream);color:var(--text);
       <option>Marketing</option><option>Commissions</option>
       <option>Taxes &amp; Permits</option><option>Miscellaneous</option>
     </select>
-    <select id="mpaid-filter" class="ii" style="width:140px;font-size:12px;padding:5px 8px" onchange="renderMonthly()">
+    <select id="mpaid-filter" class="ii" style="width:170px;font-size:12px;padding:5px 8px" onchange="renderMonthly()">
       <option value="all">All statuses</option>
-      <option value="unpaid">Unpaid only</option>
-      <option value="paid">Paid only</option>
+      <option value="unpaid">Not yet paid</option>
+      <option value="paid">Paid</option>
+      <option value="shopee">Shopee Pay Later</option>
     </select>
     <button class="btn-p" style="font-size:12px;padding:6px 14px" onclick="toggleAddEntry()">+ Add expense</button>
   </div>
   <div id="add-entry-form" style="display:none;background:var(--cream2);border:0.5px solid var(--border-l);border-radius:12px;padding:14px 16px;margin-bottom:1rem">
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:10px">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1.3fr;gap:10px;margin-bottom:10px">
       <div>
         <div style="font-size:10px;color:var(--muted);margin-bottom:3px;text-transform:uppercase">Date</div>
         <input id="me-date" class="ii" type="date" style="width:100%">
@@ -743,12 +744,21 @@ body{font-family:system-ui,sans-serif;background:var(--cream);color:var(--text);
         </select>
       </div>
       <div>
-        <div style="font-size:10px;color:var(--muted);margin-bottom:3px;text-transform:uppercase">Amount (P)</div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:3px;text-transform:uppercase">Amount (₱)</div>
         <input id="me-amt" class="ii" type="number" placeholder="0" style="width:100%">
       </div>
       <div>
         <div style="font-size:10px;color:var(--muted);margin-bottom:3px;text-transform:uppercase">Notes</div>
         <input id="me-notes" class="ni" type="text" placeholder="optional" style="width:100%">
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:3px;text-transform:uppercase">Payment method</div>
+        <select id="me-payment" class="ii" style="width:100%;font-size:12px;padding:5px 8px">
+          <option value="unpaid">Not yet paid</option>
+          <option value="paid">Paid</option>
+          <option value="shopee1">🛒 Shopee Pay Later — 1 mo</option>
+          <option value="shopee3">🛒 Shopee Pay Later — 3 mo</option>
+        </select>
       </div>
     </div>
     <div style="display:flex;gap:8px">
@@ -756,6 +766,7 @@ body{font-family:system-ui,sans-serif;background:var(--cream);color:var(--text);
       <button class="btn-s" onclick="toggleAddEntry()">Cancel</button>
     </div>
   </div>
+  <div id="spl-summary" style="display:none;margin-bottom:1rem"></div>
   <div style="background:#fff;border:0.5px solid var(--border-l);border-radius:12px;overflow:hidden;margin-bottom:1.2rem">
     <table class="tbl">
       <thead><tr>
@@ -763,6 +774,7 @@ body{font-family:system-ui,sans-serif;background:var(--cream);color:var(--text);
         <th style="text-align:left">Category</th>
         <th>Amount</th>
         <th style="text-align:left">Notes</th>
+        <th style="text-align:left">Due / Info</th>
         <th>Status</th>
         <th></th>
       </tr></thead>
@@ -2194,7 +2206,19 @@ window.executeSyncAll = async function(){
 let monthlyLog=[];
 const MCATS=['Rent','Payroll','Electricity','Water','Internet & Phone','Supplies Restock','Equipment Maintenance','Marketing','Commissions','Taxes & Permits','Miscellaneous'];
 const MCOLORS={'Rent':'#C9973A','Payroll':'#7B6BA8','Electricity':'#E4A834','Water':'#4A9EC9','Internet & Phone':'#4A7C59','Supplies Restock':'#C96B3A','Equipment Maintenance':'#8B2E2E','Marketing':'#2E6B8B','Commissions':'#6B8B2E','Taxes & Permits':'#8B6B2E','Miscellaneous':'#9C7E4A'};
-function loadMonthlyLog(){try{monthlyLog=JSON.parse(localStorage.getItem('glowbar_monthly')||'[]');}catch(e){monthlyLog=[];}}
+
+// ── SHOPEE PAY LATER HELPERS ──────────────────────────────────────
+function addMonths(dateStr,n){const d=new Date(dateStr+'T00:00:00');d.setMonth(d.getMonth()+n);return d.toISOString().slice(0,10);}
+function splInstAmt(e){return Math.round(e.amt/3);}
+function todayStr(){return new Date().toISOString().slice(0,10);}
+function isOverdue(dateStr){return dateStr<todayStr();}
+function fmtDue(dateStr){return new Date(dateStr+'T00:00:00').toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'numeric'});}
+
+function loadMonthlyLog(){
+  try{monthlyLog=JSON.parse(localStorage.getItem('glowbar_monthly')||'[]');}catch(e){monthlyLog=[];}
+  // Migrate old paid boolean to paymentStatus
+  monthlyLog.forEach(e=>{if(!e.paymentStatus)e.paymentStatus=e.paid?'paid':'unpaid';});
+}
 function saveMonthlyLog(){
   localStorage.setItem('glowbar_monthly',JSON.stringify(monthlyLog));
   // Sync to POS
@@ -2212,13 +2236,17 @@ function addMonthlyEntry(){
   const cat=document.getElementById('me-cat').value;
   const amt=parseFloat(document.getElementById('me-amt').value)||0;
   const notes=document.getElementById('me-notes').value.trim();
+  const paymentStatus=document.getElementById('me-payment')?.value||'unpaid';
   if(!date){alert('Please pick a date.');return;}
   if(amt<=0){alert('Please enter an amount greater than 0.');return;}
-  monthlyLog.push({id:Date.now(),date,cat,amt,notes,paid:false});
+  const entry={id:Date.now(),date,cat,amt,notes,paymentStatus,paid:paymentStatus==='paid'};
+  if(paymentStatus==='shopee3')entry.installmentsPaid=0;
+  monthlyLog.push(entry);
   monthlyLog.sort((a,b)=>b.date.localeCompare(a.date));
   saveMonthlyLog();
   document.getElementById('me-amt').value='';
   document.getElementById('me-notes').value='';
+  document.getElementById('me-payment').value='unpaid';
   updateMonthFilter();
   renderMonthly();
 }
@@ -2229,9 +2257,18 @@ function delMonthlyEntry(id){
   updateMonthFilter();
   renderMonthly();
 }
-function toggleMonthlyPaid(id){
+function setMonthlyStatus(id,status){
   const e=monthlyLog.find(x=>x.id===id); if(!e)return;
-  e.paid=!e.paid;
+  e.paymentStatus=status;
+  e.paid=(status==='paid');
+  if(status==='shopee3'&&e.installmentsPaid===undefined)e.installmentsPaid=0;
+  saveMonthlyLog();
+  renderMonthly();
+}
+function bumpSplInstallment(id){
+  const e=monthlyLog.find(x=>x.id===id); if(!e||e.paymentStatus!=='shopee3')return;
+  e.installmentsPaid=Math.min(3,(e.installmentsPaid||0)+1);
+  if(e.installmentsPaid>=3){e.paymentStatus='paid';e.paid=true;}
   saveMonthlyLog();
   renderMonthly();
 }
@@ -2252,8 +2289,9 @@ function renderMonthly(){
   let filtered=monthlyLog;
   if(mf!=='all')filtered=filtered.filter(e=>e.date.startsWith(mf));
   if(cf!=='all')filtered=filtered.filter(e=>e.cat===cf);
-  if(pf==='unpaid')filtered=filtered.filter(e=>!e.paid);
-  if(pf==='paid')filtered=filtered.filter(e=>e.paid);
+  if(pf==='unpaid')filtered=filtered.filter(e=>e.paymentStatus==='unpaid');
+  else if(pf==='paid')filtered=filtered.filter(e=>e.paymentStatus==='paid');
+  else if(pf==='shopee')filtered=filtered.filter(e=>e.paymentStatus==='shopee1'||e.paymentStatus==='shopee3');
   const tbody=document.getElementById('monthly-tbody');
   const empty=document.getElementById('monthly-empty');
   if(!tbody)return;
@@ -2263,30 +2301,66 @@ function renderMonthly(){
     tbody.innerHTML=filtered.map(e=>{
       const color=MCOLORS[e.cat]||'var(--muted)';
       const dl=new Date(e.date+'T00:00:00').toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'numeric'});
-      const isPaid=e.paid===true;
-      const statusBtn='<button onclick="toggleMonthlyPaid('+e.id+')" style="padding:3px 10px;border:none;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;background:'+(isPaid?'#d4edda':'#fff3cd')+';color:'+(isPaid?'#2d6a4f':'#856404')+'">'+(isPaid?'✓ Paid':'○ Not paid')+'</button>';
-      return '<tr style="opacity:'+(isPaid?'0.7':'1')+'"><td style="text-align:left;color:var(--muted);white-space:nowrap">'+dl+'</td><td style="text-align:left"><span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:500;background:'+color+'22;color:'+color+'">'+e.cat+'</span></td><td style="font-weight:500;color:'+(isPaid?'var(--muted)':'var(--text)')+'">&#8369;'+e.amt.toLocaleString()+'</td><td style="text-align:left;color:var(--muted);font-size:11px">'+(e.notes||'&mdash;')+'</td><td>'+statusBtn+'</td><td><button class="del-row" onclick="delMonthlyEntry('+e.id+')" title="Remove">&#10005;</button></td></tr>';
+      const ps=e.paymentStatus||'unpaid';
+      const isPaid=ps==='paid';
+      let statusCell='',dueCell='<span style="color:var(--muted)">—</span>';
+      if(ps==='paid'){
+        statusCell='<span style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;background:#d4edda;color:#2d6a4f;white-space:nowrap">✓ Paid</span>'
+          +'<br><button onclick="setMonthlyStatus('+e.id+',\'unpaid\')" style="font-size:10px;color:var(--muted);background:none;border:none;cursor:pointer;padding:0;margin-top:2px">↩ Undo</button>';
+      } else if(ps==='unpaid'){
+        statusCell='<select style="border:0.5px solid var(--border);border-radius:8px;padding:3px 6px;font-size:11px;background:#fff8ed;color:#856404;font-family:inherit;cursor:pointer" onchange="setMonthlyStatus('+e.id+',this.value);this.value=\'unpaid\'">'
+          +'<option value="unpaid" selected>○ Not yet paid</option>'
+          +'<option value="paid">✓ Mark paid</option>'
+          +'<option value="shopee1">🛒 Shopee — 1 month</option>'
+          +'<option value="shopee3">🛒 Shopee — 3 months</option>'
+          +'</select>';
+      } else if(ps==='shopee1'){
+        const due=addMonths(e.date,1);
+        const overdue=isOverdue(due);
+        statusCell='<span style="display:inline-block;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:600;background:#fff3e0;color:#c96b00;white-space:nowrap">🛒 Shopee 1 mo</span>'
+          +'<br><button onclick="setMonthlyStatus('+e.id+',\'paid\')" style="font-size:10px;color:#2d6a4f;background:none;border:none;cursor:pointer;padding:0;margin-top:3px">✓ Mark paid</button>';
+        dueCell='<span style="font-size:11px;font-weight:600;color:'+(overdue?'#842029':'#2d6a4f')+'">'+(overdue?'⚠ OVERDUE — ':'')+fmtDue(due)+'</span>';
+      } else if(ps==='shopee3'){
+        const instPaid=e.installmentsPaid||0;
+        const remaining=3-instPaid;
+        const monthly=splInstAmt(e);
+        if(instPaid>=3){
+          statusCell='<span style="display:inline-block;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:600;background:#d4edda;color:#2d6a4f;white-space:nowrap">🛒 Shopee 3 mo ✓</span>';
+          dueCell='<span style="font-size:11px;color:#2d6a4f">All 3 installments paid</span>';
+        } else {
+          const nextDue=addMonths(e.date,instPaid+1);
+          const overdue=isOverdue(nextDue);
+          statusCell='<span style="display:inline-block;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:600;background:#fff3e0;color:#c96b00;white-space:nowrap">🛒 Shopee 3 mo</span>'
+            +'<br><button onclick="bumpSplInstallment('+e.id+')" style="font-size:10px;color:#2d6a4f;background:none;border:none;cursor:pointer;padding:0;margin-top:3px">✓ Mark installment paid</button>';
+          dueCell='<div style="font-size:11px;font-weight:600">'+instPaid+'/3 paid &middot; &#8369;'+monthly.toLocaleString()+'/mo</div>'
+            +'<div style="font-size:10px;color:'+(overdue?'#842029':'var(--muted)')+';margin-top:2px">'+(overdue?'⚠ OVERDUE — ':'Next due: ')+fmtDue(nextDue)+'</div>'
+            +'<div style="font-size:10px;color:var(--muted)">Balance: &#8369;'+(monthly*remaining).toLocaleString()+'</div>';
+        }
+      }
+      return '<tr style="opacity:'+(isPaid?'0.65':'1')+'">'
+        +'<td style="text-align:left;color:var(--muted);white-space:nowrap">'+dl+'</td>'
+        +'<td style="text-align:left"><span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:500;background:'+color+'22;color:'+color+'">'+e.cat+'</span></td>'
+        +'<td style="font-weight:500;color:'+(isPaid?'var(--muted)':'var(--text)')+'">&#8369;'+e.amt.toLocaleString()+'</td>'
+        +'<td style="text-align:left;color:var(--muted);font-size:11px">'+(e.notes||'&mdash;')+'</td>'
+        +'<td style="text-align:left">'+dueCell+'</td>'
+        +'<td>'+statusCell+'</td>'
+        +'<td><button class="del-row" onclick="delMonthlyEntry('+e.id+')" title="Remove">&#10005;</button></td>'
+        +'</tr>';
     }).join('');
   }
+  const inScope=e=>(mf==='all'||e.date.startsWith(mf))&&(cf==='all'||e.cat===cf);
   const total=filtered.reduce((s,e)=>s+e.amt,0);
-  const totalUnpaid=monthlyLog.filter(e=>{
-    if(mf!=='all'&&!e.date.startsWith(mf))return false;
-    if(cf!=='all'&&e.cat!==cf)return false;
-    return !e.paid;
-  }).reduce((s,e)=>s+e.amt,0);
-  const totalPaid=monthlyLog.filter(e=>{
-    if(mf!=='all'&&!e.date.startsWith(mf))return false;
-    if(cf!=='all'&&e.cat!==cf)return false;
-    return e.paid;
-  }).reduce((s,e)=>s+e.amt,0);
-  const months=[...new Set(filtered.map(e=>e.date.slice(0,7)))];
-  const avgMonth=months.length>0?total/months.length:0;
+  const totalUnpaid=monthlyLog.filter(e=>inScope(e)&&e.paymentStatus==='unpaid').reduce((s,e)=>s+e.amt,0);
+  const totalPaid=monthlyLog.filter(e=>inScope(e)&&e.paymentStatus==='paid').reduce((s,e)=>s+e.amt,0);
+  const splItems=monthlyLog.filter(e=>inScope(e)&&(e.paymentStatus==='shopee1'||e.paymentStatus==='shopee3'));
+  const totalSpl=splItems.reduce((s,e)=>s+e.amt,0);
   const topCat=MCATS.map(c=>({c,t:filtered.filter(e=>e.cat===c).reduce((s,e)=>s+e.amt,0)})).sort((a,b)=>b.t-a.t)[0];
   const sumEl=document.getElementById('monthly-summary');
   if(sumEl)sumEl.innerHTML=
     '<div class="metric"><div class="metric-label">Total</div><div class="metric-value gd">&#8369;'+Math.round(total).toLocaleString()+'</div></div>'+
-    '<div class="metric" style="border:0.5px solid #f5c6cb"><div class="metric-label" style="color:#842029">Not yet paid</div><div class="metric-value" style="color:#842029">&#8369;'+Math.round(totalUnpaid).toLocaleString()+'</div><div style="font-size:10px;color:var(--muted);margin-top:2px">'+monthlyLog.filter(e=>(!mf||mf==='all'||e.date.startsWith(mf))&&(cf==='all'||e.cat===cf)&&!e.paid).length+' entries</div></div>'+
-    '<div class="metric" style="border:0.5px solid #badbcc"><div class="metric-label" style="color:#0f5132">Paid</div><div class="metric-value" style="color:#0f5132">&#8369;'+Math.round(totalPaid).toLocaleString()+'</div><div style="font-size:10px;color:var(--muted);margin-top:2px">'+monthlyLog.filter(e=>(!mf||mf==='all'||e.date.startsWith(mf))&&(cf==='all'||e.cat===cf)&&e.paid).length+' entries</div></div>'+
+    '<div class="metric" style="border:0.5px solid #f5c6cb"><div class="metric-label" style="color:#842029">Not yet paid</div><div class="metric-value" style="color:#842029">&#8369;'+Math.round(totalUnpaid).toLocaleString()+'</div><div style="font-size:10px;color:var(--muted);margin-top:2px">'+monthlyLog.filter(e=>inScope(e)&&e.paymentStatus==='unpaid').length+' entries</div></div>'+
+    '<div class="metric" style="border:0.5px solid #badbcc"><div class="metric-label" style="color:#0f5132">Paid</div><div class="metric-value" style="color:#0f5132">&#8369;'+Math.round(totalPaid).toLocaleString()+'</div><div style="font-size:10px;color:var(--muted);margin-top:2px">'+monthlyLog.filter(e=>inScope(e)&&e.paymentStatus==='paid').length+' entries</div></div>'+
+    (totalSpl>0?'<div class="metric" style="border:0.5px solid #f0a500"><div class="metric-label" style="color:#c96b00">🛒 Shopee Pay Later</div><div class="metric-value" style="color:#c96b00">&#8369;'+Math.round(totalSpl).toLocaleString()+'</div><div style="font-size:10px;color:var(--muted);margin-top:2px">'+splItems.length+' item'+(splItems.length!==1?'s':'')+'</div></div>':'')+
     (topCat&&topCat.t>0?'<div class="metric"><div class="metric-label">Top category</div><div class="metric-value" style="font-size:14px">'+topCat.c+'</div></div>':'');
   const catTotals=MCATS.map(c=>({c,t:filtered.filter(e=>e.cat===c).reduce((s,e)=>s+e.amt,0)})).filter(x=>x.t>0).sort((a,b)=>b.t-a.t);
   const catsEl=document.getElementById('monthly-cats');
@@ -2295,6 +2369,50 @@ function renderMonthly(){
     const pct=total>0?Math.round(t/total*100):0;
     return '<div style="background:#fff;border:0.5px solid var(--border-l);border-radius:10px;padding:10px 12px"><div style="font-size:10px;font-weight:600;color:'+color+';margin-bottom:4px;text-transform:uppercase;letter-spacing:0.04em">'+c+'</div><div style="font-size:16px;font-weight:600;color:var(--text)">&#8369;'+Math.round(t).toLocaleString()+'</div><div style="margin-top:6px;height:3px;background:var(--border-l);border-radius:2px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+color+';border-radius:2px"></div></div><div style="font-size:10px;color:var(--muted);margin-top:3px">'+pct+'% of total</div></div>';
   }).join('');
+  renderSplSummary();
+}
+
+function renderSplSummary(){
+  const el=document.getElementById('spl-summary');if(!el)return;
+  const today=todayStr();
+  const thisMonth=today.slice(0,7);
+  const nm=new Date();nm.setMonth(nm.getMonth()+1);
+  const nextMonth=nm.toISOString().slice(0,7);
+  let thisMoDue=0,nextMoDue=0,overdueAmt=0,totalBal=0;
+  const overdueItems=[];
+  monthlyLog.forEach(e=>{
+    if(e.paymentStatus==='shopee1'){
+      const due=addMonths(e.date,1);
+      totalBal+=e.amt;
+      if(due<today){overdueAmt+=e.amt;overdueItems.push({label:e.notes||e.cat,amt:e.amt,due});}
+      else if(due.startsWith(thisMonth))thisMoDue+=e.amt;
+      else if(due.startsWith(nextMonth))nextMoDue+=e.amt;
+    } else if(e.paymentStatus==='shopee3'){
+      const paid=e.installmentsPaid||0;
+      const monthly=splInstAmt(e);
+      for(let i=paid+1;i<=3;i++){
+        const due=addMonths(e.date,i);
+        totalBal+=monthly;
+        if(due<today){overdueAmt+=monthly;overdueItems.push({label:(e.notes||e.cat)+' (inst '+i+')',amt:monthly,due});}
+        else if(due.startsWith(thisMonth))thisMoDue+=monthly;
+        else if(due.startsWith(nextMonth))nextMoDue+=monthly;
+      }
+    }
+  });
+  if(totalBal===0){el.style.display='none';return;}
+  el.style.display='block';
+  const fmt=n=>'&#8369;'+Math.round(n).toLocaleString();
+  el.innerHTML='<div style="background:linear-gradient(135deg,#fff8ed,#fffbf0);border:1.5px solid #f0a500;border-radius:14px;padding:14px 16px;margin-bottom:4px">'
+    +'<div style="font-size:12px;font-weight:700;color:#c96b00;margin-bottom:10px">🛒 Shopee Pay Later — Outstanding Balance</div>'
+    +'<div style="display:flex;gap:10px;flex-wrap:wrap">'
+    +'<div class="metric" style="flex:1;min-width:120px;border:0.5px solid #f0a500"><div class="metric-label">Total outstanding</div><div class="metric-value" style="color:#c96b00">'+fmt(totalBal)+'</div></div>'
+    +'<div class="metric" style="flex:1;min-width:120px;border:0.5px solid #4A9EC9"><div class="metric-label">Due this month</div><div class="metric-value" style="color:#4A9EC9">'+fmt(thisMoDue)+'</div></div>'
+    +'<div class="metric" style="flex:1;min-width:120px;border:0.5px solid #9C7E4A"><div class="metric-label">Due next month</div><div class="metric-value" style="color:#9C7E4A">'+fmt(nextMoDue)+'</div></div>'
+    +(overdueAmt>0?'<div class="metric" style="flex:1;min-width:120px;border:0.5px solid #842029"><div class="metric-label" style="color:#842029">⚠ Overdue</div><div class="metric-value" style="color:#842029">'+fmt(overdueAmt)+'</div><div style="font-size:10px;color:#842029;margin-top:3px">'+overdueItems.length+' payment'+(overdueItems.length!==1?'s':'')+'</div></div>':'')
+    +'</div>'
+    +(overdueItems.length>0?'<div style="margin-top:10px;font-size:11px;color:#842029;font-weight:600">Overdue:</div>'
+      +'<div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:5px">'+overdueItems.map(x=>'<span style="background:#f5c6cb;color:#842029;border-radius:8px;padding:2px 8px;font-size:10px;font-weight:600">'+x.label+' — '+fmt(x.amt)+' (was due '+fmtDue(x.due)+')</span>').join('')+'</div>':'')
+    +'</div>';
 }
 
 function showTab(tab){
