@@ -1916,10 +1916,10 @@ function buildSvcCardInner(svc, catId){
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
     <div><div style="font-size:10px;color:var(--muted);margin-bottom:2px">Duration per session (mins)</div>
-      <input class="ii" type="number" style="width:100%" value="${durationMins}" oninput="debounce('d_${svc.id}',()=>{setSvcStateField('${svc.id}','durationMins',+this.value);refreshSvcCard('${svc.id}');},400)">
+      <input class="ii" type="number" style="width:100%" value="${durationMins||''}" placeholder="0" oninput="debounce('d_${svc.id}',()=>{setSvcStateField('${svc.id}','durationMins',+this.value);refreshSvcCard('${svc.id}');},400)">
     </div>
-    <div><div style="font-size:10px;color:var(--muted);margin-bottom:2px">${isLaser?'Package price':'Selling price'} (&#8369;)</div>
-      <input class="ii" type="number" style="width:100%" value="${price}" oninput="debounce('p_${svc.id}',()=>{setSvcStateField('${svc.id}','price',+this.value);refreshSvcCard('${svc.id}');},400)">
+    <div><div style="font-size:10px;color:var(--muted);margin-bottom:2px">${isLaser||isPkg?'Package price':'Selling price'} (&#8369;)</div>
+      <input class="ii" type="number" style="width:100%;${isPkg&&!price?'border-color:var(--gold);background:#fffbf0;':''}" value="${price||''}" placeholder="${isPkg?'Enter package price':'0'}" oninput="debounce('p_${svc.id}',()=>{setSvcStateField('${svc.id}','price',+this.value);refreshSvcCard('${svc.id}');},400)">
     </div>
   </div>
   <div style="margin-bottom:8px"><div style="font-size:10px;color:var(--muted);margin-bottom:2px">Staff role (labor cost)</div>
