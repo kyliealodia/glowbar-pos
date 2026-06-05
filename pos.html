@@ -4854,6 +4854,9 @@ function confirmPay(){
   const txid=uid('TXN');
   const now=new Date();
   // Deduct stock for products AND consumables for services
+  // Per-visit consumables are only deducted once per transaction (not once per service)
+  const _perVisit=new Set(['Massage Table Sheets','Grounding Pad']);
+  const _deductedPV=new Set();
   cart.forEach(ci=>{
     if(ci.type==='product'){
       const p=S.products.find(x=>x.id===ci.id);
@@ -4863,6 +4866,10 @@ function confirmPay(){
         p.consumables.forEach(c=>{
           const inv=S.products.find(x=>x.id===c.productId);
           if(inv){
+            if(_perVisit.has(inv.name)){
+              if(_deductedPV.has(inv.id))return; // already deducted this visit
+              _deductedPV.add(inv.id);
+            }
             inv.stock=Math.max(0,inv.stock-(c.qty*ci.qty));
             if(inv.stock<=inv.lowAt) showToast(`⚠ Low stock: ${inv.name} (${inv.stock} ${inv.unit} left)`,'err');
           }
