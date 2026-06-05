@@ -830,6 +830,124 @@ async function initFirebase(){
       localStorage.setItem('_gbSvcCleanup_v1','done');
     } catch(e){ console.error('GlowBar cleanup error:',e); }
   }
+
+  // ── MASTER FIX v1 ─────────────────────────────────────────────────
+  if(!localStorage.getItem('_gbMasterFix_v1')){
+    try{
+      // Build name lookup from in-memory CONS_DATA: "groupId_iIdx" → item name (lower)
+      const mfNm={};
+      if(typeof CONS_DATA!=='undefined') CONS_DATA.forEach(g=>g.items.forEach((it,i)=>{ mfNm[g.id+'_'+i]=it.name.toLowerCase(); }));
+      // Reverse lookup: name-fragment → {groupId,iIdx} (first match)
+      const mfFind=frag=>{for(const[k,n]of Object.entries(mfNm))if(n.includes(frag)){const[gid,...rest]=k.split('_');return{groupId:gid,iIdx:parseInt(rest.join('_'))};} return null;};
+
+      const mfSnap=await get(TRACKER_REF);
+      if(mfSnap.exists()){
+        const mfd=mfSnap.val();
+
+        // STEP 1 — Fix consState unit costs
+        let mfCons; try{mfCons=JSON.parse(mfd.glowbar_cons||'{}');}catch(e){mfCons={};}
+        const mfCs=mfCons.state||{};
+        [
+          ['waxing_4', {unitsInPack:'4',volPerUnit:'100',uom:'pcs',newUnit:'821'}],
+          ['machine_4',{unitsInPack:'1',volPerUnit:'3785',uom:'ml',newUnit:'579'}],
+          ['facial_47',{unitsInPack:'100',volPerUnit:'1',uom:'pcs',newUnit:'1440'}],
+          ['machine_0',{unitsInPack:'1',volPerUnit:'1000',uom:'g',newUnit:'599'}],
+          ['waxing_1', {unitsInPack:'1',volPerUnit:'100',uom:'g',newUnit:'1375'}],
+          ['waxing_0', {unitsInPack:'1',volPerUnit:'400',uom:'g',newUnit:'445'}],
+          ['machine_5',{unitsInPack:'4',volPerUnit:'10',uom:'pcs',newUnit:'2012'}],
+          ['waxing_6', {unitsInPack:'1',volPerUnit:'472',uom:'ml',newUnit:'439'}],
+          ['waxing_7', {unitsInPack:'1',volPerUnit:'475',uom:'ml',newUnit:'549'}],
+          ['waxing_2', {unitsInPack:'4',volPerUnit:'99',uom:'g',newUnit:'542'}],
+          ['waxing_8', {unitsInPack:'5',volPerUnit:'470',uom:'ml',newUnit:'241'}],
+          ['nails_17', {unitsInPack:'6',volPerUnit:'1',uom:'pcs',newUnit:'339'}],
+          ['nails_53', {unitsInPack:'1',volPerUnit:'550',uom:'pcs',newUnit:'260'}],
+        ].forEach(([k,fields])=>{ if(!mfCs[k])mfCs[k]={}; Object.assign(mfCs[k],fields); });
+        mfCons.state=mfCs;
+        mfd.glowbar_cons=JSON.stringify(mfCons);
+        _origSet('glowbar_cons',mfd.glowbar_cons);
+
+        // STEP 2,3,4 — Fix svc data
+        let mfSvc; try{mfSvc=JSON.parse(mfd.glowbar_svc2||'{}');}catch(e){mfSvc={};}
+        const mfSs=mfSvc.state||{};
+        const mfCats=mfSvc.cats||[];
+        // svcId → catId map
+        const svcCatIdMap={};
+        mfCats.forEach(cat=>(cat.services||[]).forEach(svc=>{ svcCatIdMap[svc.id]=cat.id; }));
+        // Helper: is service in a nail category?
+        const isNailSvc=id=>(svcCatIdMap[id]||'').startsWith('nails');
+        // Items to remove from mani/pedi (by iIdx patterns in CONS_DATA)
+        const maniPediRemove=new Set();
+        const extRemove=new Set();
+        ['foot scrub','chrome nail art','foot cover','spa jelly'].forEach(frag=>{ const r=mfFind(frag); if(r)maniPediRemove.add(r.groupId+'_'+r.iIdx); });
+        ['foot cover','spa jelly'].forEach(frag=>{ const r=mfFind(frag); if(r)extRemove.add(r.groupId+'_'+r.iIdx); });
+        // Identify mani/pedi and extension service IDs
+        const maniPediSvcs=new Set(), extSvcs=new Set();
+        mfCats.forEach(cat=>(cat.services||[]).forEach(svc=>{
+          const n=svc.name.toLowerCase();
+          if(n.includes('manicure')||n.includes('pedicure'))maniPediSvcs.add(svc.id);
+          if(n.includes('extension'))extSvcs.add(svc.id);
+        }));
+        // Clean each service's consumables
+        Object.keys(mfSs).forEach(svcId=>{
+          const st=mfSs[svcId];
+          if(!st||!Array.isArray(st.consumables)||!st.consumables.length)return;
+          const before=st.consumables.length;
+          st.consumables=st.consumables.filter(c=>{
+            if(!c.groupId||c.groupId===''||c.iIdx===-1||c.iIdx===undefined||c.iIdx===null)return false;
+            const nm=mfNm[c.groupId+'_'+c.iIdx]||'';
+            if(nm.includes('poly gel polish')&&!isNailSvc(svcId))return false;
+            if(nm.includes('soft gel')&&nm.includes('almond')&&!isNailSvc(svcId))return false;
+            if(nm.includes('instant whitening set'))return false;
+            if(nm.includes('frozen collagen mask'))return false;
+            if(nm.includes('water color nail gel'))return false;
+            if(nm.includes('nail brush'))return false;
+            if(nm.includes('cuticle oil cathy kathy'))return false;
+            if(maniPediSvcs.has(svcId)&&maniPediRemove.has(c.groupId+'_'+c.iIdx))return false;
+            if(extSvcs.has(svcId)&&extRemove.has(c.groupId+'_'+c.iIdx))return false;
+            return true;
+          });
+          if(st.consumables.length!==before)mfSs[svcId]=st;
+        });
+
+        // STEP 3 — Delete ghost services (price=0 AND no staffRole) from cats
+        mfCats.forEach(cat=>{
+          cat.services=(cat.services||[]).filter(svc=>{
+            const st=mfSs[svc.id]||{};
+            const price=parseFloat(st.price||svc.price||0);
+            const role=st.staffRole||svc.staffRole||'';
+            return !(price===0&&!role);
+          });
+        });
+
+        // STEP 4 — Fix service prices / staff / durations
+        const mfStaff=JSON.parse(localStorage.getItem('glowbar_staff')||'[]');
+        const aesId=mfStaff.find(r=>r.name.toLowerCase().includes('aesthetician'))?.id||'r2';
+        const svFix={
+          'signature glow facial':{price:1500,staffRole:aesId,durationMins:90},
+          'diamond peel facial':{price:1000,staffRole:aesId,durationMins:60},
+          'regular facial':{price:700,staffRole:aesId,durationMins:60},
+          'classic facial':{price:700,staffRole:aesId,durationMins:60},
+          'moisturizing mask':{price:200,staffRole:aesId,durationMins:10},
+          'whitening mask':{price:250,staffRole:aesId,durationMins:10},
+          '24k gold mask':{price:300,staffRole:aesId,durationMins:10},
+        };
+        mfCats.forEach(cat=>(cat.services||[]).forEach(svc=>{
+          const fix=svFix[svc.name.toLowerCase()];
+          if(fix)Object.assign(svc,fix);
+        }));
+
+        // STEP 5 — Write back
+        mfSvc.state=mfSs; mfSvc.cats=mfCats;
+        mfd.glowbar_svc2=JSON.stringify(mfSvc);
+        _origSet('glowbar_svc2',mfd.glowbar_svc2);
+        mfd.updatedAt=new Date().toISOString();
+        _origSet('glowbar_lastSync',mfd.updatedAt);
+        await set(TRACKER_REF,mfd);
+        console.log('GlowBar: master fix v1 applied');
+      }
+      localStorage.setItem('_gbMasterFix_v1','done');
+    }catch(e){console.error('masterFix error:',e);}
+  }
 }
 
 window.addEventListener('load', () => setTimeout(initFirebase, 150));
