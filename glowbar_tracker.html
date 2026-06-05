@@ -3885,20 +3885,23 @@ function consRowHtml(group,item,i){
   const ps=s.paymentStatus||'unpaid';
   const splDate=s.splDate||todayStr();
   let statusCell='',dueCell='<span style="color:var(--muted);font-size:11px">—</span>';
+  // Reusable status dropdown — always lets user switch to any option freely
+  const _selStyle='border:0.5px solid var(--border);border-radius:8px;padding:3px 5px;font-size:11px;font-family:inherit;cursor:pointer;max-width:140px';
+  const _selBg=(v)=>v==='unpaid'?'background:#fff8ed;color:#856404':v==='paid'?'background:#d4edda;color:#2d6a4f':'background:#fff3e0;color:#c96b00';
+  const _statusSel=(cur)=>'<select style="'+_selStyle+';'+_selBg(cur)+'" onchange="setConsStatus(\''+group.id+'\','+i+',this.value)">'
+    +'<option value="unpaid"'+(cur==='unpaid'?' selected':'')+'>○ Not yet paid</option>'
+    +'<option value="paid"'+(cur==='paid'?' selected':'')+'>✓ Paid</option>'
+    +'<option value="shopee1"'+(cur==='shopee1'?' selected':'')+'>🛒 Shopee — 1 mo</option>'
+    +'<option value="shopee3"'+(cur==='shopee3'?' selected':'')+'>🛒 Shopee — 3 mo</option>'
+    +'</select>';
   if(ps==='paid'){
-    statusCell='<span style="display:inline-block;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:600;background:#d4edda;color:#2d6a4f;white-space:nowrap">✓ Paid</span>'
-      +'<br><button onclick="setConsStatus(\''+group.id+'\','+i+',\'unpaid\')" style="font-size:10px;color:var(--muted);background:none;border:none;cursor:pointer;padding:0;margin-top:2px">↩ Undo</button>';
+    statusCell=_statusSel('paid');
   } else if(ps==='unpaid'){
-    statusCell='<select style="border:0.5px solid var(--border);border-radius:8px;padding:3px 5px;font-size:11px;background:#fff8ed;color:#856404;font-family:inherit;cursor:pointer;max-width:130px" onchange="setConsStatus(\''+group.id+'\','+i+',this.value);this.value=\'unpaid\'">'
-      +'<option value="unpaid" selected>○ Not yet paid</option>'
-      +'<option value="paid">✓ Mark paid</option>'
-      +'<option value="shopee1">🛒 Shopee — 1 mo</option>'
-      +'<option value="shopee3">🛒 Shopee — 3 mo</option>'
-      +'</select>';
+    statusCell=_statusSel('unpaid');
   } else if(ps==='shopee1'){
     const due=addMonths(splDate,1);
     const overdue=isOverdue(due);
-    statusCell='<span style="display:inline-block;padding:3px 6px;border-radius:20px;font-size:11px;font-weight:600;background:#fff3e0;color:#c96b00;white-space:nowrap">🛒 Shopee 1 mo</span>'
+    statusCell=_statusSel('shopee1')
       +'<br><button onclick="setConsStatus(\''+group.id+'\','+i+',\'paid\')" style="font-size:10px;color:#2d6a4f;background:none;border:none;cursor:pointer;padding:0;margin-top:2px">✓ Mark paid</button>';
     dueCell='<div style="font-size:10px;color:var(--muted);margin-bottom:2px">Purchase date:</div>'
       +'<input type="date" value="'+splDate+'" style="font-size:10px;border:0.5px solid var(--border);border-radius:5px;padding:2px 4px;width:110px;font-family:inherit" onchange="setConsSplDate(\''+group.id+'\','+i+',this.value)">'
@@ -3908,12 +3911,13 @@ function consRowHtml(group,item,i){
     const remaining=3-instPaid;
     const monthly=Math.round(effectiveTotal/3);
     if(instPaid>=3){
-      statusCell='<span style="display:inline-block;padding:3px 6px;border-radius:20px;font-size:11px;font-weight:600;background:#d4edda;color:#2d6a4f;white-space:nowrap">🛒 Shopee 3 mo ✓</span>';
+      statusCell=_statusSel('shopee3')
+        +'<br><button onclick="setConsStatus(\''+group.id+'\','+i+',\'paid\')" style="font-size:10px;color:#2d6a4f;background:none;border:none;cursor:pointer;padding:0;margin-top:2px">✓ Mark fully paid</button>';
       dueCell='<span style="font-size:11px;color:#2d6a4f">All 3 paid</span>';
     } else {
       const nextDue=addMonths(splDate,instPaid+1);
       const overdue=isOverdue(nextDue);
-      statusCell='<span style="display:inline-block;padding:3px 6px;border-radius:20px;font-size:11px;font-weight:600;background:#fff3e0;color:#c96b00;white-space:nowrap">🛒 Shopee 3 mo</span>'
+      statusCell=_statusSel('shopee3')
         +'<br><button onclick="bumpConsInstallment(\''+group.id+'\','+i+')" style="font-size:10px;color:#2d6a4f;background:none;border:none;cursor:pointer;padding:0;margin-top:2px">✓ Mark installment paid</button>';
       dueCell='<div style="font-size:10px;color:var(--muted);margin-bottom:2px">Purchase date:</div>'
         +'<input type="date" value="'+splDate+'" style="font-size:10px;border:0.5px solid var(--border);border-radius:5px;padding:2px 4px;width:110px;font-family:inherit" onchange="setConsSplDate(\''+group.id+'\','+i+',this.value)">'
