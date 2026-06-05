@@ -66,6 +66,8 @@ html{height:-webkit-fill-available;}
   .svc-name{font-size:13px;font-weight:500;color:var(--ink);display:block;margin-bottom:3px;}
   .svc-desc{font-size:11px;color:var(--ink3);display:block;margin-bottom:4px;line-height:1.4;font-weight:300;}
   .svc-price{font-size:12px;color:var(--gold-dk);font-weight:600;}
+  .save-badge{display:inline-block;margin-top:5px;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;background:linear-gradient(135deg,#fef9ec,#fdf0c8);color:var(--gold-dk);border:1px solid var(--gold);}
+  .pay-terms{display:block;margin-top:5px;font-size:10px;color:var(--ink3);font-style:italic;line-height:1.4;}
   .svc-cat{font-size:10px;color:var(--ink4);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px;}
 
   /* ── TIME SLOTS ── */
@@ -267,6 +269,17 @@ function getCatTabId(p){
   const tab=CATEGORY_TABS.find(t=>t.test(p));
   return tab?tab.id:('other_'+(p.cat||'Other'));
 }
+function getPkgTabId(pkg){
+  const n=(pkg.name||'').toLowerCase();
+  // Combo packages (contain '+') → rejuv (Glow Skin combos)
+  if(n.includes('+')&&(n.includes('diode')||n.includes('carbon')||n.includes('pico'))) return 'rejuv';
+  if(n.includes('diode')) return 'diode';
+  if(n.includes('rejuven')||n.includes('rejuve')) return 'rejuv';
+  if(n.includes('exilis')) return 'exilis';
+  if(n.includes('carbon')||n.includes('black doll')||n.includes('melasma')||n.includes('scar')) return 'pico';
+  if(n.includes('tattoo')) return 'tattoo';
+  return null;
+}
 
 function isComboBooking(){
   const types=booking.services.map(s=>getSvcMeta(s.name,'').type);
@@ -308,6 +321,20 @@ const DEMO_DATA = {
     // ── GLOW NAILS — Packages ──
     {id:112,name:'Mani + Pedi Package',cat:'Glow Nails',subcat:'Packages',price:499,durationMins:90,inPOS:true,description:'Classic manicure and pedicure combined at a bundled rate'},
     {id:113,name:'Gel Mani + Pedi Package',cat:'Glow Nails',subcat:'Packages',price:699,durationMins:120,inPOS:true,description:'Gel manicure and gel pedicure for long-lasting color'},
+    // ── CLASSIC NAIL PACKAGES ──
+    {id:114,name:'Regular Mani + Pedi & Hand Spa',cat:'Glow Nails',subcat:'Packages',price:850,durationMins:165,inPOS:true,includes:'Regular Manicure + Regular Pedicure + Hand Spa',saves:70},
+    {id:115,name:'Classic Hands Package',cat:'Glow Nails',subcat:'Packages',price:1100,durationMins:185,inPOS:true,includes:'Regular Manicure + Regular Pedicure + Hand Spa + Hand Paraffin',saves:120},
+    {id:116,name:'Regular Mani + Pedi & Foot Spa',cat:'Glow Nails',subcat:'Packages',price:950,durationMins:180,inPOS:true,includes:'Regular Manicure + Regular Pedicure + Foot Spa',saves:120},
+    {id:117,name:'Classic Feet Package',cat:'Glow Nails',subcat:'Packages',price:1300,durationMins:200,inPOS:true,includes:'Regular Manicure + Regular Pedicure + Foot Spa + Foot Paraffin',saves:170},
+    {id:118,name:'Classic Spa Package',cat:'Glow Nails',subcat:'Packages',price:1250,durationMins:240,inPOS:true,includes:'Regular Manicure + Regular Pedicure + Hand Spa + Foot Spa',saves:220},
+    {id:119,name:'GlowBar Classic Nail Package',cat:'Glow Nails',subcat:'Packages',price:1500,durationMins:280,inPOS:true,includes:'Regular Manicure + Regular Pedicure + Hand Spa + Foot Spa + Hand Paraffin + Foot Paraffin',saves:330},
+    // ── GEL NAIL PACKAGES ──
+    {id:120,name:'Gel Mani + Pedi & Hand Spa',cat:'Glow Nails',subcat:'Packages',price:1200,durationMins:195,inPOS:true,includes:'Gel Manicure + Gel Pedicure + Hand Spa',saves:180},
+    {id:121,name:'Glow Hands Package',cat:'Glow Nails',subcat:'Packages',price:1450,durationMins:215,inPOS:true,includes:'Gel Manicure + Gel Pedicure + Hand Spa + Hand Paraffin',saves:280},
+    {id:122,name:'Gel Mani + Pedi & Foot Spa',cat:'Glow Nails',subcat:'Packages',price:1350,durationMins:210,inPOS:true,includes:'Gel Manicure + Gel Pedicure + Foot Spa',saves:180},
+    {id:123,name:'Glow Feet Package',cat:'Glow Nails',subcat:'Packages',price:1650,durationMins:230,inPOS:true,includes:'Gel Manicure + Gel Pedicure + Foot Spa + Foot Paraffin',saves:330},
+    {id:124,name:'Glow Spa Package',cat:'Glow Nails',subcat:'Packages',price:1700,durationMins:270,inPOS:true,includes:'Gel Manicure + Gel Pedicure + Hand Spa + Foot Spa',saves:280},
+    {id:125,name:'GlowBar Signature Nail Package',cat:'Glow Nails',subcat:'Packages',price:2000,durationMins:310,inPOS:true,includes:'Gel Manicure + Gel Pedicure + Hand Spa + Foot Spa + Hand Paraffin + Foot Paraffin',saves:430},
     // ── HAIR WAXING ──
     {id:211,name:'Underarm Wax',cat:'Hair Waxing',price:500,durationMins:30,inPOS:true,description:'Smooth underarm hair removal with warm wax'},
     {id:212,name:'Upper Lip Wax',cat:'Hair Waxing',price:400,durationMins:20,inPOS:true,description:'Quick and gentle upper lip hair removal'},
@@ -372,40 +399,45 @@ const DEMO_DATA = {
     {id:612,name:'Lower Leg Exilis',cat:'Exilis Glow',price:1600,durationMins:40,inPOS:true,description:'RF contouring and tightening for the lower legs'},
   ],
   packages:[
-    // ── Diode Hair Removal ──
-    {id:1,name:'Underarms Diode Package',price:6000,sessions:6,active:true},
-    {id:2,name:'Upper Lip Diode Package',price:4000,sessions:6,active:true},
-    {id:3,name:'Lower Lip Diode Package',price:4000,sessions:6,active:true},
-    {id:4,name:'Cheeks Diode Package',price:5000,sessions:6,active:true},
-    {id:5,name:'Arms Full Diode Package',price:11000,sessions:6,active:true},
-    {id:6,name:'Arms Half Diode Package',price:7500,sessions:6,active:true},
-    {id:7,name:'Legs Full Diode Package',price:17500,sessions:6,active:true},
-    {id:8,name:'Legs Half Diode Package',price:12500,sessions:6,active:true},
-    // ── Skin Rejuvenation ──
-    {id:9,name:'Underarms Rejuvenation Package',price:6000,sessions:6,active:true},
-    {id:10,name:'Elbows Rejuvenation Package',price:5000,sessions:6,active:true},
-    {id:11,name:'Inner Thighs Rejuvenation Package',price:6500,sessions:6,active:true},
-    {id:12,name:'Remove & Rejuve Combo Package',price:11000,sessions:6,active:true},
-    // ── Exilis ──
-    {id:13,name:'Full Face with Neck Exilis Package',price:16000,sessions:6,active:true},
-    {id:14,name:'Full Face Exilis Package',price:14000,sessions:6,active:true},
-    {id:15,name:'Double Chin with Neck Exilis Package',price:10000,sessions:6,active:true},
-    {id:16,name:'Face Per Area Exilis Package',price:7500,sessions:6,active:true},
-    {id:17,name:'Arms Exilis Package',price:9000,sessions:6,active:true},
-    {id:18,name:'Abdomen Exilis Package',price:12500,sessions:6,active:true},
-    {id:19,name:'Inner Thigh Exilis Package',price:12000,sessions:6,active:true},
-    {id:20,name:'Love Handle Exilis Package',price:11000,sessions:6,active:true},
-    {id:21,name:'Buttocks Exilis Package',price:12000,sessions:6,active:true},
-    {id:22,name:'Lower Leg Exilis Package',price:8000,sessions:6,active:true},
-    // ── Pico Laser ──
-    {id:23,name:'Black Doll Carbon Laser Package',price:7500,sessions:6,active:true},
-    {id:24,name:'Melasma/Freckles Face Package',price:8000,sessions:6,active:true},
-    {id:25,name:'Melasma/Freckles Shoulders Package',price:9500,sessions:6,active:true},
-    {id:26,name:'Melasma/Freckles Back Package',price:12500,sessions:6,active:true},
-    {id:27,name:'Scar Lightening Face Package',price:7500,sessions:6,active:true},
-    {id:28,name:'Scar Lightening Arms Package',price:5000,sessions:6,active:true},
-    {id:29,name:'Scar Lightening Legs Package',price:7500,sessions:6,active:true},
-    {id:30,name:'Scar Lightening Knees Package',price:6500,sessions:6,active:true},
+    // ── Diode Hair Removal (5+1 free) ──
+    {id:1,name:'Underarms Diode Package',price:6000,sessions:5,freeSessions:1,active:true},
+    {id:2,name:'Upper Lip Diode Package',price:4000,sessions:5,freeSessions:1,active:true},
+    {id:3,name:'Lower Lip Diode Package',price:4000,sessions:5,freeSessions:1,active:true},
+    {id:4,name:'Cheeks Diode Package',price:5000,sessions:5,freeSessions:1,active:true},
+    {id:5,name:'Arms Full Diode Package',price:11000,sessions:5,freeSessions:1,active:true},
+    {id:6,name:'Arms Half Diode Package',price:7500,sessions:5,freeSessions:1,active:true},
+    {id:7,name:'Legs Full Diode Package',price:17500,sessions:5,freeSessions:1,active:true},
+    {id:8,name:'Legs Half Diode Package',price:12500,sessions:5,freeSessions:1,active:true},
+    // ── Skin Rejuvenation (5+1 free) ──
+    {id:9,name:'Underarms Rejuvenation Package',price:6000,sessions:5,freeSessions:1,active:true},
+    {id:10,name:'Elbows Rejuvenation Package',price:5000,sessions:5,freeSessions:1,active:true},
+    {id:11,name:'Inner Thighs Rejuvenation Package',price:6500,sessions:5,freeSessions:1,active:true},
+    {id:12,name:'Remove & Rejuve Combo Package',price:11000,sessions:5,freeSessions:1,active:true},
+    // ── Exilis (5+1 free) ──
+    {id:13,name:'Full Face with Neck Exilis Package',price:16000,sessions:5,freeSessions:1,active:true},
+    {id:14,name:'Full Face Exilis Package',price:14000,sessions:5,freeSessions:1,active:true},
+    {id:15,name:'Double Chin with Neck Exilis Package',price:10000,sessions:5,freeSessions:1,active:true},
+    {id:16,name:'Face Per Area Exilis Package',price:7500,sessions:5,freeSessions:1,active:true},
+    {id:17,name:'Arms Exilis Package',price:9000,sessions:5,freeSessions:1,active:true},
+    {id:18,name:'Abdomen Exilis Package',price:12500,sessions:5,freeSessions:1,active:true},
+    {id:19,name:'Inner Thigh Exilis Package',price:12000,sessions:5,freeSessions:1,active:true},
+    {id:20,name:'Love Handle Exilis Package',price:11000,sessions:5,freeSessions:1,active:true},
+    {id:21,name:'Buttocks Exilis Package',price:12000,sessions:5,freeSessions:1,active:true},
+    {id:22,name:'Lower Leg Exilis Package',price:8000,sessions:5,freeSessions:1,active:true},
+    // ── Pico Laser (5+1 free) ──
+    {id:23,name:'Black Doll Carbon Laser Package',price:7500,sessions:5,freeSessions:1,active:true},
+    {id:24,name:'Melasma/Freckles Face Package',price:8000,sessions:5,freeSessions:1,active:true},
+    {id:25,name:'Melasma/Freckles Shoulders Package',price:9500,sessions:5,freeSessions:1,active:true},
+    {id:26,name:'Melasma/Freckles Back Package',price:12500,sessions:5,freeSessions:1,active:true},
+    {id:27,name:'Scar Lightening Face Package',price:7500,sessions:5,freeSessions:1,active:true},
+    {id:28,name:'Scar Lightening Arms Package',price:5000,sessions:5,freeSessions:1,active:true},
+    {id:29,name:'Scar Lightening Legs Package',price:7500,sessions:5,freeSessions:1,active:true},
+    {id:30,name:'Scar Lightening Knees Package',price:6500,sessions:5,freeSessions:1,active:true},
+    // ── Combo Packages ──
+    {id:31,name:'Diode + Carbon Laser — 5 Sessions',price:12000,sessions:5,freeSessions:0,saves:3500,active:true},
+    {id:32,name:'Diode + Carbon Laser — 10 Sessions',price:21000,sessions:10,freeSessions:0,saves:7000,active:true},
+    {id:33,name:'Diode + Carbon + Pico — 5 Sessions',price:18000,sessions:5,freeSessions:0,saves:5000,active:true},
+    {id:34,name:'Diode + Carbon + Pico — 10 Sessions',price:33000,sessions:10,freeSessions:0,saves:10000,active:true},
   ],
   users:[
     {id:1,name:'Staff 1',role:'staff',specialty:'Aesthetician',color:'#C4778A'},
@@ -512,8 +544,7 @@ function showStep1(){
     const pkgs=DATA.packages.filter(p=>p.active!==false);
     const orderedTabs=[];
     CATEGORY_TABS.forEach(t=>{ if(tabMap[t.id]) orderedTabs.push({...t,services:tabMap[t.id]}); });
-    // Only show defined category tabs — uncategorized services are intentionally hidden
-    if(pkgs.length) orderedTabs.push({id:'packages',label:'Packages',icon:'📦',services:[]});
+    // Packages are shown inside their parent category tabs — no separate Packages tab
 
     // Default active tab
     if(!activeSvcCat||!orderedTabs.find(t=>t.id===activeSvcCat)) activeSvcCat=orderedTabs[0]?.id||null;
@@ -545,45 +576,62 @@ function showStep1(){
       </div>`;
     }
 
-    // Active tab content
-    if(activeSvcCat==='packages'){
-      html+=`<div class="svc-grid">`;
-      pkgs.forEach(p=>{
-        const pkgId='pkg_'+p.id;
-        const sel=booking.services.some(s=>s.id===pkgId)?'sel':'';
-        html+=`<button class="svc-btn ${sel}" onclick="selectService('${pkgId}','${p.name.replace(/'/g,"\\'")} (Package)',${p.price})">
-          ${sel?'<span style="float:right;color:var(--gold-dk);font-size:14px;">✓</span>':''}
-          <span class="svc-name">${p.name}</span>
-          <span class="svc-price">${fmtPrice(p.price)} · ${p.sessions} sessions</span>
-        </button>`;
+    // Active tab content — services + their packages merged into one tab
+    const activeTab=orderedTabs.find(t=>t.id===activeSvcCat);
+    if(activeTab){
+      const isLaserTab=['diode','rejuv','pico','exilis','tattoo'].includes(activeSvcCat);
+      // Group products by subcat (non-package subcats first, Packages last)
+      const subcatMap={};
+      activeTab.services.forEach(p=>{
+        const sc=p.subcat||'';
+        if(!subcatMap[sc]) subcatMap[sc]=[];
+        subcatMap[sc].push(p);
       });
-      html+=`</div>`;
-    } else {
-      const activeTab=orderedTabs.find(t=>t.id===activeSvcCat);
-      if(activeTab){
-        // Group by subcat within active tab
-        const subcatMap={};
-        activeTab.services.forEach(p=>{
-          const sc=p.subcat||'';
-          if(!subcatMap[sc]) subcatMap[sc]=[];
-          subcatMap[sc].push(p);
+      const subcats=Object.keys(subcatMap).sort((a,b)=>{
+        if(a==='Packages') return 1; if(b==='Packages') return -1; return 0;
+      });
+      const useSubcats=subcats.length>1||(subcats.length===1&&subcats[0]);
+      subcats.forEach((sc,si)=>{
+        if(useSubcats&&sc) html+=`<div class="subcat-hdr">${sc}</div>`;
+        html+=`<div class="svc-grid" style="${si>0?'margin-top:8px;':''}">`;
+        subcatMap[sc].forEach(p=>{
+          const sel=booking.services.some(s=>s.id===p.id)?'sel':'';
+          const hasSave=p.saves>0;
+          html+=`<button class="svc-btn ${sel}" onclick="selectService('${p.id}','${p.name.replace(/'/g,"\\'")}',${p.price},${p.durationMins||60})">
+            ${sel?'<span style="float:right;color:var(--gold-dk);font-size:14px;">✓</span>':''}
+            <span class="svc-name">${p.name}</span>
+            ${p.includes?`<span class="svc-desc">Includes: ${p.includes}</span>`:p.description?`<span class="svc-desc">${p.description}</span>`:''}
+            <span class="svc-price">${fmtPrice(p.price)}</span>
+            ${hasSave?`<span class="save-badge">💰 Save ${fmtPrice(p.saves)}</span>`:''}
+          </button>`;
         });
-        const subcats=Object.keys(subcatMap);
-        const useSubcats=subcats.length>1||(subcats.length===1&&subcats[0]);
-        subcats.forEach((sc,si)=>{
-          if(useSubcats&&sc) html+=`<div class="subcat-hdr">${sc}</div>`;
-          html+=`<div class="svc-grid" style="${si>0?'margin-top:8px;':''}">`;
-          subcatMap[sc].forEach(p=>{
-            const sel=booking.services.some(s=>s.id===p.id)?'sel':'';
-            html+=`<button class="svc-btn ${sel}" onclick="selectService('${p.id}','${p.name.replace(/'/g,"\\'")}',${p.price},${p.durationMins||60})">
-              ${sel?'<span style="float:right;color:var(--gold-dk);font-size:14px;">✓</span>':''}
-              <span class="svc-name">${p.name}</span>
-              ${p.description?`<span class="svc-desc">${p.description}</span>`:''}
-              <span class="svc-price">${fmtPrice(p.price)}</span>
-            </button>`;
-          });
-          html+=`</div>`;
+        html+=`</div>`;
+      });
+      // Session packages for this tab
+      const tabPkgs=pkgs.filter(p=>getPkgTabId(p)===activeSvcCat);
+      if(tabPkgs.length){
+        html+=`<div class="subcat-hdr">Packages</div><div class="svc-grid">`;
+        tabPkgs.forEach(p=>{
+          const pkgId='pkg_'+p.id;
+          const sel=booking.services.some(s=>s.id===pkgId)?'sel':'';
+          const paid=p.sessions||5;
+          const free=p.freeSessions||0;
+          const total=paid+free;
+          let sessLabel=free>0?`${paid}+${free} free sessions (${total} total)`:`${total} sessions`;
+          let badge='';
+          if(free===1) badge='<span class="save-badge">🎁 Get 1 FREE session</span>';
+          else if(free===2) badge='<span class="save-badge">🎁 Get 2 FREE sessions</span>';
+          else if(free>0) badge=`<span class="save-badge">🎁 Get ${free} FREE sessions</span>`;
+          if(p.saves>0) badge+=` <span class="save-badge">💰 Save ${fmtPrice(p.saves)}</span>`;
+          const terms=isLaserTab?'<span class="pay-terms">50% downpayment to start · Balance by 4th session · Full payment = FREE facial of your choice</span>':'';
+          html+=`<button class="svc-btn ${sel}" onclick="selectService('${pkgId}','${p.name.replace(/'/g,"\\'")}',${p.price})">
+            ${sel?'<span style="float:right;color:var(--gold-dk);font-size:14px;">✓</span>':''}
+            <span class="svc-name">${p.name}</span>
+            <span class="svc-price">${fmtPrice(p.price)} · ${sessLabel}</span>
+            ${badge}${terms}
+          </button>`;
         });
+        html+=`</div>`;
       }
     }
   }
