@@ -754,6 +754,77 @@ function migrateAllSvcsV6(){
   localStorage.setItem('_gbSvcV6','done');
 }
 
+// ── MIGRATION V7: unit costs, ghost services, dedup SGA, nail consumables ──
+function migrateAllSvcsV7(){
+  if(localStorage.getItem('_gbSvcV7'))return;
+  const C=(g,i,a,u)=>({groupId:g,iIdx:i,amt:String(a),unit:u});
+  const N=(i,a,u)=>C('nails',i,a,u);
+  const W=(i,a,u)=>C('waxing',i,a,u);
+  const F=(i,a,u)=>C('facial',i,a,u);
+  const M=(i,a,u)=>C('machine',i,a,u);
+
+  // — 1. Patch CONS_DATA (overrides stale snapshot) —
+  const cp=[
+    ['machine',5,{total:50.3,unitsInPack:1,volPerUnit:1,uom:'pcs'}],              // Grounding Pad
+    ['facial', 3,{unitsInPack:1,volPerUnit:1000,uom:'ml'}],                        // Natural Anti-Acne Wash
+    ['facial', 4,{unitsInPack:1,volPerUnit:1000,uom:'ml'}],                        // Glass Skin Foamy Wash
+    ['facial', 6,{unitsInPack:1,volPerUnit:1000,uom:'g'}],                         // Sunscreen Cream Gel
+    ['facial', 8,{unitsInPack:1,volPerUnit:1000,uom:'ml'}],                        // Collagen & Elastin Cream
+    ['facial',20,{total:64,unitsInPack:1,volPerUnit:10,uom:'g'}],                  // Hydrocortisone 10g
+    ['facial',21,{unitsInPack:1,volPerUnit:500,uom:'g'}],                          // Anesthesia/Numbing Cream
+    ['facial',23,{total:336,unitsInPack:1,volPerUnit:500,uom:'g'}],                // Orange Papaya Scrub
+    ['facial',40,{total:60,unitsInPack:1,volPerUnit:10,uom:'g'}],                  // Clindamycin 10g
+    ['facial',42,{unitsInPack:1,volPerUnit:1000,uom:'g'}],                         // Whitening Mask 1kg
+    ['facial',47,{total:1440,unitsInPack:100,volPerUnit:1,uom:'pcs'}],             // Massage Table Sheets
+    ['nails', 20,{unitsInPack:1,volPerUnit:1000,uom:'ml'}],                        // Foot Scrub
+    ['nails', 22,{total:282.5,unitsInPack:1,volPerUnit:3785,uom:'ml'}],            // Foot Moisturizing Lotion
+    ['nails', 23,{unitsInPack:1,volPerUnit:3785,uom:'ml'}],                        // Foot Blush Spray
+    ['nails', 26,{total:458,unitsInPack:1,volPerUnit:1000,uom:'g'}],               // Hand & Foot Mask
+    ['nails', 28,{total:336,unitsInPack:2,volPerUnit:453,uom:'g'}],                // Paraffin Wax
+  ];
+  cp.forEach(([gid,idx,fields])=>{ const g=CONS_DATA.find(x=>x.id===gid); if(g&&g.items[idx])Object.assign(g.items[idx],fields); });
+
+  // — 2. Deduplicate Soft Gel Medium Almond — keep first instance only —
+  const ng=CONS_DATA.find(x=>x.id==='nails');
+  if(ng){
+    let seen=false;
+    ng.items=ng.items.filter(it=>{ if(it.name==='Soft Gel Medium Almond'){if(!seen){seen=true;return true;}return false;} return true; });
+    const sga=ng.items.find(it=>it.name==='Soft Gel Medium Almond');
+    if(sga) Object.assign(sga,{totalCost:260,unitsInPack:1,volPerUnit:550,uom:'pcs'});
+  }
+  saveConsState();
+
+  // — 3. Delete ghost services ('Underarms' price=0, 'New service' price=0) —
+  const isGhost=s=>(!s.price||s.price===0)&&(!s.staffRole||s.staffRole==='');
+  SVC_CATS.forEach(cat=>{
+    cat.services=cat.services.filter(s=>{
+      if((s.name==='Underarms'||s.name==='New service')&&isGhost(s)){deletedSvcIds.add(s.id);return false;}
+      return true;
+    });
+  });
+
+  // — 4. Nail service consumable replacements —
+  const mani=[N(16,'0.5','ml'),N(37,'1','ml'),N(38,'3','pcs'),N(24,'1','ml'),N(39,'1','pcs'),N(12,'1.5','ml'),N(5,'0.5','ml'),N(7,'0.5','pcs'),N(8,'0.5','pcs')];
+  const gelMani=[N(16,'0.5','ml'),N(37,'1','ml'),N(38,'3','pcs'),N(24,'1','ml'),N(39,'1','pcs'),N(2,'0.5','ml'),N(5,'0.5','ml'),N(48,'0.5','ml'),N(49,'0.5','ml'),N(7,'0.5','pcs'),N(8,'0.5','pcs')];
+  const cm7={
+    's1':mani,'s2':mani,'s3':gelMani,'s4':gelMani,
+    'hp1':[N(28,'100','g'),N(27,'1','pcs'),N(37,'1','ml')],
+    'fp1':[N(28,'150','g'),N(27,'1','pcs'),N(37,'1','ml')],
+    's7':[N(20,'10','ml'),N(22,'5','ml'),N(26,'10','g'),N(37,'1','ml'),N(38,'2','pcs')],
+    's8':[N(18,'30','ml'),N(20,'20','ml'),N(22,'10','ml'),N(23,'5','ml'),N(26,'15','g'),N(47,'1','pcs'),N(19,'5','ml'),N(37,'1','ml'),N(38,'2','pcs'),N(17,'1','pcs')],
+  };
+  SVC_CATS.forEach(cat=>{
+    cat.services.forEach(svc=>{
+      if(cm7[svc.id]){
+        svc.consumables=cm7[svc.id];
+        if(svcCatState[svc.id]) svcCatState[svc.id].consumables=[];
+      }
+    });
+  });
+  saveSvcState();
+  localStorage.setItem('_gbSvcV7','done');
+}
+
 // ── BOOT APP ─────────────────────────────────────────────────────
 function bootApp(){
   if(typeof loadState === 'function'){
@@ -765,6 +836,7 @@ function bootApp(){
     migrateCatNames();
     migrateAllSvcsV5();
     migrateAllSvcsV6();
+    migrateAllSvcsV7();
     buildCats(); refreshSummary(); buildServices(); buildConsumables();
     updateMonthFilter(); renderMonthly();
     if(typeof loadPersonal === 'function') loadPersonal();
@@ -1687,12 +1759,12 @@ let CATS=[
 let SVC_CATS = [
   // ── GLOW NAILS ────────────────────────────────────────────────
   {id:'nails_mani', name:'Glow Nails — Manicure & Pedicure', group:'Glow Nails', type:'standard', canAddServices:true, services:[
-    {id:'s1',name:'Manicure',price:249,durationMins:45,staffRole:'',consumables:[{groupId:'nails',iIdx:16,amt:'0.5',unit:'ml'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'},{groupId:'nails',iIdx:38,amt:'3',unit:'pcs'},{groupId:'nails',iIdx:24,amt:'1',unit:'ml'},{groupId:'nails',iIdx:39,amt:'1',unit:'pcs'},{groupId:'nails',iIdx:12,amt:'1.5',unit:'ml'},{groupId:'nails',iIdx:5,amt:'0.5',unit:'ml'},{groupId:'nails',iIdx:7,amt:'1',unit:'pcs'},{groupId:'nails',iIdx:8,amt:'1',unit:'pcs'}],desc:'Classic nail care with cuticle shaping, filing, and polish'},
-    {id:'s2',name:'Pedicure',price:299,durationMins:60,staffRole:'',consumables:[{groupId:'nails',iIdx:16,amt:'0.5',unit:'ml'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'},{groupId:'nails',iIdx:38,amt:'3',unit:'pcs'},{groupId:'nails',iIdx:24,amt:'1',unit:'ml'},{groupId:'nails',iIdx:39,amt:'1',unit:'pcs'},{groupId:'nails',iIdx:12,amt:'1.5',unit:'ml'},{groupId:'nails',iIdx:5,amt:'0.5',unit:'ml'},{groupId:'nails',iIdx:7,amt:'1',unit:'pcs'},{groupId:'nails',iIdx:8,amt:'1',unit:'pcs'}],desc:'Foot soak, cuticle care, nail shaping, and polish'},
-    {id:'s3',name:'Gel Manicure',price:399,durationMins:60,staffRole:'',consumables:[{groupId:'nails',iIdx:16,amt:'0.5',unit:'ml'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'},{groupId:'nails',iIdx:38,amt:'3',unit:'pcs'},{groupId:'nails',iIdx:24,amt:'1',unit:'ml'},{groupId:'nails',iIdx:39,amt:'1',unit:'pcs'},{groupId:'nails',iIdx:2,amt:'0.5',unit:'ml'},{groupId:'nails',iIdx:5,amt:'0.5',unit:'ml'},{groupId:'nails',iIdx:48,amt:'0.5',unit:'ml'},{groupId:'nails',iIdx:49,amt:'0.5',unit:'ml'},{groupId:'nails',iIdx:7,amt:'1',unit:'pcs'},{groupId:'nails',iIdx:8,amt:'1',unit:'pcs'}],desc:'Long-lasting gel nail color with cuticle care and shaping'},
-    {id:'s4',name:'Gel Pedicure',price:449,durationMins:75,staffRole:'',consumables:[{groupId:'nails',iIdx:16,amt:'0.5',unit:'ml'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'},{groupId:'nails',iIdx:38,amt:'3',unit:'pcs'},{groupId:'nails',iIdx:24,amt:'1',unit:'ml'},{groupId:'nails',iIdx:39,amt:'1',unit:'pcs'},{groupId:'nails',iIdx:2,amt:'0.5',unit:'ml'},{groupId:'nails',iIdx:5,amt:'0.5',unit:'ml'},{groupId:'nails',iIdx:48,amt:'0.5',unit:'ml'},{groupId:'nails',iIdx:49,amt:'0.5',unit:'ml'},{groupId:'nails',iIdx:7,amt:'1',unit:'pcs'},{groupId:'nails',iIdx:8,amt:'1',unit:'pcs'}],desc:'Gel nail color for toes with soak and cuticle treatment'},
-    {id:'s7',name:'Hand Spa',price:349,durationMins:60,staffRole:'',consumables:[{groupId:'nails',iIdx:20,amt:'10',unit:'ml'},{groupId:'nails',iIdx:26,amt:'10',unit:'g'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'},{groupId:'nails',iIdx:38,amt:'2',unit:'pcs'}],desc:'Nourishing scrub, mask, and massage for soft, smooth hands'},
-    {id:'s8',name:'Foot Spa',price:499,durationMins:75,staffRole:'',consumables:[{groupId:'nails',iIdx:18,amt:'30',unit:'ml'},{groupId:'nails',iIdx:20,amt:'20',unit:'ml'},{groupId:'nails',iIdx:23,amt:'5',unit:'ml'},{groupId:'nails',iIdx:26,amt:'15',unit:'g'},{groupId:'nails',iIdx:47,amt:'1',unit:'pcs'},{groupId:'nails',iIdx:19,amt:'5',unit:'ml'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'},{groupId:'nails',iIdx:38,amt:'2',unit:'pcs'},{groupId:'nails',iIdx:17,amt:'1',unit:'pcs'}],desc:'Soak, exfoliation, mask, and massage for tired feet'},
+    {id:'s1',name:'Manicure',price:249,durationMins:45,staffRole:'',consumables:[{groupId:'nails',iIdx:16,amt:'0.5',unit:'ml'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'},{groupId:'nails',iIdx:38,amt:'3',unit:'pcs'},{groupId:'nails',iIdx:24,amt:'1',unit:'ml'},{groupId:'nails',iIdx:39,amt:'1',unit:'pcs'},{groupId:'nails',iIdx:12,amt:'1.5',unit:'ml'},{groupId:'nails',iIdx:5,amt:'0.5',unit:'ml'},{groupId:'nails',iIdx:7,amt:'0.5',unit:'pcs'},{groupId:'nails',iIdx:8,amt:'0.5',unit:'pcs'}],desc:'Classic nail care with cuticle shaping, filing, and polish'},
+    {id:'s2',name:'Pedicure',price:299,durationMins:60,staffRole:'',consumables:[{groupId:'nails',iIdx:16,amt:'0.5',unit:'ml'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'},{groupId:'nails',iIdx:38,amt:'3',unit:'pcs'},{groupId:'nails',iIdx:24,amt:'1',unit:'ml'},{groupId:'nails',iIdx:39,amt:'1',unit:'pcs'},{groupId:'nails',iIdx:12,amt:'1.5',unit:'ml'},{groupId:'nails',iIdx:5,amt:'0.5',unit:'ml'},{groupId:'nails',iIdx:7,amt:'0.5',unit:'pcs'},{groupId:'nails',iIdx:8,amt:'0.5',unit:'pcs'}],desc:'Foot soak, cuticle care, nail shaping, and polish'},
+    {id:'s3',name:'Gel Manicure',price:399,durationMins:60,staffRole:'',consumables:[{groupId:'nails',iIdx:16,amt:'0.5',unit:'ml'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'},{groupId:'nails',iIdx:38,amt:'3',unit:'pcs'},{groupId:'nails',iIdx:24,amt:'1',unit:'ml'},{groupId:'nails',iIdx:39,amt:'1',unit:'pcs'},{groupId:'nails',iIdx:2,amt:'0.5',unit:'ml'},{groupId:'nails',iIdx:5,amt:'0.5',unit:'ml'},{groupId:'nails',iIdx:48,amt:'0.5',unit:'ml'},{groupId:'nails',iIdx:49,amt:'0.5',unit:'ml'},{groupId:'nails',iIdx:7,amt:'0.5',unit:'pcs'},{groupId:'nails',iIdx:8,amt:'0.5',unit:'pcs'}],desc:'Long-lasting gel nail color with cuticle care and shaping'},
+    {id:'s4',name:'Gel Pedicure',price:449,durationMins:75,staffRole:'',consumables:[{groupId:'nails',iIdx:16,amt:'0.5',unit:'ml'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'},{groupId:'nails',iIdx:38,amt:'3',unit:'pcs'},{groupId:'nails',iIdx:24,amt:'1',unit:'ml'},{groupId:'nails',iIdx:39,amt:'1',unit:'pcs'},{groupId:'nails',iIdx:2,amt:'0.5',unit:'ml'},{groupId:'nails',iIdx:5,amt:'0.5',unit:'ml'},{groupId:'nails',iIdx:48,amt:'0.5',unit:'ml'},{groupId:'nails',iIdx:49,amt:'0.5',unit:'ml'},{groupId:'nails',iIdx:7,amt:'0.5',unit:'pcs'},{groupId:'nails',iIdx:8,amt:'0.5',unit:'pcs'}],desc:'Gel nail color for toes with soak and cuticle treatment'},
+    {id:'s7',name:'Hand Spa',price:349,durationMins:60,staffRole:'',consumables:[{groupId:'nails',iIdx:20,amt:'10',unit:'ml'},{groupId:'nails',iIdx:22,amt:'5',unit:'ml'},{groupId:'nails',iIdx:26,amt:'10',unit:'g'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'},{groupId:'nails',iIdx:38,amt:'2',unit:'pcs'}],desc:'Nourishing scrub, mask, and massage for soft, smooth hands'},
+    {id:'s8',name:'Foot Spa',price:499,durationMins:75,staffRole:'',consumables:[{groupId:'nails',iIdx:18,amt:'30',unit:'ml'},{groupId:'nails',iIdx:20,amt:'20',unit:'ml'},{groupId:'nails',iIdx:22,amt:'10',unit:'ml'},{groupId:'nails',iIdx:23,amt:'5',unit:'ml'},{groupId:'nails',iIdx:26,amt:'15',unit:'g'},{groupId:'nails',iIdx:47,amt:'1',unit:'pcs'},{groupId:'nails',iIdx:19,amt:'5',unit:'ml'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'},{groupId:'nails',iIdx:38,amt:'2',unit:'pcs'},{groupId:'nails',iIdx:17,amt:'1',unit:'pcs'}],desc:'Soak, exfoliation, mask, and massage for tired feet'},
     {id:'hp1',name:'Hand Paraffin',price:0,durationMins:20,staffRole:'',consumables:[{groupId:'nails',iIdx:28,amt:'100',unit:'g'},{groupId:'nails',iIdx:27,amt:'1',unit:'pcs'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'}],desc:''},
     {id:'fp1',name:'Foot Paraffin',price:0,durationMins:20,staffRole:'',consumables:[{groupId:'nails',iIdx:28,amt:'150',unit:'g'},{groupId:'nails',iIdx:27,amt:'1',unit:'pcs'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'}],desc:''},
   ]},
@@ -3477,15 +3549,15 @@ const CONS_DATA = [
     {name:'Foot File',qty:'6 pcs',unitCost:56.5,total:339,unitsInPack:6,volPerUnit:1,uom:'pcs',services:['Foot spa','Signature pedicure']},
     {name:'Foot Soak 1L',qty:'1L',unitCost:252,total:252,services:['Foot spa','Signature pedicure']},
     {name:'Callous Remover',qty:'1 gallon',unitCost:470,total:470,services:['Foot spa']},
-    {name:'Foot Scrub 1L',qty:'1L',unitCost:273,total:273,services:['Hand spa','Foot spa','Signature mani/pedi']},
+    {name:'Foot Scrub 1L',qty:'1L',unitCost:273,total:273,unitsInPack:1,volPerUnit:1000,uom:'ml',services:['Hand spa','Foot spa','Signature mani/pedi']},
     {name:'Hand & Foot Oil',qty:'1 gallon',unitCost:650,total:650,services:['Hand spa','Foot spa']},
-    {name:'Foot Moisturizing Lotion',qty:'1 gallon',unitCost:273,total:273,services:['Hand spa','Foot spa','Signature mani/pedi']},
-    {name:'Foot Blush Spray',qty:'1 gallon',unitCost:226,total:226,services:['Foot spa']},
+    {name:'Foot Moisturizing Lotion',qty:'1 gallon',unitCost:282.5,total:282.5,unitsInPack:1,volPerUnit:3785,uom:'ml',services:['Hand spa','Foot spa','Signature mani/pedi']},
+    {name:'Foot Blush Spray',qty:'1 gallon',unitCost:226,total:226,unitsInPack:1,volPerUnit:3785,uom:'ml',services:['Foot spa']},
     {name:'Merthiolate',qty:'1 gallon',unitCost:250,total:250,services:['All nail services']},
     {name:'Foot Jelly (30 pcs)',qty:'30 pcs',unitCost:18.33,total:550,services:['Foot spa']},
-    {name:'Hand & Foot Mask',qty:'1 kg',unitCost:380,total:380,services:['Hand spa','Foot spa']},
+    {name:'Hand & Foot Mask',qty:'1 kg',unitCost:458,total:458,unitsInPack:1,volPerUnit:1000,uom:'g',services:['Hand spa','Foot spa']},
     {name:'Cling Wrap (300M)',qty:'1 roll',unitCost:320,total:320,services:['Hand spa','Foot spa','Paraffin']},
-    {name:'Paraffin Wax',qty:'5 pcs 453g',unitCost:133,total:665,services:['Hand paraffin','Foot paraffin']},
+    {name:'Paraffin Wax',qty:'2 pcs 453g',unitCost:168,total:336,unitsInPack:2,volPerUnit:453,uom:'g',services:['Hand paraffin','Foot paraffin']},
     {name:'Mittens',qty:'5 pcs',unitCost:85,total:425,services:['Hand paraffin']},
     {name:'Booties',qty:'5 pcs',unitCost:85,total:425,services:['Foot paraffin']},
     {name:'Finger Bowl',qty:'3 pcs',unitCost:60,total:180,services:['All nail services']},
@@ -3532,12 +3604,12 @@ const CONS_DATA = [
     {name:'Comedone Extractor',qty:'6 pcs',unitCost:74,total:444,services:['All facials']},
     {name:'Oil Control Facial Wash 1L',qty:'1L',unitCost:383,total:383,services:['All facials']},
     {name:'Hydrating Facial Wash 1L',qty:'1L',unitCost:614,total:614,services:['All facials']},
-    {name:'Natural Anti-Acne Facial Wash Tea Tree 1L',qty:'1L',unitCost:394,total:394,services:['Anti-acne facial']},
-    {name:'Glass Skin Foamy Wash 1L',qty:'1L',unitCost:614,total:614,services:['All facials']},
+    {name:'Natural Anti-Acne Facial Wash Tea Tree 1L',qty:'1L',unitCost:394,total:394,unitsInPack:1,volPerUnit:1000,uom:'ml',services:['Anti-acne facial']},
+    {name:'Glass Skin Foamy Wash 1L',qty:'1L',unitCost:614,total:614,unitsInPack:1,volPerUnit:1000,uom:'ml',services:['All facials']},
     {name:'Niacinamide Anti-Acne Toner (Pore Minimizer)',qty:'1L',unitCost:735,total:735,unitsInPack:1,volPerUnit:1000,uom:'ml',services:['Regular facial','Whitening facial']},
-    {name:'Sunscreen Cream Gel SPF50',qty:'1 kg',unitCost:1061,total:1061,services:['All facials']},
+    {name:'Sunscreen Cream Gel SPF50',qty:'1 kg',unitCost:1061,total:1061,unitsInPack:1,volPerUnit:1000,uom:'g',services:['All facials']},
     {name:'Brightening Cream',qty:'1L',unitCost:749,total:749,services:['Whitening facial']},
-    {name:'Collagen & Elastin Cream (Anti Aging)',qty:'1L',unitCost:683,total:683,services:['Anti-aging facial']},
+    {name:'Collagen & Elastin Cream (Anti Aging)',qty:'1L',unitCost:683,total:683,unitsInPack:1,volPerUnit:1000,uom:'ml',services:['Anti-aging facial']},
     {name:'Glass Skin Moisturizing Cream',qty:'1L',unitCost:683,total:683,services:['Regular facial','Hydrafacial']},
     {name:'Anti Acne Cream',qty:'1L',unitCost:599,total:599,services:['Anti-acne facial']},
     {name:'Brightening Serum',qty:'1L',unitCost:548,total:548,services:['Whitening facial']},
@@ -3549,10 +3621,10 @@ const CONS_DATA = [
     {name:'Moisturising Toner',qty:'1L',unitCost:499,total:499,services:['Regular facial','Hydrafacial']},
     {name:'Anti Acne Toner',qty:'1L',unitCost:549,total:549,services:['Anti-acne facial']},
     {name:'Massage/Steaming Cream',qty:'1L',unitCost:700,total:700,services:['All facials']},
-    {name:'Hydrocortisone 1% Cream',qty:'10g x10 pcs',unitCost:64,total:640,services:['Sensitive skin facials']},
-    {name:'Anesthesia/Numbing Cream',qty:'500g',unitCost:697,total:697,services:['LHR','Carbon laser']},
+    {name:'Hydrocortisone 1% Cream',qty:'1 tube 10g',unitCost:64,total:64,unitsInPack:1,volPerUnit:10,uom:'g',services:['Sensitive skin facials']},
+    {name:'Anesthesia/Numbing Cream',qty:'500g',unitCost:697,total:697,unitsInPack:1,volPerUnit:500,uom:'g',services:['LHR','Carbon laser']},
     {name:'Gold Peel-Off Mask',qty:'800g',unitCost:610,total:610,services:['Whitening facial','Anti-aging facial']},
-    {name:'Orange Papaya Whitening Scrub (Brightening)',qty:'500g',unitCost:672,total:672,services:['Whitening facial']},
+    {name:'Orange Papaya Whitening Scrub (Brightening)',qty:'500g',unitCost:336,total:336,unitsInPack:1,volPerUnit:500,uom:'g',services:['Whitening facial']},
     {name:'Lavender & Tea Tree Salt Scrub (Anti Aging)',qty:'500g',unitCost:599,total:599,services:['Anti-aging facial']},
     {name:'Moisturising Scrub',qty:'500g',unitCost:625,total:625,services:['Regular facial']},
     {name:'Anti Acne Peel Off',qty:'500g',unitCost:1320,total:1320,services:['Anti-acne facial']},
@@ -3569,9 +3641,9 @@ const CONS_DATA = [
     {name:'Longevity with Retinol Set x10',qty:'10 sets',unitCost:273,total:2730,services:['Anti-aging facial']},
     {name:'Instant Whitening Set x10',qty:'10 sets',unitCost:210,total:2100,services:['Whitening facial']},
     {name:'Acne Control Set x10',qty:'10 sets',unitCost:233,total:2330,services:['Anti-acne facial']},
-    {name:'Clindamycin 1% Cream 10g x10',qty:'10g x10 pcs',unitCost:60,total:600,services:['Anti-acne facial']},
+    {name:'Clindamycin 1% Cream 10g x10',qty:'1 tube 10g',unitCost:60,total:60,unitsInPack:1,volPerUnit:10,uom:'g',services:['Anti-acne facial']},
     {name:'Seaweed Mask 1kg',qty:'1 kg',unitCost:1496,total:1496,services:['All facials']},
-    {name:'Whitening Mask 1kg',qty:'1 kg',unitCost:1496,total:1496,services:['Whitening facial']},
+    {name:'Whitening Mask 1kg',qty:'1 kg',unitCost:1496,total:1496,unitsInPack:1,volPerUnit:1000,uom:'g',services:['Whitening facial']},
     {name:'Hydrocortisone 1% Cream 1kg',qty:'1 kg',unitCost:1381,total:1381,services:['Sensitive skin facials']},
     {name:'Wilkins Water',qty:'1 case (24x500ml)',total:0,unitsInPack:24,volPerUnit:500,uom:'ml'},
     {name:'Facial Tissue',qty:'1 box (200 pcs)',total:0,unitsInPack:200,volPerUnit:1,uom:'pcs'},
@@ -3587,7 +3659,7 @@ const CONS_DATA = [
     {name:'Hydrafacial Tips/Cartridges',qty:'Set',unitCost:0,total:0,services:['Hydrafacial']},
     {name:'Carbon Cream/Lotion',qty:'Per use',unitCost:0,total:0,services:['Carbon laser – face']},
     {name:'Ultrasound Gel',qty:'1 jug 3785ml',total:579,unitsInPack:1,volPerUnit:3785,uom:'ml'},
-    {name:'Grounding Pad',qty:'4 packs × 10 pcs',total:2012,unitsInPack:4,volPerUnit:10,uom:'pcs'},
+    {name:'Grounding Pad',qty:'1 pc',total:50.3,unitsInPack:1,volPerUnit:1,uom:'pcs'},
   ]}
 ];
 
