@@ -406,10 +406,81 @@ window.addEventListener('beforeunload', ()=>{
   if(window.saveToFirebase) window.saveToFirebase();
 });
 
+// ── ONE-TIME MIGRATIONS ───────────────────────────────────────────
+function migrateConsUnits(){
+  if(localStorage.getItem('_gbConsUnits_v1'))return;
+  // [groupId, itemIndex, {fields to set}]
+  const cfg=[
+    ['machine',0,{unitsInPack:1,volPerUnit:1000,uom:'g'}],          // RF Cream
+    ['machine',4,{unitsInPack:1,volPerUnit:3785,uom:'ml'}],         // Ultrasound Gel
+    ['waxing', 4,{unitsInPack:4,volPerUnit:100,uom:'pcs',newUnit:'2384'}], // Latex Gloves (4 boxes×100pcs=₱5.96/pc)
+    ['waxing', 1,{unitsInPack:1,volPerUnit:100,uom:'g'}],           // Pre/Post Wax Powder
+    ['facial',47,{unitsInPack:100,volPerUnit:1,uom:'pcs'}],         // Massage Table Sheets
+    ['waxing', 7,{unitsInPack:1,volPerUnit:472,uom:'ml'}],          // Aloe Vera Gel
+    ['waxing', 6,{unitsInPack:1,volPerUnit:470,uom:'ml'}],          // Pre Wax Cleanser
+    ['waxing', 2,{unitsInPack:4,volPerUnit:99,uom:'g'}],            // After Wax Treatment Powder
+    ['waxing', 0,{unitsInPack:1,volPerUnit:400,uom:'g'}],           // Hard Wax Beans
+    ['nails', 16,{unitsInPack:1,volPerUnit:3785,uom:'ml'}],         // Cuticle Remover
+    ['nails', 15,{unitsInPack:1,volPerUnit:3785,uom:'ml'}],         // Acetone
+    ['nails', 37,{unitsInPack:1,volPerUnit:2000,uom:'ml'}],         // Alcohol
+    ['nails', 24,{unitsInPack:1,volPerUnit:3785,uom:'ml'}],         // Merthiolate
+    ['nails', 19,{unitsInPack:1,volPerUnit:3785,uom:'ml'}],         // Callous Remover
+    ['nails', 18,{unitsInPack:1,volPerUnit:3785,uom:'ml'}],         // Foot Soak
+  ];
+  cfg.forEach(([gid,idx,fields])=>{
+    const k=gid+'_'+idx;
+    if(!consState[k])consState[k]={newQty:'',newUnit:'',supplier:''};
+    Object.assign(consState[k],fields);
+  });
+  saveConsState();
+  localStorage.setItem('_gbConsUnits_v1','done');
+}
+
+function migrateSvcConsumables(){
+  if(localStorage.getItem('_gbSvcCons_v1'))return;
+  // Nail-only service IDs — only these should have nails|50 (Poly Gel) or nails|53 (Soft Gel)
+  const nailSvcs=new Set(['s1','s2','s3','s4','s7','s8','s9','s13','s14','s15','s16','s17','s18']);
+  // Laser/tattoo/wart IDs — should not have Instant Whitening Set (facial|38)
+  const noWhiteSet=new Set([
+    's29','s30','sr1','sr2','sr3','sr4',
+    's25','s27','d1','d2','d3','d4','d5','d6','d7','d8',
+    's51','s52','p1','p2','p3','p4','p5','p6','p7','p8',
+    's45','s46','s49','s50','e1','e2','e3','e4','e5','e6','e7','e8','e9','e10',
+    's31','s32','s33','t1','s42','s43','s44'
+  ]);
+  // Base facial IDs — remove Frozen Collagen Mask (any invalid item)
+  const baseFacials=new Set(['s34','s35','s36','s37','s38']);
+  let changed=false;
+  Object.keys(svcCatState).forEach(svcId=>{
+    const st=svcCatState[svcId];
+    if(!st||!Array.isArray(st.consumables)||!st.consumables.length)return;
+    const before=st.consumables.length;
+    st.consumables=st.consumables.filter(c=>{
+      // Remove empty/placeholder entries
+      if(!c.groupId||c.groupId===''||c.iIdx===-1||c.iIdx===undefined||c.iIdx===null)return false;
+      // Remove Poly Gel Polish (nails|50) from non-nail services
+      if(c.groupId==='nails'&&c.iIdx===50&&!nailSvcs.has(svcId))return false;
+      // Remove Soft Gel (nails|53) from non-nail services
+      if(c.groupId==='nails'&&c.iIdx===53&&!nailSvcs.has(svcId))return false;
+      // Remove Instant Whitening Set (facial|38) from laser/wart services
+      if(c.groupId==='facial'&&c.iIdx===38&&noWhiteSet.has(svcId))return false;
+      // Remove any item that points to a non-existent CONS_DATA entry (catches ghost items like Frozen Collagen Mask)
+      const grp=typeof CONS_DATA!=='undefined'?CONS_DATA.find(g=>g.id===c.groupId):null;
+      if(!grp||!grp.items[c.iIdx])return false;
+      return true;
+    });
+    if(st.consumables.length!==before){svcCatState[svcId]=st;changed=true;}
+  });
+  if(changed)saveSvcState();
+  localStorage.setItem('_gbSvcCons_v1','done');
+}
+
 // ── BOOT APP ─────────────────────────────────────────────────────
 function bootApp(){
   if(typeof loadState === 'function'){
     loadState(); loadConsState(); loadStaff(); loadSvcState(); loadMonthlyLog();
+    migrateConsUnits();
+    migrateSvcConsumables();
     buildCats(); refreshSummary(); buildServices(); buildConsumables();
     updateMonthFilter(); renderMonthly();
     if(typeof loadPersonal === 'function') loadPersonal();
