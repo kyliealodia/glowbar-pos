@@ -441,6 +441,27 @@ function migrateConsUnits(){
   localStorage.setItem('_gbConsUnits_v3','done');
 }
 
+function migrateConsUnitsV4(){
+  if(localStorage.getItem('_gbConsUnitsV4'))return;
+  // Clear newUnit for items that now have correct totalCost in CONS_DATA
+  ['waxing_4','nails_17'].forEach(k=>{
+    if(consState[k]) delete consState[k].newUnit;
+  });
+  saveConsState();
+  localStorage.setItem('_gbConsUnitsV4','done');
+}
+
+function migrateCatNames(){
+  let changed=false;
+  SVC_CATS.forEach(cat=>{
+    if(cat.name==='Skin Rejuvenation (Whitening)'||cat.name==='Skin Carbon Whitening'){
+      cat.name='Carbon Laser (Whitening)';
+      changed=true;
+    }
+  });
+  if(changed)saveSvcState();
+}
+
 function migrateSvcConsumables(){
   if(localStorage.getItem('_gbSvcCons_v3'))return;
   // Nail-only service IDs — only these should have nails|50 (Poly Gel) or nails|53 (Soft Gel)
@@ -607,8 +628,10 @@ function bootApp(){
   if(typeof loadState === 'function'){
     loadState(); loadConsState(); loadStaff(); loadSvcState(); loadMonthlyLog();
     migrateConsUnits();
+    migrateConsUnitsV4();
     migrateSvcConsumables();
     migrateAllSvcsV4();
+    migrateCatNames();
     buildCats(); refreshSummary(); buildServices(); buildConsumables();
     updateMonthFilter(); renderMonthly();
     if(typeof loadPersonal === 'function') loadPersonal();
@@ -2151,15 +2174,13 @@ function getConsUnitCost(groupId,iIdx){
   const cs=getCS(groupId,iIdx);
   const group=CONS_DATA.find(g=>g.id===groupId); if(!group)return 0;
   const item=group.items[iIdx]; if(!item)return 0;
-  // Use new supplier unit cost if entered (already per-smallest-unit cost)
   const nu=parseFloat(cs.newUnit);
-  if(!isNaN(nu)&&nu>0){
-    return nu;
-  }
-  // Original: cost per ml/g/pcs = total / (unitsInPack * volPerUnit)
-  const total=item.total||0;
   const unitsInPack=parseFloat(item.unitsInPack||1)||1;
   const volPerUnit=parseFloat(item.volPerUnit||1)||1;
+  if(!isNaN(nu)&&nu>0){
+    return nu/(unitsInPack*volPerUnit);
+  }
+  const total=parseFloat(item.totalCost||item.total)||0;
   return total/(unitsInPack*volPerUnit);
 }
 function buildConsDropdown(selectedFlatIdx){
@@ -2307,7 +2328,24 @@ function buildSvcCardInner(svc, catId){
   const {laborCost,elec,water,consCost,totalCost,price,commission,discount,profit,margin,durationMins,roleId}=calcSvcCost(svc);
   const pColor=profit>=0?'var(--green)':'var(--red)';
   const cons=(st.consumables&&st.consumables.length>0)?st.consumables:(svc.consumables||[]);
-  const consRows=cons.map((c,ci)=>svcConsRowHtml(svc.id,c,ci)).join('');
+  const _nailCats=new Set(['nails_mani','nails_ext','nails_art','nails_pkg']);
+  const _nonRetailCats=new Set(['skin_rej','diode','pico','tattoo','wart','exilis','waxing','waxing_hair','glow_pkg']);
+  const _isNailCat=_nailCats.has(catId);
+  const _isRetailCat=!_nonRetailCats.has(catId);
+  const filteredCons=cons.filter(c=>{
+    if(!c.groupId||c.iIdx===undefined||c.iIdx<0)return true;
+    const _grp=CONS_DATA.find(g=>g.id===c.groupId);
+    const _item=_grp?_grp.items[c.iIdx]:null;
+    if(!_item)return false;
+    const _nm=_item.name||'';
+    if(c.groupId==='nails'&&(c.iIdx===50||_nm==='Poly Gel Polish'))return _isNailCat;
+    if(c.groupId==='nails'&&(c.iIdx===58||_nm==='Soft Gel Medium Almond'))return _isNailCat;
+    if(_nm==='Water Color Nail Gel')return _isNailCat;
+    if(_nm==='Frozen Collagen Mask')return false;
+    if(c.groupId==='facial'&&(c.iIdx===38||_nm.startsWith('Instant Whitening Set')))return _isRetailCat;
+    return true;
+  });
+  const consRows=filteredCons.map((c,ci)=>svcConsRowHtml(svc.id,c,ci)).join('');
   const staffOpts=staffRoles.map(r=>`<option value="${r.id}"${r.id===roleId?' selected':''}>${r.name} (&#8369;${r.dayRate}/day)</option>`).join('');
   const isLaser=svc.sessions;
   const isPkg=svc.packageServices!==undefined&&!isLaser;
@@ -3291,7 +3329,7 @@ const CONS_DATA = [
     {name:'Nail Foil',qty:'1 set',unitCost:72,total:72,services:['Nail art']},
     {name:'Acetone',qty:'1 gallon',unitCost:550,total:550,services:['Gel polish','Nail art']},
     {name:'Cuticle Remover',qty:'1 gallon',unitCost:180,total:180,services:['All nail services']},
-    {name:'Foot File',qty:'5 pcs',unitCost:25,total:125,services:['Foot spa','Signature pedicure']},
+    {name:'Foot File',qty:'6 pcs',unitCost:56.5,total:339,unitsInPack:6,volPerUnit:1,uom:'pcs',services:['Foot spa','Signature pedicure']},
     {name:'Foot Soak 1L',qty:'1L',unitCost:252,total:252,services:['Foot spa','Signature pedicure']},
     {name:'Callous Remover',qty:'1 gallon',unitCost:470,total:470,services:['Foot spa']},
     {name:'Foot Scrub 1L',qty:'1L',unitCost:273,total:273,services:['Hand spa','Foot spa','Signature mani/pedi']},
@@ -3332,17 +3370,18 @@ const CONS_DATA = [
     {name:'Rhinestones Small',qty:'1000 pcs',total:0,unitsInPack:1000,volPerUnit:1,uom:'pcs'},
     {name:'Mirror Glitter Set',qty:'1 set',total:0,unitsInPack:1,volPerUnit:10,uom:'g'},
     {name:'Spa Jelly',qty:'30 pcs',total:0,unitsInPack:30,volPerUnit:1,uom:'pcs'},
+    {name:'Soft Gel Medium Almond',qty:'1 pack',totalCost:260,unitsInPack:1,volPerUnit:550,uom:'pcs'},
   ]},
   {id:'waxing', name:'Waxing Supplies', cat:'waxing', items:[
-    {name:'Hard Wax Beans',qty:'5 kg',unitCost:298,total:1490,unitsInPack:1,volPerUnit:5000,uom:'g',services:['All waxing services']},
-    {name:'Pre/Post Wax Powder',qty:'5 pcs 99g',unitCost:275,total:1375,services:['All waxing services']},
-    {name:'After Wax Treatment',qty:'4 pcs 60ml',unitCost:98,total:392,services:['All waxing services']},
+    {name:'Hard Wax Beans',qty:'1 bag 400g',unitCost:445,total:445,unitsInPack:1,volPerUnit:400,uom:'g',services:['All waxing services']},
+    {name:'Pre/Post Wax Powder',qty:'5 pcs 99g',unitCost:275,total:1375,unitsInPack:1,volPerUnit:100,uom:'g',services:['All waxing services']},
+    {name:'After Wax Treatment',qty:'4 pcs 99g',unitCost:135.5,total:542,unitsInPack:4,volPerUnit:99,uom:'g',services:['All waxing services']},
     {name:'Depilatory Paper (200 pcs)',qty:'2 packs',unitCost:115,total:230,services:['Soft waxing']},
-    {name:'Latex Gloves (100 pcs)',qty:'5 boxes',unitCost:209,total:1045,unitsInPack:500,volPerUnit:1,uom:'pcs',services:['All waxing services']},
+    {name:'Latex Gloves (100 pcs)',qty:'4 boxes',unitCost:205.25,total:821,unitsInPack:4,volPerUnit:100,uom:'pcs',services:['All waxing services']},
     {name:'Wax Stick (100 pcs)',qty:'2 packs',unitCost:92,total:184,unitsInPack:200,volPerUnit:1,uom:'pcs',services:['All waxing services']},
-    {name:'Pre Wax Cleanser',qty:'1L',total:0,unitsInPack:1,volPerUnit:1000,uom:'ml'},
-    {name:'Aloe Vera Gel',qty:'1L',total:0,unitsInPack:1,volPerUnit:1000,uom:'ml'},
-    {name:'Soft Wax Cartridge',qty:'5 pcs',total:0,unitsInPack:5,volPerUnit:150,uom:'ml'},
+    {name:'Pre Wax Cleanser',qty:'1 bottle 472ml',total:439,unitsInPack:1,volPerUnit:472,uom:'ml'},
+    {name:'Aloe Vera Gel',qty:'1 bottle 475ml',total:549,unitsInPack:1,volPerUnit:475,uom:'ml'},
+    {name:'Soft Wax Cartridge',qty:'5 pcs',total:241,unitsInPack:5,volPerUnit:470,uom:'ml'},
   ]},
   {id:'facial', name:'Facial Supplies', cat:'facial', items:[
     {name:'Comedone Extractor',qty:'6 pcs',unitCost:74,total:444,services:['All facials']},
@@ -3392,18 +3431,18 @@ const CONS_DATA = [
     {name:'Wilkins Water',qty:'1 case (24x500ml)',total:0,unitsInPack:24,volPerUnit:500,uom:'ml'},
     {name:'Facial Tissue',qty:'1 box (200 pcs)',total:0,unitsInPack:200,volPerUnit:1,uom:'pcs'},
     {name:'Sponge',qty:'50 pcs',total:0,unitsInPack:50,volPerUnit:1,uom:'pcs'},
-    {name:'Massage Table Sheets',qty:'100 pcs',total:0,unitsInPack:100,volPerUnit:1,uom:'pcs'},
+    {name:'Massage Table Sheets',qty:'100 pcs',total:1440,unitsInPack:100,volPerUnit:1,uom:'pcs'},
     {name:'Sheet Face Mask',qty:'50 pcs',total:0,unitsInPack:50,volPerUnit:1,uom:'pcs'},
     {name:'24K Gold Mask Sheet',qty:'50 pcs',total:0,unitsInPack:50,volPerUnit:1,uom:'pcs'},
     {name:'Pore Tightening Gel',qty:'500g',total:0,unitsInPack:1,volPerUnit:500,uom:'g'},
   ]},
   {id:'machine', name:'Machine Consumables', cat:'machine', items:[
-    {name:'RF Cream (1 gallon)',qty:'1 gallon',unitCost:1800,total:1800,unitsInPack:1,volPerUnit:3785,uom:'ml',services:['Exilis','12D HIFU']},
+    {name:'RF Cream (1 gallon)',qty:'1 gallon',unitCost:599,total:599,unitsInPack:1,volPerUnit:1000,uom:'ml',services:['Exilis','12D HIFU']},
     {name:'Razor (20 pcs)',qty:'20 pcs',unitCost:39,total:780,unitsInPack:20,volPerUnit:1,uom:'pcs',services:['LHR – underarm','LHR – full legs']},
     {name:'Hydrafacial Tips/Cartridges',qty:'Set',unitCost:0,total:0,services:['Hydrafacial']},
     {name:'Carbon Cream/Lotion',qty:'Per use',unitCost:0,total:0,services:['Carbon laser – face']},
-    {name:'Ultrasound Gel',qty:'1L',total:0,unitsInPack:1,volPerUnit:1000,uom:'ml'},
-    {name:'Grounding Pad',qty:'100 pcs',total:0,unitsInPack:100,volPerUnit:1,uom:'pcs'},
+    {name:'Ultrasound Gel',qty:'1 jug 3785ml',total:579,unitsInPack:1,volPerUnit:3785,uom:'ml'},
+    {name:'Grounding Pad',qty:'4 packs × 10 pcs',total:2012,unitsInPack:4,volPerUnit:10,uom:'pcs'},
   ]}
 ];
 
