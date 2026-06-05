@@ -3873,12 +3873,12 @@ function updConsTotal(gid,i,v){
 function consRowHtml(group,item,i){
   const s=getCS(group.id,i);
   const nt=newTotal(item,group.id,i);
-  const tags=item.services.map(sv=>`<span class="svc-tag">${sv}</span>`).join('');
+  const tags=(item.services||[]).map(sv=>`<span class="svc-tag">${sv}</span>`).join('');
 
   const unitsInPack=parseFloat(s.unitsInPack||item.unitsInPack||1)||1;
   const volPerUnit=parseFloat(s.volPerUnit||item.volPerUnit||1)||1;
   const uom=s.uom||item.uom||'pcs';
-  const effectiveTotal=nt!==null?nt:(item.total||0);
+  const effectiveTotal=nt!==null?nt:(parseFloat(item.totalCost||item.total)||0);
   const costPerSmallUnit=effectiveTotal/(unitsInPack*volPerUnit);
   const cpu=costPerSmallUnit>0?`₱${costPerSmallUnit<1?costPerSmallUnit.toFixed(4):costPerSmallUnit.toFixed(2)}/${uom}`:'—';
 
