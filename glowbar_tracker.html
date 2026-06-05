@@ -496,6 +496,42 @@ async function initFirebase(){
 
   // Always boot — Firebase or localStorage fallback
   bootApp();
+
+  // One-time cleanup: remove stale services that were deleted from the tracker
+  // but may still exist in Firebase gb/products and gb/serviceNames.
+  // Guarded by a flag so it only fires once per device.
+  if(!localStorage.getItem('_gbSvcCleanup_v1')){
+    const staleNames=new Set([
+      'Face','Underarm','Arms & Legs','Bikini','Full Body',
+      'Nail Extensions',
+      'Nail Art','Glitter / Foil','Nail Stickers',
+      'Skin Rejuvenation — Single','Skin Rejuvenation Package','Remove & Rejuve Combo Underarms',
+      'Diode Single','Diode Package',
+      'Single Session','Package',
+      'Fat Reduction','Lifting','Fat Reduction — Package (4+1 free)','Lifting — Package (4+1 free)',
+      'Buttocks Exilis','Lower Leg Exilis',
+      'Tattoo Removal — Small','Tattoo Removal — Medium','Tattoo Removal — Large',
+      'Wart Removal — Small','Wart Removal — Medium','Wart Removal — Large',
+      'Starter Pack','Skin Pack','All-In'
+    ]);
+    try {
+      const toArr=v=>!v?[]:Array.isArray(v)?v:Object.values(v);
+      const [pSnap,sSnap]=await Promise.all([
+        get(ref(db,'gb/products')),
+        get(ref(db,'gb/serviceNames'))
+      ]);
+      const prods=toArr(pSnap.exists()?pSnap.val():[]);
+      const svcs=toArr(sSnap.exists()?sSnap.val():[]);
+      const cleanProds=prods.filter(p=>p&&!staleNames.has(p.name));
+      const cleanSvcs=svcs.filter(s=>s&&!staleNames.has(s.name));
+      const pRemoved=prods.length-cleanProds.length;
+      const sRemoved=svcs.length-cleanSvcs.length;
+      if(pRemoved>0) await set(ref(db,'gb/products'),cleanProds);
+      if(sRemoved>0) await set(ref(db,'gb/serviceNames'),cleanSvcs);
+      console.log(`GlowBar cleanup: removed ${pRemoved} from gb/products, ${sRemoved} from gb/serviceNames`);
+      localStorage.setItem('_gbSvcCleanup_v1','done');
+    } catch(e){ console.error('GlowBar cleanup error:',e); }
+  }
 }
 
 window.addEventListener('load', () => setTimeout(initFirebase, 150));
