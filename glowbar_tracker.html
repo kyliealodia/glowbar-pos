@@ -480,12 +480,135 @@ function migrateSvcConsumables(){
   localStorage.setItem('_gbSvcCons_v3','done');
 }
 
+// ── MIGRATION V4: fix duplicates, prices, consumables ────────────
+function migrateAllSvcsV4(){
+  if(localStorage.getItem('_gbSvcV4'))return;
+  // Helper shorthand builders
+  const C=(g,i,a,u)=>({groupId:g,iIdx:i,amt:String(a),unit:u});
+  const N=(i,a,u)=>C('nails',i,a,u);
+  const W=(i,a,u)=>C('waxing',i,a,u);
+  const F=(i,a,u)=>C('facial',i,a,u);
+  const M=(i,a,u)=>C('machine',i,a,u);
+  // Shared bases
+  const nailBase=[N(16,'0.5','ml'),N(37,'1','ml'),N(38,'3','pcs'),N(24,'1','ml'),N(39,'1','pcs')];
+  const waxBase=[W(5,'2','pcs'),W(1,'2','g'),W(2,'2','g'),W(6,'3','ml'),W(7,'3','ml'),W(4,'2','pcs'),N(38,'2','pcs'),N(37,'1','ml'),F(47,'1','pcs')];
+  const facBase=[F(6,'2','g'),F(34,'1','pcs'),F(31,'1','pcs'),F(44,'250','ml'),F(46,'2','pcs'),F(45,'1','pcs'),F(47,'1','pcs'),N(38,'2','pcs'),N(37,'1','ml')];
+  const dioBase=[M(1,'1','pcs'),W(4,'2','pcs'),N(37,'1','ml'),N(38,'2','pcs'),F(47,'1','pcs')];
+  const picoBase=[W(4,'2','pcs'),N(37,'1','ml'),N(38,'2','pcs'),F(47,'1','pcs')];
+  const skinBase=[W(4,'2','pcs'),N(37,'1','ml'),N(38,'2','pcs'),F(47,'1','pcs')];
+  const exBase=[W(4,'2','pcs'),N(37,'1','ml'),N(38,'2','pcs'),F(47,'1','pcs'),M(5,'1','pcs')];
+  const tBase=[F(21,'3','g'),W(4,'2','pcs'),N(37,'1','ml'),N(38,'2','pcs'),F(47,'1','pcs')];
+  const nailMani=[...nailBase,N(12,'1.5','ml'),N(5,'0.5','ml'),N(7,'1','pcs'),N(8,'1','pcs')];
+  const gelMani=[...nailBase,N(2,'0.5','ml'),N(5,'0.5','ml'),N(48,'0.5','ml'),N(49,'0.5','ml'),N(7,'1','pcs'),N(8,'1','pcs')];
+  // Consumable map by service name (lowercase key)
+  const consMap={
+    'manicure':nailMani,'regular manicure':nailMani,
+    'pedicure':nailMani,'regular pedicure':nailMani,
+    'gel manicure':gelMani,'gel pedicure':gelMani,
+    'hand paraffin':[N(28,'100','g'),N(27,'1','pcs'),N(37,'1','ml')],
+    'foot paraffin':[N(28,'150','g'),N(27,'1','pcs'),N(37,'1','ml')],
+    'hand spa':[N(20,'10','ml'),N(22,'5','ml'),N(26,'10','g'),N(37,'1','ml'),N(38,'2','pcs')],
+    'foot spa':[N(18,'30','ml'),N(20,'20','ml'),N(22,'10','ml'),N(23,'5','ml'),N(26,'15','g'),N(47,'1','pcs'),N(19,'5','ml'),N(37,'1','ml'),N(38,'2','pcs'),N(17,'1','pcs')],
+    'add on foot jelly':[N(25,'1','pcs'),N(57,'1','pcs')],
+    'polygel extension':[N(50,'0.5','ml'),N(51,'0.5','ml'),N(52,'0.5','ml'),N(48,'0.5','ml'),N(49,'0.5','ml'),N(5,'0.5','ml'),N(37,'1','ml'),N(38,'3','pcs'),N(39,'1','pcs'),N(7,'1','pcs'),N(8,'1','pcs')],
+    'nail extensions':[N(50,'0.5','ml'),N(51,'0.5','ml'),N(52,'0.5','ml'),N(48,'0.5','ml'),N(49,'0.5','ml'),N(5,'0.5','ml'),N(37,'1','ml'),N(38,'3','pcs'),N(39,'1','pcs'),N(7,'1','pcs'),N(8,'1','pcs')],
+    'softgel extension':[N(53,'10','pcs'),N(52,'0.5','ml'),N(48,'0.5','ml'),N(49,'0.5','ml'),N(5,'0.5','ml'),N(37,'1','ml'),N(38,'3','pcs'),N(39,'1','pcs'),N(7,'1','pcs'),N(8,'1','pcs')],
+    'chrome powder':[N(4,'2','pcs'),N(54,'1','pcs')],
+    'nail stickers':[N(55,'3','pcs')],
+    'mani + pedi package':[N(16,'1','ml'),N(37,'2','ml'),N(38,'6','pcs'),N(24,'2','ml'),N(39,'2','pcs'),N(12,'3','ml'),N(5,'1','ml'),N(7,'2','pcs'),N(8,'2','pcs')],
+    'gel mani + pedi package':[N(16,'1','ml'),N(37,'2','ml'),N(38,'6','pcs'),N(24,'2','ml'),N(39,'2','pcs'),N(2,'1','ml'),N(5,'1','ml'),N(48,'1','ml'),N(49,'1','ml'),N(7,'2','pcs'),N(8,'2','pcs')],
+    'face':[...waxBase],'underarm':[...waxBase,W(0,'10','g')],
+    'arms & legs':[...waxBase,W(0,'50','g')],'bikini':[...waxBase,W(0,'25','g')],
+    'full body':[...waxBase,W(0,'150','g')],
+    'underarm wax':[...waxBase,W(0,'10','g')],'upper lip wax':[...waxBase,W(0,'3','g')],
+    'lower lip wax':[...waxBase,W(0,'3','g')],'half arms wax':[...waxBase,W(0,'20','g')],
+    'full arms wax':[...waxBase,W(0,'35','g')],'half legs wax':[...waxBase,W(0,'30','g')],
+    'full legs wax':[...waxBase,W(0,'50','g')],'brazilian wax':[...waxBase,W(0,'25','g')],
+    'bikini wax':[...waxBase,W(0,'20','g')],
+    'regular facial':[...facBase,F(2,'2','ml'),F(5,'2','ml'),F(9,'3','g')],
+    'classic facial':[...facBase,F(2,'2','ml'),F(5,'2','ml'),F(9,'3','g')],
+    'whitening facial':[...facBase,F(2,'2','ml'),F(15,'2','ml'),F(9,'3','g'),F(23,'3','g'),F(42,'3','g')],
+    'anti-acne facial':[...facBase,F(3,'2','ml'),F(5,'2','ml'),F(50,'2','g'),F(24,'3','g'),F(41,'3','g')],
+    'anti-aging facial':[...facBase,F(4,'2','ml'),F(16,'2','ml'),F(8,'3','g'),F(24,'3','g'),F(29,'3','g')],
+    'anti aging facial':[...facBase,F(4,'2','ml'),F(16,'2','ml'),F(8,'3','g'),F(24,'3','g'),F(29,'3','g')],
+    'signature glow facial':[...facBase,F(2,'2','ml'),F(15,'2','ml'),F(9,'3','g'),F(23,'3','g'),F(42,'3','g'),F(50,'2','g')],
+    'diamond peel facial':[...facBase,F(2,'2','ml'),F(15,'2','ml'),F(9,'3','g'),F(42,'3','g')],
+    'collagen mask':[F(29,'15','g')],'moisturizing mask':[F(48,'1','pcs')],
+    'whitening mask':[F(42,'15','g')],'24k gold mask':[F(49,'1','pcs')],
+    'diode single':[...dioBase],'diode package':[...dioBase],
+    'underarms diode':[...dioBase,M(4,'5','ml')],'upper lip diode':[...dioBase,M(4,'3','ml')],
+    'lower lip diode':[...dioBase,M(4,'3','ml')],'cheeks diode':[...dioBase,M(4,'3','ml')],
+    'arms full diode':[...dioBase,M(4,'15','ml')],'arms half diode':[...dioBase,M(4,'10','ml')],
+    'legs full diode':[...dioBase,M(4,'25','ml')],'legs half diode':[...dioBase,M(4,'15','ml')],
+    'single session':[...picoBase],'package':[...picoBase],
+    'black doll carbon laser':[...picoBase,F(43,'1','g'),M(3,'5','g')],
+    'melasma/freckles face':[...picoBase,F(43,'1','g')],'melasma/freckles shoulders':[...picoBase,F(43,'2','g')],
+    'melasma/freckles back':[...picoBase,F(43,'3','g')],'scar lightening face':[...picoBase,F(43,'1','g')],
+    'scar lightening arms':[...picoBase,F(43,'2','g')],'scar lightening legs':[...picoBase,F(43,'3','g')],
+    'scar lightening knees':[...picoBase,F(43,'1','g')],
+    'skin rejuvenation — single':[...skinBase],'skin rejuvenation package':[...skinBase,M(4,'5','ml')],
+    'underarms rejuvenation':[...skinBase,M(4,'5','ml')],'elbows rejuvenation':[...skinBase,M(4,'3','ml')],
+    'inner thighs rejuvenation':[...skinBase,M(4,'10','ml')],
+    'remove & rejuve combo underarms':[...skinBase,M(1,'1','pcs'),M(4,'5','ml')],
+    'tattoo removal — small':[...tBase],'tattoo removal — medium':[...tBase],
+    'tattoo removal — large':[...tBase],'tattoo laser removal':[...tBase],
+    'wart removal — small':[...tBase],'wart removal — medium':[...tBase],'wart removal — large':[...tBase],
+    'fat reduction':[...exBase,M(4,'15','ml')],'lifting':[...exBase,M(0,'8','g')],
+    'fat reduction — package (4+1 free)':[...exBase,M(4,'15','ml')],
+    'lifting — package (4+1 free)':[...exBase,M(0,'8','g')],
+    'full face with neck':[...exBase,M(0,'10','g')],'full face':[...exBase,M(0,'8','g')],
+    'double chin with neck':[...exBase,M(0,'5','g')],'face per area':[...exBase,M(0,'3','g')],
+    'arms exilis':[...exBase,M(4,'10','ml')],'abdomen exilis':[...exBase,M(4,'15','ml')],
+    'inner thigh exilis':[...exBase,M(4,'12','ml')],'love handle exilis':[...exBase,M(4,'12','ml')],
+    'buttocks exilis':[...exBase],'lower leg exilis':[...exBase],
+  };
+  // Staff role IDs
+  const aesId=staffRoles.find(r=>r.name.toLowerCase().includes('aesthetician'))?.id||'r2';
+  const ntId=staffRoles.find(r=>r.name.toLowerCase().includes('nail'))?.id||'r1';
+  const fixes={
+    'classic facial':{name:'Regular Facial',price:700,staffRole:aesId,durationMins:60},
+    'regular facial':{price:700,staffRole:aesId,durationMins:60},
+    'whitening facial':{price:900,staffRole:aesId},
+    'anti-acne facial':{price:1000,staffRole:aesId},
+    'anti aging facial':{price:900,staffRole:aesId},
+    'anti-aging facial':{price:900,staffRole:aesId},
+    'signature glow facial':{price:1500,staffRole:aesId,durationMins:90},
+    'diamond peel facial':{price:1000,staffRole:aesId,durationMins:60},
+    'hand paraffin':{price:350,staffRole:ntId,durationMins:30},
+    'foot paraffin':{price:450,staffRole:ntId,durationMins:30},
+    'softgel extension':{price:1000,staffRole:ntId,durationMins:60},
+  };
+  SVC_CATS.forEach(cat=>{
+    // Remove price=0 AND no-staff stubs (duplicates from hardcoded migration)
+    const seen=new Set();
+    cat.services=cat.services.filter(svc=>{
+      const isStub=(!svc.price||svc.price===0)&&(!svc.staffRole||svc.staffRole==='');
+      if(isStub)return false;
+      if(seen.has(svc.name)){return false;} // remove second+ occurrence by name
+      seen.add(svc.name);
+      return true;
+    });
+    cat.services.forEach(svc=>{
+      const n=svc.name.toLowerCase().trim();
+      const fix=fixes[n];
+      if(fix){Object.assign(svc,fix);}
+      // Clear svcCatState consumables so hardcoded ones take effect
+      if(svcCatState[svc.id])svcCatState[svc.id].consumables=[];
+      // Set hardcoded consumables
+      svc.consumables=consMap[n]||[];
+    });
+  });
+  saveSvcState();
+  localStorage.setItem('_gbSvcV4','done');
+}
+
 // ── BOOT APP ─────────────────────────────────────────────────────
 function bootApp(){
   if(typeof loadState === 'function'){
     loadState(); loadConsState(); loadStaff(); loadSvcState(); loadMonthlyLog();
     migrateConsUnits();
     migrateSvcConsumables();
+    migrateAllSvcsV4();
     buildCats(); refreshSummary(); buildServices(); buildConsumables();
     updateMonthFilter(); renderMonthly();
     if(typeof loadPersonal === 'function') loadPersonal();
@@ -572,6 +695,25 @@ async function initFirebase(){
 
   // Always boot — Firebase or localStorage fallback
   bootApp();
+
+  // Sync migration v4 changes to Firebase
+  if(!localStorage.getItem('_gbSvcV4Firebase')){
+    try {
+      const raw=localStorage.getItem('glowbar_svc2');
+      if(raw){
+        const fsnap4=await get(TRACKER_REF);
+        if(fsnap4.exists()){
+          const fd4=fsnap4.val();
+          fd4.glowbar_svc2=raw;
+          fd4.updatedAt=new Date().toISOString();
+          _origSet('glowbar_lastSync',fd4.updatedAt);
+          await set(TRACKER_REF,fd4);
+          console.log('GlowBar: v4 svc migration synced to Firebase');
+        }
+      }
+      localStorage.setItem('_gbSvcV4Firebase','done');
+    }catch(e){console.error('svcV4Firebase error:',e);}
+  }
 
   // One-time Firebase-direct fix: update consumable unit configs and clean
   // service consumables directly in Firebase (bypasses localStorage flag check).
