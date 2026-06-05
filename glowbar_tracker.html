@@ -542,9 +542,9 @@ function migrateAllSvcsV4(){
     'arms & legs':[...waxBase,W(0,'50','g')],'bikini':[...waxBase,W(0,'25','g')],
     'full body':[...waxBase,W(0,'150','g')],
     'underarm wax':[...waxBase,W(0,'10','g')],'upper lip wax':[...waxBase,W(0,'3','g')],
-    'lower lip wax':[...waxBase,W(0,'3','g')],'half arms wax':[...waxBase,W(0,'20','g')],
-    'full arms wax':[...waxBase,W(0,'35','g')],'half legs wax':[...waxBase,W(0,'30','g')],
-    'full legs wax':[...waxBase,W(0,'50','g')],'brazilian wax':[...waxBase,W(0,'25','g')],
+    'lower lip wax':[...waxBase,W(0,'3','g')],'half arms wax':[...waxBase,W(8,'20','ml')],
+    'full arms wax':[...waxBase,W(8,'35','ml')],'half legs wax':[...waxBase,W(8,'30','ml')],
+    'full legs wax':[...waxBase,W(8,'50','ml')],'brazilian wax':[...waxBase,W(0,'25','g')],
     'bikini wax':[...waxBase,W(0,'20','g')],
     'regular facial':[...facBase,F(2,'2','ml'),F(5,'2','ml'),F(9,'3','g')],
     'classic facial':[...facBase,F(2,'2','ml'),F(5,'2','ml'),F(9,'3','g')],
@@ -708,6 +708,52 @@ function migrateAllSvcsV5(){
   localStorage.setItem('_gbSvcV5','done');
 }
 
+// ── MIGRATION V6: clean blank consumable rows + waxing consumable fixes ──
+function migrateAllSvcsV6(){
+  if(localStorage.getItem('_gbSvcV6'))return;
+  const C=(g,i,a,u)=>({groupId:g,iIdx:i,amt:String(a),unit:u});
+  const N=(i,a,u)=>C('nails',i,a,u);
+  const W=(i,a,u)=>C('waxing',i,a,u);
+  const F=(i,a,u)=>C('facial',i,a,u);
+  const wb=[W(5,'2','pcs'),W(1,'2','g'),W(2,'2','g'),W(6,'3','ml'),W(7,'3','ml'),W(4,'2','pcs'),N(38,'2','pcs'),N(37,'1','ml'),F(47,'1','pcs')];
+  // Waxing consumables by service ID (base + area-specific wax type)
+  const waxMap={
+    's19':[...wb],                          // Face — base only
+    's20':[...wb,W(0,'10','g')],            // Underarm — hard wax 10g
+    's21':[...wb,W(0,'50','g')],            // Arms & Legs — hard wax 50g
+    's23':[...wb,W(0,'25','g')],            // Bikini — hard wax 25g
+    's24':[...wb,W(0,'150','g')],           // Full Body — hard wax 150g
+    'hw1':[...wb,W(0,'10','g')],            // Underarm Wax — hard wax 10g
+    'hw2':[...wb,W(0,'3','g')],             // Upper Lip — hard wax 3g
+    'hw3':[...wb,W(0,'3','g')],             // Lower Lip — hard wax 3g
+    'hw4':[...wb,W(8,'20','ml')],           // Half Arms — soft wax 20ml
+    'hw5':[...wb,W(8,'35','ml')],           // Full Arms — soft wax 35ml
+    'hw6':[...wb,W(8,'30','ml')],           // Half Legs — soft wax 30ml
+    'hw7':[...wb,W(8,'50','ml')],           // Full Legs — soft wax 50ml
+    'hw8':[...wb,W(0,'25','g')],            // Brazilian — hard wax 25g
+    'hw9':[...wb,W(0,'20','g')],            // Bikini Wax — hard wax 20g
+  };
+  const isBlank=c=>!c.groupId||c.iIdx==null||c.iIdx<0;
+  SVC_CATS.forEach(cat=>{
+    cat.services.forEach(svc=>{
+      const st=getSvcState(svc.id);
+      // Apply waxing service overrides
+      if(waxMap[svc.id]){
+        svc.consumables=waxMap[svc.id];
+        if(st) st.consumables=[];
+      } else {
+        // Clean blank rows from svc.consumables
+        svc.consumables=(svc.consumables||[]).filter(c=>!isBlank(c));
+        // Clean blank rows from state override (if any)
+        if(st&&Array.isArray(st.consumables)) st.consumables=st.consumables.filter(c=>!isBlank(c));
+      }
+      if(svcCatState[svc.id]) svcCatState[svc.id]=st||{};
+    });
+  });
+  saveSvcState();
+  localStorage.setItem('_gbSvcV6','done');
+}
+
 // ── BOOT APP ─────────────────────────────────────────────────────
 function bootApp(){
   if(typeof loadState === 'function'){
@@ -718,6 +764,7 @@ function bootApp(){
     migrateAllSvcsV4();
     migrateCatNames();
     migrateAllSvcsV5();
+    migrateAllSvcsV6();
     buildCats(); refreshSummary(); buildServices(); buildConsumables();
     updateMonthFilter(); renderMonthly();
     if(typeof loadPersonal === 'function') loadPersonal();
@@ -1679,10 +1726,10 @@ let SVC_CATS = [
     {id:'hw1',name:'Underarm Wax',price:500,durationMins:30,staffRole:'',consumables:[{groupId:'waxing',iIdx:5,amt:'2',unit:'pcs'},{groupId:'waxing',iIdx:1,amt:'2',unit:'g'},{groupId:'waxing',iIdx:2,amt:'2',unit:'g'},{groupId:'waxing',iIdx:6,amt:'3',unit:'ml'},{groupId:'waxing',iIdx:7,amt:'3',unit:'ml'},{groupId:'waxing',iIdx:4,amt:'2',unit:'pcs'},{groupId:'nails',iIdx:38,amt:'2',unit:'pcs'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'},{groupId:'facial',iIdx:47,amt:'1',unit:'pcs'},{groupId:'waxing',iIdx:0,amt:'10',unit:'g'}],desc:'Smooth underarm hair removal with warm wax'},
     {id:'hw2',name:'Upper Lip Wax',price:400,durationMins:20,staffRole:'',consumables:[{groupId:'waxing',iIdx:5,amt:'2',unit:'pcs'},{groupId:'waxing',iIdx:1,amt:'2',unit:'g'},{groupId:'waxing',iIdx:2,amt:'2',unit:'g'},{groupId:'waxing',iIdx:6,amt:'3',unit:'ml'},{groupId:'waxing',iIdx:7,amt:'3',unit:'ml'},{groupId:'waxing',iIdx:4,amt:'2',unit:'pcs'},{groupId:'nails',iIdx:38,amt:'2',unit:'pcs'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'},{groupId:'facial',iIdx:47,amt:'1',unit:'pcs'},{groupId:'waxing',iIdx:0,amt:'3',unit:'g'}],desc:'Quick and gentle upper lip hair removal'},
     {id:'hw3',name:'Lower Lip Wax',price:400,durationMins:20,staffRole:'',consumables:[{groupId:'waxing',iIdx:5,amt:'2',unit:'pcs'},{groupId:'waxing',iIdx:1,amt:'2',unit:'g'},{groupId:'waxing',iIdx:2,amt:'2',unit:'g'},{groupId:'waxing',iIdx:6,amt:'3',unit:'ml'},{groupId:'waxing',iIdx:7,amt:'3',unit:'ml'},{groupId:'waxing',iIdx:4,amt:'2',unit:'pcs'},{groupId:'nails',iIdx:38,amt:'2',unit:'pcs'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'},{groupId:'facial',iIdx:47,amt:'1',unit:'pcs'},{groupId:'waxing',iIdx:0,amt:'3',unit:'g'}],desc:'Clean lower lip hair removal using warm wax'},
-    {id:'hw4',name:'Half Arms Wax',price:600,durationMins:30,staffRole:'',consumables:[{groupId:'waxing',iIdx:5,amt:'2',unit:'pcs'},{groupId:'waxing',iIdx:1,amt:'2',unit:'g'},{groupId:'waxing',iIdx:2,amt:'2',unit:'g'},{groupId:'waxing',iIdx:6,amt:'3',unit:'ml'},{groupId:'waxing',iIdx:7,amt:'3',unit:'ml'},{groupId:'waxing',iIdx:4,amt:'2',unit:'pcs'},{groupId:'nails',iIdx:38,amt:'2',unit:'pcs'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'},{groupId:'facial',iIdx:47,amt:'1',unit:'pcs'},{groupId:'waxing',iIdx:0,amt:'20',unit:'g'}],desc:'Wrist to elbow hair removal with warm wax'},
-    {id:'hw5',name:'Full Arms Wax',price:850,durationMins:40,staffRole:'',consumables:[{groupId:'waxing',iIdx:5,amt:'2',unit:'pcs'},{groupId:'waxing',iIdx:1,amt:'2',unit:'g'},{groupId:'waxing',iIdx:2,amt:'2',unit:'g'},{groupId:'waxing',iIdx:6,amt:'3',unit:'ml'},{groupId:'waxing',iIdx:7,amt:'3',unit:'ml'},{groupId:'waxing',iIdx:4,amt:'2',unit:'pcs'},{groupId:'nails',iIdx:38,amt:'2',unit:'pcs'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'},{groupId:'facial',iIdx:47,amt:'1',unit:'pcs'},{groupId:'waxing',iIdx:0,amt:'35',unit:'g'}],desc:'Complete arm hair removal from wrists to shoulders'},
-    {id:'hw6',name:'Half Legs Wax',price:700,durationMins:30,staffRole:'',consumables:[{groupId:'waxing',iIdx:5,amt:'2',unit:'pcs'},{groupId:'waxing',iIdx:1,amt:'2',unit:'g'},{groupId:'waxing',iIdx:2,amt:'2',unit:'g'},{groupId:'waxing',iIdx:6,amt:'3',unit:'ml'},{groupId:'waxing',iIdx:7,amt:'3',unit:'ml'},{groupId:'waxing',iIdx:4,amt:'2',unit:'pcs'},{groupId:'nails',iIdx:38,amt:'2',unit:'pcs'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'},{groupId:'facial',iIdx:47,amt:'1',unit:'pcs'},{groupId:'waxing',iIdx:0,amt:'30',unit:'g'}],desc:'Ankle to knee hair removal for smooth legs'},
-    {id:'hw7',name:'Full Legs Wax',price:1000,durationMins:40,staffRole:'',consumables:[{groupId:'waxing',iIdx:5,amt:'2',unit:'pcs'},{groupId:'waxing',iIdx:1,amt:'2',unit:'g'},{groupId:'waxing',iIdx:2,amt:'2',unit:'g'},{groupId:'waxing',iIdx:6,amt:'3',unit:'ml'},{groupId:'waxing',iIdx:7,amt:'3',unit:'ml'},{groupId:'waxing',iIdx:4,amt:'2',unit:'pcs'},{groupId:'nails',iIdx:38,amt:'2',unit:'pcs'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'},{groupId:'facial',iIdx:47,amt:'1',unit:'pcs'},{groupId:'waxing',iIdx:0,amt:'50',unit:'g'}],desc:'Full leg hair removal from ankles to upper thighs'},
+    {id:'hw4',name:'Half Arms Wax',price:600,durationMins:30,staffRole:'',consumables:[{groupId:'waxing',iIdx:5,amt:'2',unit:'pcs'},{groupId:'waxing',iIdx:1,amt:'2',unit:'g'},{groupId:'waxing',iIdx:2,amt:'2',unit:'g'},{groupId:'waxing',iIdx:6,amt:'3',unit:'ml'},{groupId:'waxing',iIdx:7,amt:'3',unit:'ml'},{groupId:'waxing',iIdx:4,amt:'2',unit:'pcs'},{groupId:'nails',iIdx:38,amt:'2',unit:'pcs'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'},{groupId:'facial',iIdx:47,amt:'1',unit:'pcs'},{groupId:'waxing',iIdx:8,amt:'20',unit:'ml'}],desc:'Wrist to elbow hair removal with soft wax'},
+    {id:'hw5',name:'Full Arms Wax',price:850,durationMins:40,staffRole:'',consumables:[{groupId:'waxing',iIdx:5,amt:'2',unit:'pcs'},{groupId:'waxing',iIdx:1,amt:'2',unit:'g'},{groupId:'waxing',iIdx:2,amt:'2',unit:'g'},{groupId:'waxing',iIdx:6,amt:'3',unit:'ml'},{groupId:'waxing',iIdx:7,amt:'3',unit:'ml'},{groupId:'waxing',iIdx:4,amt:'2',unit:'pcs'},{groupId:'nails',iIdx:38,amt:'2',unit:'pcs'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'},{groupId:'facial',iIdx:47,amt:'1',unit:'pcs'},{groupId:'waxing',iIdx:8,amt:'35',unit:'ml'}],desc:'Complete arm hair removal from wrists to shoulders'},
+    {id:'hw6',name:'Half Legs Wax',price:700,durationMins:30,staffRole:'',consumables:[{groupId:'waxing',iIdx:5,amt:'2',unit:'pcs'},{groupId:'waxing',iIdx:1,amt:'2',unit:'g'},{groupId:'waxing',iIdx:2,amt:'2',unit:'g'},{groupId:'waxing',iIdx:6,amt:'3',unit:'ml'},{groupId:'waxing',iIdx:7,amt:'3',unit:'ml'},{groupId:'waxing',iIdx:4,amt:'2',unit:'pcs'},{groupId:'nails',iIdx:38,amt:'2',unit:'pcs'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'},{groupId:'facial',iIdx:47,amt:'1',unit:'pcs'},{groupId:'waxing',iIdx:8,amt:'30',unit:'ml'}],desc:'Ankle to knee hair removal for smooth legs'},
+    {id:'hw7',name:'Full Legs Wax',price:1000,durationMins:40,staffRole:'',consumables:[{groupId:'waxing',iIdx:5,amt:'2',unit:'pcs'},{groupId:'waxing',iIdx:1,amt:'2',unit:'g'},{groupId:'waxing',iIdx:2,amt:'2',unit:'g'},{groupId:'waxing',iIdx:6,amt:'3',unit:'ml'},{groupId:'waxing',iIdx:7,amt:'3',unit:'ml'},{groupId:'waxing',iIdx:4,amt:'2',unit:'pcs'},{groupId:'nails',iIdx:38,amt:'2',unit:'pcs'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'},{groupId:'facial',iIdx:47,amt:'1',unit:'pcs'},{groupId:'waxing',iIdx:8,amt:'50',unit:'ml'}],desc:'Full leg hair removal from ankles to upper thighs'},
     {id:'hw8',name:'Brazilian Wax',price:800,durationMins:30,staffRole:'',consumables:[{groupId:'waxing',iIdx:5,amt:'2',unit:'pcs'},{groupId:'waxing',iIdx:1,amt:'2',unit:'g'},{groupId:'waxing',iIdx:2,amt:'2',unit:'g'},{groupId:'waxing',iIdx:6,amt:'3',unit:'ml'},{groupId:'waxing',iIdx:7,amt:'3',unit:'ml'},{groupId:'waxing',iIdx:4,amt:'2',unit:'pcs'},{groupId:'nails',iIdx:38,amt:'2',unit:'pcs'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'},{groupId:'facial',iIdx:47,amt:'1',unit:'pcs'},{groupId:'waxing',iIdx:0,amt:'25',unit:'g'}],desc:'Complete intimate area hair removal for lasting smoothness'},
     {id:'hw9',name:'Bikini Wax',price:600,durationMins:20,staffRole:'',consumables:[{groupId:'waxing',iIdx:5,amt:'2',unit:'pcs'},{groupId:'waxing',iIdx:1,amt:'2',unit:'g'},{groupId:'waxing',iIdx:2,amt:'2',unit:'g'},{groupId:'waxing',iIdx:6,amt:'3',unit:'ml'},{groupId:'waxing',iIdx:7,amt:'3',unit:'ml'},{groupId:'waxing',iIdx:4,amt:'2',unit:'pcs'},{groupId:'nails',iIdx:38,amt:'2',unit:'pcs'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'},{groupId:'facial',iIdx:47,amt:'1',unit:'pcs'},{groupId:'waxing',iIdx:0,amt:'20',unit:'g'}],desc:'Bikini line cleanup for a neat, clean result'},
   ]},
@@ -2238,7 +2285,7 @@ function calcSvcCost(svc){
   // consumables
   let consCost=0;
   const cons=(st.consumables&&st.consumables.length>0)?st.consumables:(svc.consumables||[]);
-  cons.forEach(c=>{ if(!c.groupId||c.iIdx===undefined||c.iIdx<0)return; const uc=getConsUnitCost(c.groupId,c.iIdx); consCost+=(parseFloat(c.amt)||0)*uc; });
+  cons.forEach(c=>{ if(!c.groupId||c.iIdx==null||c.iIdx<0)return; const uc=getConsUnitCost(c.groupId,c.iIdx); consCost+=(parseFloat(c.amt)||0)*uc; });
 
   // package: cost = sessions * per-session-cost (using labor+elec+water+cons only)
   let totalCost=laborCost+elec+water+consCost;
@@ -2321,44 +2368,55 @@ function svcConsRowHtml(svcId,c,ci){
   </div>`;
 }
 
-function setSvcCons(svcId,ci,f,v){
+function _findSvc(svcId){ for(const cat of SVC_CATS){const s=cat.services.find(x=>x.id===svcId);if(s)return s;} return null; }
+function _initConsState(svcId){
   const st=getSvcState(svcId);
-  if(!st.consumables) st.consumables=[];
+  if(!st.consumables||!st.consumables.length){
+    const svc=_findSvc(svcId);
+    st.consumables=[...(svc?.consumables||[])];
+  }
+  return st;
+}
+function setSvcCons(svcId,ci,f,v){
+  const st=_initConsState(svcId);
   const c=st.consumables[ci]||{};
   st.consumables[ci]=c;
   c[f]=v;
   if(f==='itemIdx'){
     const target=parseInt(v);
-    let flat=0;
-    let found=false;
+    if(target<0){ c.groupId=''; c.iIdx=-1; svcCatState[svcId]=st; saveSvcState(); refreshSvcCard(svcId); return; }
+    let flat=0,found=false;
     for(let gi=0;gi<CONS_DATA.length;gi++){
       const g=CONS_DATA[gi];
       for(let ii=0;ii<g.items.length;ii++){
         if(flat===target){
-          c.groupId=g.id;
-          c.iIdx=ii;
-          // Auto-set unit to match consumable UOM
+          c.groupId=g.id; c.iIdx=ii;
           const cs=getCS(g.id,ii);
           c.unit=cs.uom||g.items[ii].uom||'ml';
-          found=true;
-          break;
+          found=true; break;
         }
         flat++;
       }
       if(found) break;
     }
-    // Save immediately and refresh
-    svcCatState[svcId]=st;
-    saveSvcState();
-    refreshSvcCard(svcId);
-    return;
+    svcCatState[svcId]=st; saveSvcState(); refreshSvcCard(svcId); return;
   }
   svcCatState[svcId]=st;
   setSvcStateField(svcId,'consumables',st.consumables);
   debounce('svc_'+svcId,()=>refreshSvcCard(svcId),400);
 }
-function delSvcCons(svcId,ci){ const st=getSvcState(svcId); if(!st.consumables)return; st.consumables.splice(ci,1); setSvcStateField(svcId,'consumables',st.consumables); refreshSvcCard(svcId); }
-function addSvcCons(svcId){ const st=getSvcState(svcId); const cons=st.consumables||[]; cons.push({groupId:'',iIdx:-1,amt:'',unit:'ml'}); st.consumables=cons; svcCatState[svcId]=st; saveSvcState(); refreshSvcCard(svcId); }
+function delSvcCons(svcId,origIdx){
+  const st=_initConsState(svcId);
+  st.consumables.splice(origIdx,1);
+  svcCatState[svcId]=st;
+  setSvcStateField(svcId,'consumables',st.consumables);
+  refreshSvcCard(svcId);
+}
+function addSvcCons(svcId){
+  const st=_initConsState(svcId);
+  st.consumables.push({groupId:'',iIdx:-1,amt:'',unit:'ml'});
+  svcCatState[svcId]=st; saveSvcState(); refreshSvcCard(svcId);
+}
 
 function buildComboSvcCardInner(svc, catId){
   const allSvcs=getAllSvcsFlat();
@@ -2418,8 +2476,9 @@ function buildSvcCardInner(svc, catId){
   const _nonRetailCats=new Set(['skin_rej','diode','pico','tattoo','wart','exilis','waxing','waxing_hair','glow_pkg']);
   const _isNailCat=_nailCats.has(catId);
   const _isRetailCat=!_nonRetailCats.has(catId);
-  const filteredCons=cons.filter(c=>{
-    if(!c.groupId||c.iIdx===undefined||c.iIdx<0)return true;
+  // Keep original index alongside each item so the ✕ delete button uses the right index
+  const indexedCons=cons.map((c,i)=>({c,i})).filter(({c})=>{
+    if(!c.groupId||c.iIdx==null||c.iIdx<0)return true; // keep blank rows so user can delete them
     const _grp=CONS_DATA.find(g=>g.id===c.groupId);
     const _item=_grp?_grp.items[c.iIdx]:null;
     if(!_item)return false;
@@ -2431,7 +2490,7 @@ function buildSvcCardInner(svc, catId){
     if(c.groupId==='facial'&&(c.iIdx===38||_nm.startsWith('Instant Whitening Set')))return _isRetailCat;
     return true;
   });
-  const consRows=filteredCons.map((c,ci)=>svcConsRowHtml(svc.id,c,ci)).join('');
+  const consRows=indexedCons.map(({c,i})=>svcConsRowHtml(svc.id,c,i)).join('');
   const staffOpts=staffRoles.map(r=>`<option value="${r.id}"${r.id===roleId?' selected':''}>${r.name} (&#8369;${r.dayRate}/day)</option>`).join('');
   const isLaser=svc.sessions;
   const isPkg=svc.packageServices!==undefined&&!isLaser;
