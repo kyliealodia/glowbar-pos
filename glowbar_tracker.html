@@ -1442,7 +1442,7 @@ function refreshSummary(){
       if(paidBy==='mcjames')mcjamesUsed+=eff;
       else if(paidBy==='kylie')kylieUsed+=eff;
       else if(paidBy==='shopee1'||paidBy==='shopee3')splAmt+=eff;
-      else if(paidBy==='pending')pendingAmt+=eff;
+      else pendingAmt+=eff; // 'pending' or unset — always counts toward contingency
     });
   });
   renderExpensesSplSummary();
@@ -1466,9 +1466,9 @@ function refreshSummary(){
       <div style="font-size:11px;font-weight:600;color:${kylieRemaining<0?'var(--red)':kylieRemaining<50000?'var(--warn)':'var(--green)'}">Remaining: ${fmt(Math.abs(kylieRemaining))}${kylieRemaining<0?' over':''}</div>
     </div>
     <div class="metric">
-      <div class="metric-label">Pending / Not yet paid</div>
+      <div class="metric-label">Pending / Unassigned</div>
       <div class="metric-value a">${fmt(pendingAmt)}</div>
-      <div style="font-size:10px;color:var(--muted);margin-top:3px">Not deducted from any fund</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:3px">Counts toward contingency</div>
     </div>
     ${splAmt>0?`<div class="metric" style="border:0.5px solid #f0a500">
       <div class="metric-label" style="color:#c96b00">🛒 Shopee Pay Later</div>
