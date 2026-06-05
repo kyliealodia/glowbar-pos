@@ -408,7 +408,7 @@ window.addEventListener('beforeunload', ()=>{
 
 // ── ONE-TIME MIGRATIONS ───────────────────────────────────────────
 function migrateConsUnits(){
-  if(localStorage.getItem('_gbConsUnits_v1'))return;
+  if(localStorage.getItem('_gbConsUnits_v2'))return;
   // [groupId, itemIndex, {fields to set}]
   const cfg=[
     ['machine',0,{unitsInPack:1,volPerUnit:1000,uom:'g'}],          // RF Cream
@@ -420,6 +420,7 @@ function migrateConsUnits(){
     ['waxing', 6,{unitsInPack:1,volPerUnit:470,uom:'ml'}],          // Pre Wax Cleanser
     ['waxing', 2,{unitsInPack:4,volPerUnit:99,uom:'g'}],            // After Wax Treatment Powder
     ['waxing', 0,{unitsInPack:1,volPerUnit:400,uom:'g'}],           // Hard Wax Beans
+    ['waxing', 8,{unitsInPack:5,volPerUnit:150,uom:'ml'}],          // Soft Wax Cartridge
     ['nails', 16,{unitsInPack:1,volPerUnit:3785,uom:'ml'}],         // Cuticle Remover
     ['nails', 15,{unitsInPack:1,volPerUnit:3785,uom:'ml'}],         // Acetone
     ['nails', 37,{unitsInPack:1,volPerUnit:2000,uom:'ml'}],         // Alcohol
@@ -433,11 +434,11 @@ function migrateConsUnits(){
     Object.assign(consState[k],fields);
   });
   saveConsState();
-  localStorage.setItem('_gbConsUnits_v1','done');
+  localStorage.setItem('_gbConsUnits_v2','done');
 }
 
 function migrateSvcConsumables(){
-  if(localStorage.getItem('_gbSvcCons_v1'))return;
+  if(localStorage.getItem('_gbSvcCons_v2'))return;
   // Nail-only service IDs — only these should have nails|50 (Poly Gel) or nails|53 (Soft Gel)
   const nailSvcs=new Set(['s1','s2','s3','s4','s7','s8','s9','s13','s14','s15','s16','s17','s18']);
   // Laser/tattoo/wart IDs — should not have Instant Whitening Set (facial|38)
@@ -472,7 +473,7 @@ function migrateSvcConsumables(){
     if(st.consumables.length!==before){svcCatState[svcId]=st;changed=true;}
   });
   if(changed)saveSvcState();
-  localStorage.setItem('_gbSvcCons_v1','done');
+  localStorage.setItem('_gbSvcCons_v2','done');
 }
 
 // ── BOOT APP ─────────────────────────────────────────────────────
@@ -567,6 +568,82 @@ async function initFirebase(){
 
   // Always boot — Firebase or localStorage fallback
   bootApp();
+
+  // One-time Firebase-direct fix: update consumable unit configs and clean
+  // service consumables directly in Firebase (bypasses localStorage flag check).
+  if(!localStorage.getItem('_gbFirebaseConsfix_v1')){
+    try {
+      const fsnap=await get(TRACKER_REF);
+      if(fsnap.exists()){
+        const fdata=fsnap.val();
+        let fbChanged=false;
+
+        // -- Update consState unit configs --
+        let cons; try{cons=JSON.parse(fdata.glowbar_cons||'{}');}catch(e){cons={};}
+        const cs=cons.state||{};
+        const unitCfg=[
+          ['machine_0',{unitsInPack:'1',volPerUnit:'1000',uom:'g'}],
+          ['machine_4',{unitsInPack:'1',volPerUnit:'3785',uom:'ml'}],
+          ['waxing_4', {unitsInPack:'4',volPerUnit:'100',uom:'pcs',newUnit:'2384'}],
+          ['facial_47',{unitsInPack:'100',volPerUnit:'1',uom:'pcs'}],
+          ['waxing_1', {unitsInPack:'1',volPerUnit:'100',uom:'g'}],
+          ['waxing_0', {unitsInPack:'1',volPerUnit:'400',uom:'g'}],
+          ['waxing_6', {unitsInPack:'1',volPerUnit:'470',uom:'ml'}],
+          ['waxing_2', {unitsInPack:'4',volPerUnit:'99',uom:'g'}],
+          ['waxing_8', {unitsInPack:'5',volPerUnit:'150',uom:'ml'}],
+        ];
+        unitCfg.forEach(([k,fields])=>{if(!cs[k])cs[k]={};Object.assign(cs[k],fields);});
+        cons.state=cs;
+        fdata.glowbar_cons=JSON.stringify(cons);
+        _origSet('glowbar_cons',fdata.glowbar_cons);
+        fbChanged=true;
+
+        // -- Clean service consumables --
+        let svc; try{svc=JSON.parse(fdata.glowbar_svc2||'{}');}catch(e){svc={};}
+        const ss=svc.state||{};
+        const nailSvcsF=new Set(['s1','s2','s3','s4','s7','s8','s9','s13','s14','s15','s16','s17','s18']);
+        const noWhiteF=new Set([
+          's29','s30','sr1','sr2','sr3','sr4',
+          's25','s27','d1','d2','d3','d4','d5','d6','d7','d8',
+          's51','s52','p1','p2','p3','p4','p5','p6','p7','p8',
+          's45','s46','s49','s50','e1','e2','e3','e4','e5','e6','e7','e8','e9','e10',
+          's31','s32','s33','t1','s42','s43','s44'
+        ]);
+        // Max valid item index per group (after latest CONS_DATA additions)
+        const grpMax={nails:58,waxing:9,facial:51,machine:6};
+        let svcModified=false;
+        Object.keys(ss).forEach(svcId=>{
+          const st=ss[svcId];
+          if(!st||!Array.isArray(st.consumables)||!st.consumables.length)return;
+          const before=st.consumables.length;
+          st.consumables=st.consumables.filter(c=>{
+            if(!c.groupId||c.groupId===''||c.iIdx===-1||c.iIdx===undefined||c.iIdx===null)return false;
+            if(c.groupId==='nails'&&c.iIdx===50&&!nailSvcsF.has(svcId))return false;
+            if(c.groupId==='nails'&&c.iIdx===53&&!nailSvcsF.has(svcId))return false;
+            if(c.groupId==='facial'&&c.iIdx===38&&noWhiteF.has(svcId))return false;
+            const max=grpMax[c.groupId];
+            if(!max||c.iIdx>=max)return false;
+            return true;
+          });
+          if(st.consumables.length!==before)svcModified=true;
+        });
+        if(svcModified){
+          svc.state=ss;
+          fdata.glowbar_svc2=JSON.stringify(svc);
+          _origSet('glowbar_svc2',fdata.glowbar_svc2);
+          fbChanged=true;
+        }
+
+        if(fbChanged){
+          fdata.updatedAt=new Date().toISOString();
+          _origSet('glowbar_lastSync',fdata.updatedAt);
+          await set(TRACKER_REF,fdata);
+          console.log('GlowBar: Firebase consumable fix applied');
+        }
+      }
+      localStorage.setItem('_gbFirebaseConsfix_v1','done');
+    }catch(e){console.error('fixFirebaseConsumables error:',e);}
+  }
 
   // One-time cleanup: remove stale services that were deleted from the tracker
   // but may still exist in Firebase gb/products and gb/serviceNames.
@@ -2986,6 +3063,7 @@ const CONS_DATA = [
     {name:'Wax Stick (100 pcs)',qty:'2 packs',unitCost:92,total:184,unitsInPack:200,volPerUnit:1,uom:'pcs',services:['All waxing services']},
     {name:'Pre Wax Cleanser',qty:'1L',total:0,unitsInPack:1,volPerUnit:1000,uom:'ml'},
     {name:'Aloe Vera Gel',qty:'1L',total:0,unitsInPack:1,volPerUnit:1000,uom:'ml'},
+    {name:'Soft Wax Cartridge',qty:'5 pcs',total:0,unitsInPack:5,volPerUnit:150,uom:'ml'},
   ]},
   {id:'facial', name:'Facial Supplies', cat:'facial', items:[
     {name:'Comedone Extractor',qty:'6 pcs',unitCost:74,total:444,services:['All facials']},
