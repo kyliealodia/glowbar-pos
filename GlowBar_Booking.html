@@ -257,7 +257,7 @@ const CATEGORY_TABS = [
       return s.includes('pico')||c.includes('pico')||n.includes('pico')||n.includes('carbon')||n.includes('black doll')||n.includes('melasma')||n.includes('scar'); }},
   {id:'nails',   label:'Nails',                icon:'💅',
     test:p=>{ const c=(p.cat||'').toLowerCase(),s=(p.subcat||'').toLowerCase(),n=(p.name||'').toLowerCase();
-      return (c.includes('nail')||s.includes('manicure')||s.includes('pedicure')||s.includes('extension')||s.includes('nail art')||n.includes('mani')||n.includes('pedi')||n.includes('gel mani')||n.includes('nail')||n.includes('polygel')||n.includes('softgel'))&&!n.includes('foot spa'); }},
+      return (c.includes('nail')||s.includes('manicure')||s.includes('pedicure')||s.includes('extension')||s.includes('nail art')||n.includes('mani')||n.includes('pedi')||n.includes('gel mani')||n.includes('nail')||n.includes('polygel')||n.includes('softgel')||n.includes('foot spa')||n.includes('hand spa')); }},
   {id:'footspa', label:'Foot Spa',             icon:'🦶',
     test:p=>{ const n=(p.name||'').toLowerCase(); return n.includes('foot spa')||n.includes('hand spa'); }},
   {id:'facial',  label:'Facial',               icon:'🌸',
@@ -271,8 +271,8 @@ function getCatTabId(p){
 }
 function getPkgTabId(pkg){
   const n=(pkg.name||'').toLowerCase();
-  // Combo packages (contain '+') → rejuv (Glow Skin combos)
-  if(n.includes('+')&&(n.includes('diode')||n.includes('carbon')||n.includes('pico'))) return 'rejuv';
+  // Combo packages use ' + ' (spaces) between service types; '10+2' has no spaces
+  if(n.includes(' + ')&&(n.includes('diode')||n.includes('carbon')||n.includes('pico'))) return 'rejuv';
   if(n.includes('diode')) return 'diode';
   if(n.includes('rejuven')||n.includes('rejuve')) return 'rejuv';
   if(n.includes('exilis')) return 'exilis';
@@ -318,6 +318,8 @@ const DEMO_DATA = {
     {id:109,name:'Glitter / Foil',cat:'Glow Nails',subcat:'Nail Art',price:100,durationMins:10,inPOS:true,description:'Sparkle glitter or metallic foil accent per nail'},
     {id:110,name:'Chrome Powder',cat:'Glow Nails',subcat:'Nail Art',price:150,durationMins:10,inPOS:true,description:'High-shine chrome mirror finish per nail'},
     {id:111,name:'Nail Stickers',cat:'Glow Nails',subcat:'Nail Art',price:80,durationMins:5,inPOS:true,description:'Cute nail art stickers or decals per nail'},
+    {id:126,name:'Nail Art (Whole Hand)',cat:'Glow Nails',subcat:'Nail Art',price:250,durationMins:20,inPOS:true,description:'Custom nail art design for all 5 nails'},
+    {id:127,name:'Stones / Stickers / Charms',cat:'Glow Nails',subcat:'Nail Art',price:100,durationMins:5,inPOS:true,description:'Rhinestones, stickers, or charms per nail'},
     // ── GLOW NAILS — Packages ──
     {id:112,name:'Mani + Pedi Package',cat:'Glow Nails',subcat:'Packages',price:499,durationMins:90,inPOS:true,description:'Classic manicure and pedicure combined at a bundled rate'},
     {id:113,name:'Gel Mani + Pedi Package',cat:'Glow Nails',subcat:'Packages',price:699,durationMins:120,inPOS:true,description:'Gel manicure and gel pedicure for long-lasting color'},
@@ -346,10 +348,10 @@ const DEMO_DATA = {
     {id:218,name:'Brazilian Wax',cat:'Hair Waxing',price:800,durationMins:30,inPOS:true,description:'Complete intimate area hair removal for lasting smoothness'},
     {id:219,name:'Bikini Wax',cat:'Hair Waxing',price:600,durationMins:20,inPOS:true,description:'Bikini line cleanup for a neat, clean result'},
     // ── GLOW FACIALS ──
-    {id:301,name:'Regular Facial',cat:'Glow Facials',subcat:'Facials',price:699,durationMins:60,inPOS:true,description:'Deep cleansing with steam, extractions, and moisturizing'},
+    {id:301,name:'Regular Facial',cat:'Glow Facials',subcat:'Facials',price:700,durationMins:60,inPOS:true,description:'Deep cleansing with steam, extractions, and moisturizing'},
     {id:302,name:'Whitening Facial',cat:'Glow Facials',subcat:'Facials',price:999,durationMins:75,inPOS:true,description:'Brightening treatment to even skin tone and lighten dark spots'},
-    {id:303,name:'Anti-Acne Facial',cat:'Glow Facials',subcat:'Facials',price:999,durationMins:75,inPOS:true,description:'Clarifying facial to target breakouts, excess oil, and blemishes'},
-    {id:304,name:'Anti-Aging Facial',cat:'Glow Facials',subcat:'Facials',price:1099,durationMins:75,inPOS:true,description:'Firming and lifting facial to reduce fine lines and wrinkles'},
+    {id:303,name:'Anti-Acne Facial',cat:'Glow Facials',subcat:'Facials',price:1000,durationMins:75,inPOS:true,description:'Clarifying facial to target breakouts, excess oil, and blemishes'},
+    {id:304,name:'Anti-Aging Facial',cat:'Glow Facials',subcat:'Facials',price:900,durationMins:75,inPOS:true,description:'Firming and lifting facial to reduce fine lines and wrinkles'},
     {id:305,name:'HydraFacial',cat:'Glow Facials',subcat:'Facials',price:2000,durationMins:90,inPOS:true,description:'Multi-step facial with deep cleansing, exfoliation, and serum infusion'},
     // ── GLOW FACIALS — Add-ons ──
     {id:306,name:'LED Therapy',cat:'Glow Facials',subcat:'Add-ons',price:200,durationMins:15,inPOS:true,description:'Light therapy to boost collagen and calm inflammation'},
@@ -434,10 +436,43 @@ const DEMO_DATA = {
     {id:29,name:'Scar Lightening Legs Package',price:7500,sessions:5,freeSessions:1,active:true},
     {id:30,name:'Scar Lightening Knees Package',price:6500,sessions:5,freeSessions:1,active:true},
     // ── Combo Packages ──
-    {id:31,name:'Diode + Carbon Laser — 5 Sessions',price:12000,sessions:5,freeSessions:0,saves:3500,active:true},
-    {id:32,name:'Diode + Carbon Laser — 10 Sessions',price:21000,sessions:10,freeSessions:0,saves:7000,active:true},
-    {id:33,name:'Diode + Carbon + Pico — 5 Sessions',price:18000,sessions:5,freeSessions:0,saves:5000,active:true},
-    {id:34,name:'Diode + Carbon + Pico — 10 Sessions',price:33000,sessions:10,freeSessions:0,saves:10000,active:true},
+    {id:31,name:'Diode + Carbon Laser — 5 Sessions Each',price:10000,sessions:5,freeSessions:0,saves:3500,description:'5 sessions Diode Hair Removal + 5 sessions Carbon Laser Deep Renewal',active:true},
+    {id:32,name:'Diode + Carbon Laser — 10 Sessions Each',price:20000,sessions:10,freeSessions:0,saves:7000,description:'10 sessions Diode Hair Removal + 10 sessions Carbon Laser Deep Renewal',active:true},
+    {id:33,name:'Diode + Carbon + Pico — 5 Sessions Each',price:16500,sessions:5,freeSessions:0,saves:5000,description:'5 sessions Diode + 5 sessions Carbon Laser + 5 sessions Pico Laser',active:true},
+    {id:34,name:'Diode + Carbon + Pico — 10 Sessions Each',price:33000,sessions:10,freeSessions:0,saves:10000,description:'10 sessions Diode + 10 sessions Carbon Laser + 10 sessions Pico Laser',active:true},
+    // ── Diode 10+2 ──
+    {id:35,name:'Underarms Diode 10+2',price:12000,sessions:10,freeSessions:2,active:true},
+    {id:36,name:'Upper Lip Diode 10+2',price:8000,sessions:10,freeSessions:2,active:true},
+    {id:37,name:'Lower Lip Diode 10+2',price:8000,sessions:10,freeSessions:2,active:true},
+    {id:38,name:'Cheeks Diode 10+2',price:10000,sessions:10,freeSessions:2,active:true},
+    {id:39,name:'Arms Half Diode 10+2',price:15000,sessions:10,freeSessions:2,active:true},
+    {id:40,name:'Arms Full Diode 10+2',price:22000,sessions:10,freeSessions:2,active:true},
+    {id:41,name:'Legs Half Diode 10+2',price:25000,sessions:10,freeSessions:2,active:true},
+    {id:42,name:'Legs Full Diode 10+2',price:35000,sessions:10,freeSessions:2,active:true},
+    // ── Carbon Laser / Skin Rejuvenation 10+2 ──
+    {id:43,name:'Underarms Rejuvenation 10+2',price:12000,sessions:10,freeSessions:2,active:true},
+    {id:44,name:'Elbows Rejuvenation 10+2',price:10000,sessions:10,freeSessions:2,active:true},
+    {id:45,name:'Inner Thighs Rejuvenation 10+2',price:13000,sessions:10,freeSessions:2,active:true},
+    // ── Pico Laser 10+2 ──
+    {id:46,name:'Black Doll Carbon Laser 10+2',price:15000,sessions:10,freeSessions:2,active:true},
+    {id:47,name:'Melasma/Freckles Face 10+2',price:16000,sessions:10,freeSessions:2,active:true},
+    {id:48,name:'Melasma/Freckles Shoulders 10+2',price:19000,sessions:10,freeSessions:2,active:true},
+    {id:49,name:'Melasma/Freckles Back 10+2',price:25000,sessions:10,freeSessions:2,active:true},
+    {id:50,name:'Scar Lightening Face 10+2',price:15000,sessions:10,freeSessions:2,active:true},
+    {id:51,name:'Scar Lightening Arms 10+2',price:10000,sessions:10,freeSessions:2,active:true},
+    {id:52,name:'Scar Lightening Legs 10+2',price:15000,sessions:10,freeSessions:2,active:true},
+    {id:53,name:'Scar Lightening Knees 10+2',price:13000,sessions:10,freeSessions:2,active:true},
+    // ── Exilis 10+2 ──
+    {id:54,name:'Full Face with Neck Exilis 10+2',price:32000,sessions:10,freeSessions:2,active:true},
+    {id:55,name:'Full Face Exilis 10+2',price:28000,sessions:10,freeSessions:2,active:true},
+    {id:56,name:'Double Chin with Neck Exilis 10+2',price:20000,sessions:10,freeSessions:2,active:true},
+    {id:57,name:'Face Per Area Exilis 10+2',price:15000,sessions:10,freeSessions:2,active:true},
+    {id:58,name:'Arms Exilis 10+2',price:18000,sessions:10,freeSessions:2,active:true},
+    {id:59,name:'Abdomen Exilis 10+2',price:25000,sessions:10,freeSessions:2,active:true},
+    {id:60,name:'Inner Thigh Exilis 10+2',price:24000,sessions:10,freeSessions:2,active:true},
+    {id:61,name:'Love Handle Exilis 10+2',price:22000,sessions:10,freeSessions:2,active:true},
+    {id:62,name:'Buttocks Exilis 10+2',price:24000,sessions:10,freeSessions:2,active:true},
+    {id:63,name:'Lower Leg Exilis 10+2',price:16000,sessions:10,freeSessions:2,active:true},
   ],
   users:[
     {id:1,name:'Staff 1',role:'staff',specialty:'Aesthetician',color:'#C4778A'},
@@ -627,6 +662,7 @@ function showStep1(){
           html+=`<button class="svc-btn ${sel}" onclick="selectService('${pkgId}','${p.name.replace(/'/g,"\\'")}',${p.price})">
             ${sel?'<span style="float:right;color:var(--gold-dk);font-size:14px;">✓</span>':''}
             <span class="svc-name">${p.name}</span>
+            ${p.description?`<span class="svc-desc">Includes: ${p.description}</span>`:''}
             <span class="svc-price">${fmtPrice(p.price)} · ${sessLabel}</span>
             ${badge}${terms}
           </button>`;
