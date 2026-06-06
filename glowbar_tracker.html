@@ -333,18 +333,18 @@ window.pushConsumablesToPOS = async function(){
       const unitsInPack=parseFloat(s.unitsInPack||item.unitsInPack||1)||1;
       const volPerUnit=parseFloat(s.volPerUnit||item.volPerUnit||1)||1;
       const costPerUnit=(typeof getConsUnitCost==='function')?getConsUnitCost(group.id,i):0;
-      // Stock = number of smallest units available (packs × units/pack)
-      const qtyPacks=parseFloat(s.newQty)||parseFloat(item.qty)||1;
-      const stock=Math.max(0,Math.round(qtyPacks*unitsInPack));
+      // Stock = total usable amount = unitsInPack × volPerUnit
+      const stock=Math.max(0,Math.round(unitsInPack*volPerUnit));
       trackerProducts.push({
         id:'cons_'+group.id+'_'+i,
         name:item.name,
         cat:'Consumables',
         group:group.name,
         unit:uom,
+        unitsInPack:unitsInPack,
         volPerUnit:volPerUnit,
         stock:stock,
-        lowAt:Math.max(1,Math.ceil(stock*0.15)),
+        lowAt:Math.max(1,Math.ceil(stock*0.10)),
         cost:Math.round(costPerUnit*10000)/10000,
         price:0,
         inPOS:false,
@@ -825,6 +825,39 @@ function migrateAllSvcsV7(){
   localStorage.setItem('_gbSvcV7','done');
 }
 
+// ── ONE-TIME FIREBASE MIGRATION: fix consumable stock in gb/products ─
+async function migrateConsumableStockOnFirebase(){
+  if(localStorage.getItem('_gbConsStockMigV1')) return;
+  if(typeof db==='undefined'||!db||typeof CONS_DATA==='undefined') return;
+  try{
+    const posRef=ref(db,'gb/products');
+    const snap=await get(posRef);
+    if(!snap.exists()){ localStorage.setItem('_gbConsStockMigV1','done'); return; }
+    const raw=snap.val();
+    const arr=(Array.isArray(raw)?raw:Object.values(raw)).filter(Boolean);
+    const patched=arr.map(p=>{
+      if(!p||!p.isConsumable) return p;
+      let unitsInPack=1,volPerUnit=1;
+      for(const group of CONS_DATA){
+        for(let i=0;i<group.items.length;i++){
+          if(group.items[i].name===p.name){
+            const s=(typeof getCS==='function')?getCS(group.id,i):{};
+            unitsInPack=parseFloat(s.unitsInPack||group.items[i].unitsInPack||1)||1;
+            volPerUnit=parseFloat(s.volPerUnit||group.items[i].volPerUnit||1)||1;
+            break;
+          }
+        }
+      }
+      const stock=Math.max(0,Math.round(unitsInPack*volPerUnit));
+      const lowAt=Math.max(1,Math.ceil(stock*0.10));
+      return{...p,stock,lowAt,unitsInPack,volPerUnit};
+    });
+    await set(posRef,patched);
+    localStorage.setItem('_gbConsStockMigV1','done');
+    console.log('GlowBar Tracker: consumable stock migration done (unitsInPack×volPerUnit)');
+  }catch(e){ console.error('migrateConsumableStockOnFirebase:',e); }
+}
+
 // ── BOOT APP ─────────────────────────────────────────────────────
 function bootApp(){
   if(typeof loadState === 'function'){
@@ -837,6 +870,7 @@ function bootApp(){
     migrateAllSvcsV5();
     migrateAllSvcsV6();
     migrateAllSvcsV7();
+    migrateConsumableStockOnFirebase();
     buildCats(); refreshSummary(); buildServices(); buildConsumables();
     updateMonthFilter(); renderMonthly();
     if(typeof loadPersonal === 'function') loadPersonal();
