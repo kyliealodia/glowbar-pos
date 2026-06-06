@@ -269,13 +269,15 @@ function getCatTabId(p){
 }
 function getPkgTabId(pkg){
   const n=(pkg.name||'').toLowerCase();
+  const isPackage = n.includes('package')||n.includes('5+1')||n.includes('10+2')||n.includes('4+1');
   // Combo packages use ' + ' (spaces) between service types; '10+2' has no spaces
   if(n.includes(' + ')&&(n.includes('diode')||n.includes('carbon')||n.includes('pico'))) return 'rejuv';
   if(n.includes('diode')) return 'diode';
   if(n.includes('rejuven')||n.includes('rejuve')) return 'rejuv';
   if(n.includes('exilis')) return 'exilis';
-  if(n.includes('carbon')||n.includes('black doll')||n.includes('melasma')||n.includes('scar')) return 'pico';
-  if(n.includes('tattoo')) return 'tattoo';
+  if(n.includes('pico')||n.includes('carbon')||n.includes('black doll')||n.includes('melasma')||n.includes('scar')) return 'pico';
+  if(isPackage && (n.includes('mani')||n.includes('pedi')||n.includes('nail')||n.includes('hand spa')||n.includes('foot spa')||n.includes('glow hands')||n.includes('glow feet')||n.includes('classic'))) return 'nails';
+  if(n.includes('tattoo')||n.includes('ink')) return 'tattoo';
   return null;
 }
 
@@ -616,7 +618,7 @@ function showStep1(){
     const activeTab=orderedTabs.find(t=>t.id===activeSvcCat);
     if(activeTab){
       const isLaserTab=['diode','rejuv','pico','exilis','tattoo'].includes(activeSvcCat);
-      // Group products by subcat (non-package subcats first, Packages last)
+      const tabPkgs=pkgs.filter(p=>getPkgTabId(p)===activeSvcCat);
       const subcatMap={};
       activeTab.services.forEach(p=>{
         const sc=p.subcat||'';
@@ -643,10 +645,8 @@ function showStep1(){
         });
         html+=`</div>`;
       });
-      // Session packages for this tab
-      const tabPkgs=pkgs.filter(p=>getPkgTabId(p)===activeSvcCat);
       if(tabPkgs.length){
-        html+=`<div class="subcat-hdr">Packages</div><div class="svc-grid">`;
+        html+=`<div class="svc-grid" style="margin-top:16px;">`;
         tabPkgs.forEach(p=>{
           const pkgId='pkg_'+p.id;
           const sel=booking.services.some(s=>s.id===pkgId)?'sel':'';
@@ -663,7 +663,7 @@ function showStep1(){
           html+=`<button class="svc-btn ${sel}" onclick="selectService('${pkgId}','${p.name.replace(/'/g,"\\'")}',${p.price})">
             ${sel?'<span style="float:right;color:var(--gold-dk);font-size:14px;">✓</span>':''}
             <span class="svc-name">${p.name}</span>
-            ${p.description?`<span class="svc-desc">Includes: ${p.description}</span>`:''}
+            ${p.includes?`<span class="svc-desc">Includes: ${p.includes}</span>`:p.description?`<span class="svc-desc">${p.description}</span>`:''}
             <span class="svc-price">${fmtPrice(p.price)} · ${sessLabel}</span>
             ${badge}${terms}
           </button>`;
