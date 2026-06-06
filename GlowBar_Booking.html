@@ -718,6 +718,7 @@ function selectService(id, name, price, durationMins){
     } else {
       window.selectedService = null;
     }
+      console.log('selectedService', window.selectedService);
     // Ensure step1 Next button state follows selection
     const step1btn = document.getElementById('step1next');
     if(step1btn){
@@ -883,7 +884,7 @@ function renderCal(){
 
 function pickDate(ds){
   booking.date=ds; booking.time='';
-  if(window) window.selectedDate = ds;
+  if(window){ window.selectedDate = ds; console.log('selectedDate', ds); }
   renderCal();
   const timeCard=document.getElementById('timeCard');
   const staffCard=document.getElementById('staffCard');
@@ -1036,7 +1037,7 @@ function selectTime(t){
   if(staffCard) staffCard.style.display='block';
   const btn=document.getElementById('step2next');
   if(btn) btn.removeAttribute('disabled');
-  if(window) window.selectedTime = t;
+  if(window){ window.selectedTime = t; console.log('selectedTime', t); }
 }
 
 function selectStaff(type, name, color, role){
@@ -1170,10 +1171,14 @@ async function submitBooking(){
     if(booking.discountAmount!=null) appt.discountAmount = booking.discountAmount;
     if(booking.finalPrice!=null) appt.finalPrice = booking.finalPrice;
   }
+  console.log('Prepared booking payload', appt);
   try{
     if(db){
-      // Use Firebase push() — generates unique key, never collides, works regardless of array/object format
-      await db.ref('gb/bookings').push(appt);
+      // Use Firebase push() — generates unique key
+      const pushRes = await db.ref('gb/bookings').push(appt);
+      console.log('Firebase push result key:', pushRes && pushRes.key);
+    } else {
+      console.log('No Firebase DB available — simulated push', appt);
     }
     clearTimeout(timeout);
     showSuccess(ref);
