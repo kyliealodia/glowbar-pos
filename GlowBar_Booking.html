@@ -289,6 +289,19 @@ function isWaxService(p){
   return getCatTabId(p) === 'waxing';
 }
 
+function mergeSettings(defaults, incoming){
+  if(!incoming || typeof incoming !== 'object' || Array.isArray(incoming)) return defaults;
+  const merged = {...defaults};
+  Object.keys(incoming).forEach(key => {
+    if(key === 'partTimer' && typeof incoming[key] === 'object' && !Array.isArray(incoming[key])){
+      merged[key] = {...defaults[key], ...incoming[key]};
+    } else {
+      merged[key] = incoming[key];
+    }
+  });
+  return merged;
+}
+
 function isComboBooking(){
   const types=booking.services.map(s=>getSvcMeta(s.name,'').type);
   const hasNail=types.includes('nail');
@@ -552,7 +565,7 @@ async function loadData(){
     DATA.packages = nonNailDbPackages.length ? nonNailDbPackages : DEMO_DATA.packages;
     DATA.users    = users && users.length ? users : DEMO_DATA.users;
     DATA.bookings = bkgs  || [];
-    DATA.settings = d.settings && typeof d.settings==='object' && !Array.isArray(d.settings) ? d.settings : DATA.settings;
+    DATA.settings = mergeSettings(DATA.settings, d.settings);
 
     showStep1();
   } catch(e){
