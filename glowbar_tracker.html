@@ -451,6 +451,52 @@ function migrateConsUnitsV4(){
   localStorage.setItem('_gbConsUnitsV4','done');
 }
 
+function migrateConsUnitsV5(){
+  if(localStorage.getItem('_gbConsUnitsV5'))return;
+  // Fix items where v3 migration set wrong volPerUnit (used 3785 for 1L bottles)
+  // and add missing unitsInPack/volPerUnit for items not in v3 migration
+  const fixes=[
+    ['nails',18,{unitsInPack:1,volPerUnit:1000,uom:'ml'}],  // Foot Soak 1L (was 3785)
+    ['nails',21,{unitsInPack:1,volPerUnit:3785,uom:'ml'}],  // Hand & Foot Oil 1 gal
+    ['nails',25,{unitsInPack:30,volPerUnit:1,uom:'pcs'}],   // Foot Jelly 30pcs
+    ['nails',28,{unitsInPack:2,volPerUnit:453,uom:'g'}],    // Paraffin Wax 2×453g
+    ['nails',37,{unitsInPack:1,volPerUnit:2000,uom:'ml'}],  // Alcohol 2L
+    ['nails',39,{unitsInPack:20,volPerUnit:40,uom:'pcs'}],  // Removal Wipes 20pks×40
+    ['facial',5,{unitsInPack:1,volPerUnit:1000,uom:'ml'}],  // Niacinamide Toner 1L
+    ['facial',7,{unitsInPack:1,volPerUnit:1000,uom:'ml'}],  // Brightening Cream 1L
+    ['facial',9,{unitsInPack:1,volPerUnit:1000,uom:'ml'}],  // Glass Skin Moisturizing Cream 1L
+    ['facial',10,{unitsInPack:1,volPerUnit:1000,uom:'ml'}], // Anti Acne Cream 1L
+    ['facial',11,{unitsInPack:1,volPerUnit:1000,uom:'ml'}], // Brightening Serum 1L
+    ['facial',12,{unitsInPack:1,volPerUnit:1000,uom:'ml'}], // Anti Aging Serum 1L
+    ['facial',13,{unitsInPack:1,volPerUnit:1000,uom:'ml'}], // Moisturising Serum 1L
+    ['facial',14,{unitsInPack:1,volPerUnit:1000,uom:'ml'}], // Anti Acne Serum 1L
+    ['facial',15,{unitsInPack:1,volPerUnit:1000,uom:'ml'}], // Glutathione Toner 1L
+    ['facial',16,{unitsInPack:1,volPerUnit:1000,uom:'ml'}], // Collagen & Elastin Toner 1L
+    ['facial',17,{unitsInPack:1,volPerUnit:1000,uom:'ml'}], // Moisturising Toner 1L
+    ['facial',18,{unitsInPack:1,volPerUnit:1000,uom:'ml'}], // Anti Acne Toner 1L
+    ['facial',19,{unitsInPack:1,volPerUnit:1000,uom:'ml'}], // Massage/Steaming Cream 1L
+    ['facial',24,{unitsInPack:1,volPerUnit:500,uom:'g'}],   // Lavender & Tea Tree Scrub 500g
+    ['facial',25,{unitsInPack:1,volPerUnit:500,uom:'g'}],   // Moisturising Scrub 500g
+    ['facial',26,{unitsInPack:1,volPerUnit:500,uom:'g'}],   // Anti Acne Peel Off 500g
+    ['facial',27,{unitsInPack:1,volPerUnit:500,uom:'g'}],   // Brightening Peel Off 500g
+    ['facial',28,{unitsInPack:1,volPerUnit:500,uom:'g'}],   // Anti Aging Peel Off 500g
+    ['facial',29,{unitsInPack:1,volPerUnit:500,uom:'g'}],   // Collagen Mask Peel Off 500g
+    ['facial',30,{unitsInPack:1,volPerUnit:500,uom:'g'}],   // Bamboo Charcoal Peel Off 500g
+    ['facial',41,{unitsInPack:1,volPerUnit:1000,uom:'g'}],  // Seaweed Mask 1kg
+    ['facial',43,{unitsInPack:1,volPerUnit:1000,uom:'g'}],  // Hydrocortisone 1% Cream 1kg
+    ['machine',1,{unitsInPack:20,volPerUnit:1,uom:'pcs'}],  // Razor 20pcs
+    ['machine',2,{unitsInPack:1,volPerUnit:1,uom:'pcs'}],   // Hydrafacial Tips 1pc
+    ['machine',3,{unitsInPack:1,volPerUnit:1,uom:'pcs'}],   // Carbon Cream/Lotion 1pc
+  ];
+  fixes.forEach(([gid,idx,fields])=>{
+    const k=gid+'_'+idx;
+    if(!consState[k])consState[k]={newQty:'',newUnit:'',supplier:''};
+    Object.assign(consState[k],fields);
+  });
+  saveConsState();
+  localStorage.setItem('_gbConsUnitsV5','done');
+}
+
 function migrateCatNames(){
   let changed=false;
   SVC_CATS.forEach(cat=>{
@@ -825,36 +871,40 @@ function migrateAllSvcsV7(){
   localStorage.setItem('_gbSvcV7','done');
 }
 
-// ── ONE-TIME FIREBASE MIGRATION: fix consumable stock in gb/products ─
+// ── ONE-TIME FIREBASE MIGRATION V2: fix consumable stock+cost in gb/products ─
 async function migrateConsumableStockOnFirebase(){
-  if(localStorage.getItem('_gbConsStockMigV1')) return;
+  if(localStorage.getItem('_gbConsStockMigV2')) return;
   if(typeof db==='undefined'||!db||typeof CONS_DATA==='undefined') return;
   try{
     const posRef=ref(db,'gb/products');
     const snap=await get(posRef);
-    if(!snap.exists()){ localStorage.setItem('_gbConsStockMigV1','done'); return; }
+    if(!snap.exists()){ localStorage.setItem('_gbConsStockMigV2','done'); return; }
     const raw=snap.val();
     const arr=(Array.isArray(raw)?raw:Object.values(raw)).filter(Boolean);
     const patched=arr.map(p=>{
       if(!p||!p.isConsumable) return p;
-      let unitsInPack=1,volPerUnit=1;
+      let unitsInPack=1,volPerUnit=1,totalCost=0;
       for(const group of CONS_DATA){
         for(let i=0;i<group.items.length;i++){
           if(group.items[i].name===p.name){
+            const item=group.items[i];
             const s=(typeof getCS==='function')?getCS(group.id,i):{};
-            unitsInPack=parseFloat(s.unitsInPack||group.items[i].unitsInPack||1)||1;
-            volPerUnit=parseFloat(s.volPerUnit||group.items[i].volPerUnit||1)||1;
+            // Prefer consState values (set by migrations) over item defaults
+            unitsInPack=parseFloat(s.unitsInPack||item.unitsInPack||1)||1;
+            volPerUnit=parseFloat(s.volPerUnit||item.volPerUnit||1)||1;
+            totalCost=parseFloat(item.totalCost||item.total)||0;
             break;
           }
         }
       }
       const stock=Math.max(0,Math.round(unitsInPack*volPerUnit));
-      const lowAt=Math.max(1,Math.ceil(stock*0.10));
-      return{...p,stock,lowAt,unitsInPack,volPerUnit};
+      const lowAt=Math.max(1,Math.round(stock*0.10));
+      const cost=stock>0?Math.round((totalCost/stock)*10000)/10000:0;
+      return{...p,stock,lowAt,cost,unitsInPack,volPerUnit};
     });
     await set(posRef,patched);
-    localStorage.setItem('_gbConsStockMigV1','done');
-    console.log('GlowBar Tracker: consumable stock migration done (unitsInPack×volPerUnit)');
+    localStorage.setItem('_gbConsStockMigV2','done');
+    console.log('GlowBar Tracker: consumable stock+cost migration V2 done');
   }catch(e){ console.error('migrateConsumableStockOnFirebase:',e); }
 }
 
@@ -864,6 +914,7 @@ function bootApp(){
     loadState(); loadConsState(); loadStaff(); loadSvcState(); loadMonthlyLog();
     migrateConsUnits();
     migrateConsUnitsV4();
+    migrateConsUnitsV5();
     migrateSvcConsumables();
     migrateAllSvcsV4();
     migrateCatNames();
@@ -2414,8 +2465,9 @@ function getConsUnitCost(groupId,iIdx){
   const group=CONS_DATA.find(g=>g.id===groupId); if(!group)return 0;
   const item=group.items[iIdx]; if(!item)return 0;
   const nu=parseFloat(cs.newUnit);
-  const unitsInPack=parseFloat(item.unitsInPack||1)||1;
-  const volPerUnit=parseFloat(item.volPerUnit||1)||1;
+  // Prefer consState values (set by migrations) over CONS_DATA item defaults
+  const unitsInPack=parseFloat(cs.unitsInPack||item.unitsInPack||1)||1;
+  const volPerUnit=parseFloat(cs.volPerUnit||item.volPerUnit||1)||1;
   if(!isNaN(nu)&&nu>0){
     return nu/(unitsInPack*volPerUnit);
   }
