@@ -237,32 +237,30 @@ const TIMES = ['09:00','09:30','10:00','10:30','11:00','11:30','12:00','12:30','
 
 // ── CATEGORY TAB DEFINITIONS ──
 const CATEGORY_TABS = [
-  {id:'waxing',   label:'Hair Waxing',         icon:'✂',
-    test:p=>{ const c=(p.cat||'').toLowerCase(),n=(p.name||'').toLowerCase();
-      return (c.includes('wax')||n.includes('wax')||n.includes('brazilian')||n.includes('bikini')||n.includes('upper lip')&&!n.includes('diode'))&&!n.includes('foot spa'); }},
-  {id:'diode',   label:'Diode Hair Removal',   icon:'💡',
-    test:p=>{ const s=(p.subcat||'').toLowerCase(),c=(p.cat||'').toLowerCase(),n=(p.name||'').toLowerCase();
-      return s.includes('diode')||c.includes('diode')||n.includes('diode'); }},
-  {id:'rejuv',   label:'Skin Rejuvenation',    icon:'✨',
-    test:p=>{ const s=(p.subcat||'').toLowerCase(),n=(p.name||'').toLowerCase();
-      return s.includes('rejuven')||n.includes('rejuven')||n.includes('rejuve'); }},
-  {id:'tattoo',  label:'Tattoo Laser',         icon:'🖋',
-    test:p=>{ const c=(p.cat||'').toLowerCase(),n=(p.name||'').toLowerCase();
-      return c.includes('ink')||n.includes('tattoo'); }},
-  {id:'exilis',  label:'Exilis',               icon:'⚡',
-    test:p=>{ const c=(p.cat||'').toLowerCase(),n=(p.name||'').toLowerCase();
-      return c.includes('exilis')||n.includes('exilis')||c.includes('body contour'); }},
-  {id:'pico',    label:'Pico Laser',           icon:'🔬',
-    test:p=>{ const s=(p.subcat||'').toLowerCase(),c=(p.cat||'').toLowerCase(),n=(p.name||'').toLowerCase();
-      return s.includes('pico')||c.includes('pico')||n.includes('pico')||n.includes('carbon')||n.includes('black doll')||n.includes('melasma')||n.includes('scar'); }},
   {id:'nails',   label:'Nails',                icon:'💅',
     test:p=>{ const c=(p.cat||'').toLowerCase(),s=(p.subcat||'').toLowerCase(),n=(p.name||'').toLowerCase();
       return (c.includes('nail')||s.includes('manicure')||s.includes('pedicure')||s.includes('extension')||s.includes('nail art')||n.includes('mani')||n.includes('pedi')||n.includes('gel mani')||n.includes('nail')||n.includes('polygel')||n.includes('softgel')||n.includes('foot spa')||n.includes('hand spa')); }},
-  {id:'footspa', label:'Foot Spa',             icon:'🦶',
-    test:p=>{ const n=(p.name||'').toLowerCase(); return n.includes('foot spa')||n.includes('hand spa'); }},
+  {id:'footspa', label:'Spa Treatments',       icon:'💧',
+    test:p=>{ const c=(p.cat||'').toLowerCase(),s=(p.subcat||'').toLowerCase(),n=(p.name||'').toLowerCase();
+      return n.includes('foot spa')||n.includes('hand spa')||n.includes('paraffin')||n.includes('foot jelly')||s.includes('spa')||n.includes('spa'); }},
+  {id:'waxing',   label:'Hair Waxing',         icon:'✂',
+    test:p=>{ const c=(p.cat||'').toLowerCase(),n=(p.name||'').toLowerCase();
+      return (c.includes('wax')||n.includes('wax')||n.includes('brazilian')||n.includes('bikini')||n.includes('upper lip')&&!n.includes('diode'))&&!n.includes('foot spa'); }},
   {id:'facial',  label:'Facial',               icon:'🌸',
     test:p=>{ const c=(p.cat||'').toLowerCase(),s=(p.subcat||'').toLowerCase(),n=(p.name||'').toLowerCase();
       return c.includes('facial')||s.includes('facial')||n.includes('facial')||n.includes('hydra'); }},
+  {id:'diode',   label:'Diode Hair Removal',   icon:'💡',
+    test:p=>{ const s=(p.subcat||'').toLowerCase(),c=(p.cat||'').toLowerCase(),n=(p.name||'').toLowerCase();
+      return s.includes('diode')||c.includes('diode')||n.includes('diode'); }},
+  {id:'pico',    label:'Pico Laser',           icon:'🔬',
+    test:p=>{ const s=(p.subcat||'').toLowerCase(),c=(p.cat||'').toLowerCase(),n=(p.name||'').toLowerCase();
+      return s.includes('pico')||c.includes('pico')||n.includes('pico')||n.includes('carbon')||n.includes('black doll')||n.includes('melasma')||n.includes('scar'); }},
+  {id:'exilis',  label:'Exilis',               icon:'⚡',
+    test:p=>{ const c=(p.cat||'').toLowerCase(),n=(p.name||'').toLowerCase();
+      return c.includes('exilis')||n.includes('exilis')||c.includes('body contour'); }},
+  {id:'tattoo',  label:'Tattoo Laser',         icon:'🖋',
+    test:p=>{ const c=(p.cat||'').toLowerCase(),n=(p.name||'').toLowerCase();
+      return c.includes('ink')||n.includes('tattoo'); }},
 ];
 
 function getCatTabId(p){
@@ -309,8 +307,11 @@ const DEMO_DATA = {
     {id:102,name:'Pedicure',cat:'Glow Nails',subcat:'Manicure & Pedicure',price:299,durationMins:60,inPOS:true,description:'Foot soak, cuticle care, nail shaping, and polish'},
     {id:103,name:'Gel Manicure',cat:'Glow Nails',subcat:'Manicure & Pedicure',price:399,durationMins:60,inPOS:true,description:'Long-lasting gel nail color with cuticle care and shaping'},
     {id:104,name:'Gel Pedicure',cat:'Glow Nails',subcat:'Manicure & Pedicure',price:449,durationMins:75,inPOS:true,description:'Gel nail color for toes with soak and cuticle treatment'},
-    {id:105,name:'Hand Spa',cat:'Glow Nails',subcat:'Manicure & Pedicure',price:349,durationMins:60,inPOS:true,description:'Nourishing scrub, mask, and massage for soft, smooth hands'},
-    {id:106,name:'Foot Spa',cat:'Glow Nails',subcat:'Manicure & Pedicure',price:499,durationMins:75,inPOS:true,description:'Soak, exfoliation, mask, and massage for tired feet'},
+    {id:105,name:'Hand Spa',cat:'Glow Nails',subcat:'Manicure & Pedicure',price:450,durationMins:60,inPOS:true,description:'Nourishing scrub, mask, and massage for soft, smooth hands'},
+    {id:106,name:'Foot Spa',cat:'Glow Nails',subcat:'Manicure & Pedicure',price:600,durationMins:75,inPOS:true,description:'Soak, exfoliation, mask, and massage for tired feet'},
+    {id:130,name:'Hand Paraffin',cat:'Glow Nails',subcat:'Add-ons',price:350,durationMins:20,inPOS:true,description:'Moisturizing paraffin treatment for soft, supple hands'},
+    {id:131,name:'Foot Paraffin',cat:'Glow Nails',subcat:'Add-ons',price:450,durationMins:25,inPOS:true,description:'Warm paraffin treatment to hydrate and soothe feet'},
+    {id:132,name:'Add on Foot Jelly',cat:'Glow Nails',subcat:'Add-ons',price:200,durationMins:10,inPOS:true,description:'Cooling foot jelly add-on to refresh and soften tired feet'},
     // ── GLOW NAILS — Extensions ──
     {id:107,name:'Nail Extensions',cat:'Glow Nails',subcat:'Extensions',price:800,durationMins:90,inPOS:true,description:'Acrylic or gel nail extensions for added length and strength'},
     // ── GLOW NAILS — Nail Art ──
