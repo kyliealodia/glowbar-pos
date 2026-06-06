@@ -239,7 +239,11 @@ const TIMES = ['09:00','09:30','10:00','10:30','11:00','11:30','12:00','12:30','
 const CATEGORY_TABS = [
   {id:'nails',   label:'Nails',                icon:'💅',
     test:p=>{ const c=(p.cat||'').toLowerCase(),s=(p.subcat||'').toLowerCase(),n=(p.name||'').toLowerCase();
-      return (c.includes('nail')||s.includes('manicure')||s.includes('pedicure')||s.includes('extension')||s.includes('nail art')||n.includes('mani')||n.includes('pedi')||n.includes('gel mani')||n.includes('nail')||n.includes('polygel')||n.includes('softgel')||n.includes('foot spa')||n.includes('hand spa')||n.includes('paraffin')||n.includes('foot jelly')||s.includes('spa')||n.includes('spa')); }},
+      return (c.includes('nail')||s.includes('manicure')||s.includes('pedicure')||s.includes('extension')||s.includes('nail art')||n.includes('mani')||n.includes('pedi')||n.includes('gel mani')||n.includes('nail')||n.includes('polygel')||n.includes('softgel'))
+        && !n.includes('hand spa') && !n.includes('foot spa') && !n.includes('hand paraffin') && !n.includes('foot paraffin') && !n.includes('foot jelly'); }},
+  {id:'spa',    label:'Spa Treatments',       icon:'🧖',
+    test:p=>{ const n=(p.name||'').toLowerCase();
+      return n.includes('hand spa')||n.includes('foot spa')||n.includes('hand paraffin')||n.includes('foot paraffin')||n.includes('foot jelly'); }},
   {id:'waxing',   label:'Hair Waxing',         icon:'✂',
     test:p=>{ const c=(p.cat||'').toLowerCase(),n=(p.name||'').toLowerCase();
       return (c.includes('wax')||n.includes('wax')||n.includes('brazilian')||n.includes('bikini')||n.includes('upper lip')&&!n.includes('diode'))&&!n.includes('foot spa'); }},
