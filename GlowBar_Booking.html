@@ -709,6 +709,21 @@ function selectService(id, name, price, durationMins){
   booking.servicePrice=booking.services.reduce((t,s)=>t+s.price,0);
   booking.serviceId=booking.services.length===1?booking.services[0].id:null;
   booking.duration=Math.max(booking.services.reduce((t,s)=>t+(s.durationMins||60),0),30);
+  // Expose selected service(s) globally for other steps / integrations
+  if(window){
+    if(booking.services.length===1){
+      window.selectedService = booking.services[0];
+    } else if(booking.services.length>1){
+      window.selectedService = booking.services.slice();
+    } else {
+      window.selectedService = null;
+    }
+    // Ensure step1 Next button state follows selection
+    const step1btn = document.getElementById('step1next');
+    if(step1btn){
+      if(booking.services.length) step1btn.removeAttribute('disabled'); else step1btn.setAttribute('disabled','');
+    }
+  }
   showStep1();
 }
 
@@ -868,6 +883,7 @@ function renderCal(){
 
 function pickDate(ds){
   booking.date=ds; booking.time='';
+  if(window) window.selectedDate = ds;
   renderCal();
   const timeCard=document.getElementById('timeCard');
   const staffCard=document.getElementById('staffCard');
@@ -1020,6 +1036,7 @@ function selectTime(t){
   if(staffCard) staffCard.style.display='block';
   const btn=document.getElementById('step2next');
   if(btn) btn.removeAttribute('disabled');
+  if(window) window.selectedTime = t;
 }
 
 function selectStaff(type, name, color, role){
@@ -1109,24 +1126,33 @@ async function submitBooking(){
   if(btn){btn.disabled=true;btn.textContent='Submitting…';}
 
   // Safety timeout — show success after 8 seconds regardless
-  const timeout=setTimeout(()=>{showSuccess(ref);sendConfirmationEmail({...appt,client:booking.name,name:booking.name},ref);},8000);
+  // Safety timeout — will show success if network is slow
+  let ref = 'GB'+String(Math.floor(Math.random()*100000000)).padStart(8,'0');
+  const timeout=setTimeout(()=>{try{showSuccess(ref);sendConfirmationEmail({...appt,client:booking.name,name:booking.name},ref);}catch(e){} },8000);
 
-  const ref=uid('BK');
-  const svcMeta=getSvcMeta(booking.service||'');
+  // Prefer explicit global selections if available
+  const selSvc = (window && window.selectedService) ? window.selectedService : (booking.services[0]||null);
+  const selDate = (window && window.selectedDate) ? window.selectedDate : booking.date;
+  const selTime = (window && window.selectedTime) ? window.selectedTime : booking.time;
+
+  const svcMeta=getSvcMeta(selSvc?selSvc.name:booking.service||'');
   const combo=isComboBooking();
   const appt={
     id:Date.now(),
     client:booking.name,
     phone:booking.phone,
     email:booking.email||'',
-    service:booking.service,
+    // single service fields
+    service: selSvc ? (selSvc.name||booking.service) : booking.service,
+    price: selSvc ? (selSvc.price||booking.servicePrice) : booking.servicePrice,
+    // preserve full services array and totals
     services:booking.services,
     totalPrice:booking.servicePrice,
     staff:booking.staff||'',
     aesthetician:combo?(booking.aesthetician||''):undefined,
     nailTech:combo?(booking.nailTech||''):undefined,
-    date:booking.date,
-    time:booking.time,
+    date:selDate,
+    time:selTime,
     duration:booking.duration||60,
     serviceType:svcMeta.type,
     groupSize:booking.groupSize||1,
@@ -1137,6 +1163,13 @@ async function submitBooking(){
     ref,
     createdAt:new Date().toISOString()
   };
+  // promo fields (if present on booking)
+  if(booking.promoApplied){
+    appt.promoApplied = booking.promoApplied;
+    if(booking.originalPrice!=null) appt.originalPrice = booking.originalPrice;
+    if(booking.discountAmount!=null) appt.discountAmount = booking.discountAmount;
+    if(booking.finalPrice!=null) appt.finalPrice = booking.finalPrice;
+  }
   try{
     if(db){
       // Use Firebase push() — generates unique key, never collides, works regardless of array/object format
