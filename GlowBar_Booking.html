@@ -285,6 +285,9 @@ function getPkgTabId(pkg){
 function isNailService(p){
   return getCatTabId(p) === 'nails';
 }
+function isWaxService(p){
+  return getCatTabId(p) === 'waxing';
+}
 
 function isComboBooking(){
   const types=booking.services.map(s=>getSvcMeta(s.name,'').type);
@@ -345,15 +348,12 @@ const DEMO_DATA = {
     {id:124,name:'Glow Spa Package',cat:'Glow Nails',subcat:'Packages',price:1700,durationMins:270,inPOS:true,includes:'Gel Manicure + Gel Pedicure + Hand Spa + Foot Spa',saves:280},
     {id:125,name:'GlowBar Signature Nail Package',cat:'Glow Nails',subcat:'Packages',price:2000,durationMins:310,inPOS:true,includes:'Gel Manicure + Gel Pedicure + Hand Spa + Foot Spa + Hand Paraffin + Foot Paraffin',saves:430},
     // ── HAIR WAXING ──
-    {id:211,name:'Underarm Wax',cat:'Hair Waxing',price:500,durationMins:30,inPOS:true,description:'Smooth underarm hair removal with warm wax'},
-    {id:212,name:'Upper Lip Wax',cat:'Hair Waxing',price:400,durationMins:20,inPOS:true,description:'Quick and gentle upper lip hair removal'},
-    {id:213,name:'Lower Lip Wax',cat:'Hair Waxing',price:400,durationMins:20,inPOS:true,description:'Clean lower lip hair removal using warm wax'},
-    {id:214,name:'Half Arms Wax',cat:'Hair Waxing',price:600,durationMins:30,inPOS:true,description:'Wrist to elbow hair removal with warm wax'},
-    {id:215,name:'Full Arms Wax',cat:'Hair Waxing',price:850,durationMins:40,inPOS:true,description:'Complete arm hair removal from wrists to shoulders'},
-    {id:216,name:'Half Legs Wax',cat:'Hair Waxing',price:700,durationMins:30,inPOS:true,description:'Ankle to knee hair removal for smooth legs'},
-    {id:217,name:'Full Legs Wax',cat:'Hair Waxing',price:1000,durationMins:40,inPOS:true,description:'Full leg hair removal from ankles to upper thighs'},
-    {id:218,name:'Brazilian Wax',cat:'Hair Waxing',price:800,durationMins:30,inPOS:true,description:'Complete intimate area hair removal for lasting smoothness'},
-    {id:219,name:'Bikini Wax',cat:'Hair Waxing',price:600,durationMins:20,inPOS:true,description:'Bikini line cleanup for a neat, clean result'},
+    {id:211,name:'Underarm',cat:'Hair Waxing',price:500,durationMins:30,inPOS:true,description:'Smooth underarm hair removal with warm wax'},
+    {id:214,name:'Half Arms',cat:'Hair Waxing',price:600,durationMins:30,inPOS:true,description:'Wrist to elbow hair removal with warm wax'},
+    {id:215,name:'Full Arms',cat:'Hair Waxing',price:850,durationMins:40,inPOS:true,description:'Complete arm hair removal from wrists to shoulders'},
+    {id:216,name:'Half Legs',cat:'Hair Waxing',price:700,durationMins:30,inPOS:true,description:'Ankle to knee hair removal for smooth legs'},
+    {id:217,name:'Full Legs',cat:'Hair Waxing',price:1000,durationMins:40,inPOS:true,description:'Full leg hair removal from ankles to upper thighs'},
+    {id:218,name:'Brazilian',cat:'Hair Waxing',price:1000,durationMins:30,inPOS:true,description:'Complete intimate area hair removal for lasting smoothness'},
     // ── GLOW FACIALS ──
     {id:301,name:'Regular Facial',cat:'Glow Facials',subcat:'Facials',price:700,durationMins:60,inPOS:true,description:'Deep cleansing with steam, extractions, and moisturizing'},
     {id:302,name:'Whitening Facial',cat:'Glow Facials',subcat:'Facials',price:999,durationMins:75,inPOS:true,description:'Brightening treatment to even skin tone and lighten dark spots'},
@@ -540,10 +540,14 @@ async function loadData(){
 
     const dbProds = prods && prods.length ? prods : null;
     const nailProducts = DEMO_DATA.products.filter(isNailService);
-    const nonNailDbProds = dbProds ? dbProds.filter(p=>getCatTabId(p)!=='nails') : [];
+    const waxProducts = DEMO_DATA.products.filter(isWaxService);
+    const nonNailNonWaxDbProds = dbProds ? dbProds.filter(p=>{
+      const tid = getCatTabId(p);
+      return tid !== 'nails' && tid !== 'waxing';
+    }) : [];
     const nonNailDbPackages = pkgs ? pkgs.filter(p=>getPkgTabId(p)!=='nails') : [];
     DATA.products = dbProds
-      ? [...nailProducts, ...nonNailDbProds]
+      ? [...nailProducts, ...waxProducts, ...nonNailNonWaxDbProds]
       : DEMO_DATA.products;
     DATA.packages = nonNailDbPackages.length ? nonNailDbPackages : DEMO_DATA.packages;
     DATA.users    = users && users.length ? users : DEMO_DATA.users;
@@ -564,8 +568,9 @@ async function loadData(){
 // ── STEP 1: SERVICE ──
 function showStep1(){
   setStep(1);
-  // nailServices is intentionally empty here to prevent Firebase from adding nail services
+  // nailServices and waxingServices are intentionally empty here to prevent Firebase from adding these categories
   const nailServices = [];
+  const waxingServices = [];
 
   // Filter to bookable services only
   const services = DATA.products.filter(p=>
@@ -594,6 +599,9 @@ function showStep1(){
     // Nail services are hardcoded only. Prevent Firebase from adding any nail services.
     if(tabMap['nails']){
       tabMap['nails'] = nailServices.concat(DEMO_DATA.products.filter(isNailService));
+    }
+    if(tabMap['waxing']){
+      tabMap['waxing'] = waxingServices.concat(DEMO_DATA.products.filter(isWaxService));
     }
 
     // Build tabs in preferred order + any extras
