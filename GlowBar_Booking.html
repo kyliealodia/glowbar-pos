@@ -239,10 +239,7 @@ const TIMES = ['09:00','09:30','10:00','10:30','11:00','11:30','12:00','12:30','
 const CATEGORY_TABS = [
   {id:'nails',   label:'Nails',                icon:'💅',
     test:p=>{ const c=(p.cat||'').toLowerCase(),s=(p.subcat||'').toLowerCase(),n=(p.name||'').toLowerCase();
-      return (c.includes('nail')||s.includes('manicure')||s.includes('pedicure')||s.includes('extension')||s.includes('nail art')||n.includes('mani')||n.includes('pedi')||n.includes('gel mani')||n.includes('nail')||n.includes('polygel')||n.includes('softgel')||n.includes('foot spa')||n.includes('hand spa')); }},
-  {id:'footspa', label:'Spa Treatments',       icon:'💧',
-    test:p=>{ const c=(p.cat||'').toLowerCase(),s=(p.subcat||'').toLowerCase(),n=(p.name||'').toLowerCase();
-      return n.includes('foot spa')||n.includes('hand spa')||n.includes('paraffin')||n.includes('foot jelly')||s.includes('spa')||n.includes('spa'); }},
+      return (c.includes('nail')||s.includes('manicure')||s.includes('pedicure')||s.includes('extension')||s.includes('nail art')||n.includes('mani')||n.includes('pedi')||n.includes('gel mani')||n.includes('nail')||n.includes('polygel')||n.includes('softgel')||n.includes('foot spa')||n.includes('hand spa')||n.includes('paraffin')||n.includes('foot jelly')||s.includes('spa')||n.includes('spa')); }},
   {id:'waxing',   label:'Hair Waxing',         icon:'✂',
     test:p=>{ const c=(p.cat||'').toLowerCase(),n=(p.name||'').toLowerCase();
       return (c.includes('wax')||n.includes('wax')||n.includes('brazilian')||n.includes('bikini')||n.includes('upper lip')&&!n.includes('diode'))&&!n.includes('foot spa'); }},
@@ -619,6 +616,7 @@ function showStep1(){
     if(activeTab){
       const isLaserTab=['diode','rejuv','pico','exilis','tattoo'].includes(activeSvcCat);
       const tabPkgs=pkgs.filter(p=>getPkgTabId(p)===activeSvcCat);
+      tabPkgs.sort((a,b)=>Number(a.id)-Number(b.id));
       const subcatMap={};
       activeTab.services.forEach(p=>{
         const sc=p.subcat||'';
@@ -646,7 +644,7 @@ function showStep1(){
         html+=`</div>`;
       });
       if(tabPkgs.length){
-        html+=`<div class="svc-grid" style="margin-top:16px;">`;
+        html+=`<div class="subcat-hdr">Packages</div><div class="svc-grid" style="margin-top:16px;">`;
         tabPkgs.forEach(p=>{
           const pkgId='pkg_'+p.id;
           const sel=booking.services.some(s=>s.id===pkgId)?'sel':'';
