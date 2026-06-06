@@ -278,6 +278,10 @@ function getPkgTabId(pkg){
   return null;
 }
 
+function isNailService(p){
+  return getCatTabId(p) === 'nails';
+}
+
 function isComboBooking(){
   const types=booking.services.map(s=>getSvcMeta(s.name,'').type);
   const hasNail=types.includes('nail');
@@ -302,27 +306,26 @@ function show(html){ document.getElementById('mainContent').innerHTML=html; }
 const DEMO_DATA = {
   products:[
     // ── GLOW NAILS — Manicure & Pedicure ──
-    {id:101,name:'Manicure',cat:'Glow Nails',subcat:'Manicure & Pedicure',price:249,durationMins:45,inPOS:true,description:'Classic nail care with cuticle shaping, filing, and polish'},
-    {id:102,name:'Pedicure',cat:'Glow Nails',subcat:'Manicure & Pedicure',price:299,durationMins:60,inPOS:true,description:'Foot soak, cuticle care, nail shaping, and polish'},
-    {id:103,name:'Gel Manicure',cat:'Glow Nails',subcat:'Manicure & Pedicure',price:399,durationMins:60,inPOS:true,description:'Long-lasting gel nail color with cuticle care and shaping'},
-    {id:104,name:'Gel Pedicure',cat:'Glow Nails',subcat:'Manicure & Pedicure',price:449,durationMins:75,inPOS:true,description:'Gel nail color for toes with soak and cuticle treatment'},
+    {id:101,name:'Manicure',cat:'Glow Nails',subcat:'Manicure & Pedicure',price:240,durationMins:45,inPOS:true,description:'Classic nail care with cuticle shaping, filing, and polish'},
+    {id:102,name:'Pedicure',cat:'Glow Nails',subcat:'Manicure & Pedicure',price:270,durationMins:60,inPOS:true,description:'Foot soak, cuticle care, nail shaping, and polish'},
+    {id:103,name:'Gel Manicure',cat:'Glow Nails',subcat:'Manicure & Pedicure',price:450,durationMins:60,inPOS:true,description:'Long-lasting gel nail color with cuticle care and shaping'},
+    {id:104,name:'Gel Pedicure',cat:'Glow Nails',subcat:'Manicure & Pedicure',price:480,durationMins:75,inPOS:true,description:'Gel nail color for toes with soak and cuticle treatment'},
     {id:105,name:'Hand Spa',cat:'Glow Nails',subcat:'Manicure & Pedicure',price:450,durationMins:60,inPOS:true,description:'Nourishing scrub, mask, and massage for soft, smooth hands'},
     {id:106,name:'Foot Spa',cat:'Glow Nails',subcat:'Manicure & Pedicure',price:600,durationMins:75,inPOS:true,description:'Soak, exfoliation, mask, and massage for tired feet'},
     {id:130,name:'Hand Paraffin',cat:'Glow Nails',subcat:'Add-ons',price:350,durationMins:20,inPOS:true,description:'Moisturizing paraffin treatment for soft, supple hands'},
     {id:131,name:'Foot Paraffin',cat:'Glow Nails',subcat:'Add-ons',price:450,durationMins:25,inPOS:true,description:'Warm paraffin treatment to hydrate and soothe feet'},
     {id:132,name:'Add on Foot Jelly',cat:'Glow Nails',subcat:'Add-ons',price:200,durationMins:10,inPOS:true,description:'Cooling foot jelly add-on to refresh and soften tired feet'},
     // ── GLOW NAILS — Extensions ──
-    {id:107,name:'Nail Extensions',cat:'Glow Nails',subcat:'Extensions',price:800,durationMins:90,inPOS:true,description:'Acrylic or gel nail extensions for added length and strength'},
+    {id:107,name:'Polygel Extension',cat:'Glow Nails',subcat:'Extensions',price:1000,durationMins:90,inPOS:true,description:'Polygel extension treatment for durable, long-lasting nails'},
+    {id:133,name:'Softgel Extension',cat:'Glow Nails',subcat:'Extensions',price:1000,durationMins:90,inPOS:true,description:'Softgel extension treatment for lightweight and flexible nail enhancement'},
     // ── GLOW NAILS — Nail Art ──
     {id:108,name:'Nail Art',cat:'Glow Nails',subcat:'Nail Art',price:50,durationMins:5,inPOS:true,description:'Custom hand-painted nail design per nail'},
-    {id:109,name:'Glitter / Foil',cat:'Glow Nails',subcat:'Nail Art',price:100,durationMins:10,inPOS:true,description:'Sparkle glitter or metallic foil accent per nail'},
-    {id:110,name:'Chrome Powder',cat:'Glow Nails',subcat:'Nail Art',price:150,durationMins:10,inPOS:true,description:'High-shine chrome mirror finish per nail'},
-    {id:111,name:'Nail Stickers',cat:'Glow Nails',subcat:'Nail Art',price:80,durationMins:5,inPOS:true,description:'Cute nail art stickers or decals per nail'},
+    {id:110,name:'Chrome Powder',cat:'Glow Nails',subcat:'Nail Art',price:100,durationMins:10,inPOS:true,description:'High-shine chrome mirror finish per nail'},
     {id:126,name:'Nail Art (Whole Hand)',cat:'Glow Nails',subcat:'Nail Art',price:250,durationMins:20,inPOS:true,description:'Custom nail art design for all 5 nails'},
     {id:127,name:'Stones / Stickers / Charms',cat:'Glow Nails',subcat:'Nail Art',price:100,durationMins:5,inPOS:true,description:'Rhinestones, stickers, or charms per nail'},
     // ── GLOW NAILS — Packages ──
-    {id:112,name:'Mani + Pedi Package',cat:'Glow Nails',subcat:'Packages',price:499,durationMins:90,inPOS:true,description:'Classic manicure and pedicure combined at a bundled rate'},
-    {id:113,name:'Gel Mani + Pedi Package',cat:'Glow Nails',subcat:'Packages',price:699,durationMins:120,inPOS:true,description:'Gel manicure and gel pedicure for long-lasting color'},
+    {id:112,name:'Mani + Pedi Package',cat:'Glow Nails',subcat:'Packages',price:510,durationMins:90,inPOS:true,description:'Classic manicure and pedicure combined at a bundled rate'},
+    {id:113,name:'Gel Mani + Pedi Package',cat:'Glow Nails',subcat:'Packages',price:800,durationMins:120,inPOS:true,description:'Gel manicure and gel pedicure for long-lasting color'},
     // ── CLASSIC NAIL PACKAGES ──
     {id:114,name:'Regular Mani + Pedi & Hand Spa',cat:'Glow Nails',subcat:'Packages',price:850,durationMins:165,inPOS:true,includes:'Regular Manicure + Regular Pedicure + Hand Spa',saves:70},
     {id:115,name:'Classic Hands Package',cat:'Glow Nails',subcat:'Packages',price:1100,durationMins:185,inPOS:true,includes:'Regular Manicure + Regular Pedicure + Hand Spa + Hand Paraffin',saves:120},
@@ -531,8 +534,14 @@ async function loadData(){
     const users = toArray(d.users);
     const bkgs  = toArray(d.bookings);
 
-    DATA.products = prods && prods.length ? prods : DEMO_DATA.products;
-    DATA.packages = pkgs  && pkgs.length  ? pkgs  : DEMO_DATA.packages;
+    const dbProds = prods && prods.length ? prods : null;
+    const nailProducts = DEMO_DATA.products.filter(isNailService);
+    const nonNailDbProds = dbProds ? dbProds.filter(p=>getCatTabId(p)!=='nails') : [];
+    const nonNailDbPackages = pkgs ? pkgs.filter(p=>getPkgTabId(p)!=='nails') : [];
+    DATA.products = dbProds
+      ? [...nailProducts, ...nonNailDbProds]
+      : DEMO_DATA.products;
+    DATA.packages = nonNailDbPackages.length ? nonNailDbPackages : DEMO_DATA.packages;
     DATA.users    = users && users.length ? users : DEMO_DATA.users;
     DATA.bookings = bkgs  || [];
     DATA.settings = d.settings && typeof d.settings==='object' && !Array.isArray(d.settings) ? d.settings : DATA.settings;
@@ -551,6 +560,9 @@ async function loadData(){
 // ── STEP 1: SERVICE ──
 function showStep1(){
   setStep(1);
+  // nailServices is intentionally empty here to prevent Firebase from adding nail services
+  const nailServices = [];
+
   // Filter to bookable services only
   const services = DATA.products.filter(p=>
     p.inPOS!==false && p.active!==false && p.available!==false && p.unavailable!==true
@@ -574,6 +586,11 @@ function showStep1(){
       if(!tabMap[tid]) tabMap[tid]=[];
       tabMap[tid].push(p);
     });
+
+    // Nail services are hardcoded only. Prevent Firebase from adding any nail services.
+    if(tabMap['nails']){
+      tabMap['nails'] = nailServices.concat(DEMO_DATA.products.filter(isNailService));
+    }
 
     // Build tabs in preferred order + any extras
     const pkgs=DATA.packages.filter(p=>p.active!==false);
@@ -615,7 +632,7 @@ function showStep1(){
     const activeTab=orderedTabs.find(t=>t.id===activeSvcCat);
     if(activeTab){
       const isLaserTab=['diode','rejuv','pico','exilis','tattoo'].includes(activeSvcCat);
-      const tabPkgs=pkgs.filter(p=>getPkgTabId(p)===activeSvcCat);
+      const tabPkgs=(activeSvcCat==='nails' ? [] : pkgs.filter(p=>getPkgTabId(p)===activeSvcCat));
       tabPkgs.sort((a,b)=>Number(a.id)-Number(b.id));
       const subcatMap={};
       activeTab.services.forEach(p=>{
