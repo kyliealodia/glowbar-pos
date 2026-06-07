@@ -1156,23 +1156,21 @@ async function submitBooking(){
   const combo=isComboBooking();
   const appt={
     id:Date.now(),
-    client:booking.name,
-    phone:booking.phone,
+    client:booking.name||'',
+    phone:booking.phone||'',
     email:booking.email||'',
-    service: booking.services.length ? booking.services[0].name : booking.service,
-    services:booking.services,
-    price: booking.servicePrice,
-    totalPrice:booking.servicePrice,
-    finalPrice:booking.finalPrice!=null?booking.finalPrice:booking.servicePrice,
+    service: booking.services.length ? booking.services[0].name : (booking.service||''),
+    services:booking.services||[],
+    price: booking.servicePrice||0,
+    totalPrice:booking.servicePrice||0,
+    finalPrice:booking.finalPrice!=null?booking.finalPrice:booking.servicePrice||0,
     promoApplied:booking.promoApplied||null,
     discountAmount:booking.discountAmount||0,
-    date:selDate,
-    time:selTime,
+    date:selDate||'',
+    time:selTime||'',
     duration:booking.duration||60,
     staff:booking.staff||'',
-    aesthetician:combo?(booking.aesthetician||''):undefined,
-    nailTech:combo?(booking.nailTech||''):undefined,
-    serviceType:svcMeta.type,
+    serviceType:svcMeta.type||'',
     groupSize:booking.groupSize||1,
     source:'online',
     status:'pending',
@@ -1181,26 +1179,28 @@ async function submitBooking(){
     ref,
     createdAt:new Date().toISOString()
   };
-  console.log('Prepared booking payload', appt);
+  // Strip any remaining undefined/null values Firebase would reject
+  const cleanAppt=JSON.parse(JSON.stringify(appt,(k,v)=>v===undefined?null:v));
+  console.log('Prepared booking payload', cleanAppt);
   try{
     if(db){
-      const pushRes = await db.ref('gb/bookings').push(appt);
+      const pushRes = await db.ref('gb/bookings').push(cleanAppt);
       console.log('Firebase push result key:', pushRes && pushRes.key);
     } else {
       console.log('No Firebase DB available — simulated push', appt);
     }
-    window.booking = appt;
-    console.log('Booking saved:', appt);
+    window.booking = cleanAppt;
+    console.log('Booking saved:', cleanAppt);
     clearTimeout(timeout);
     showSuccess(ref);
-    sendConfirmationEmail({...appt, client: booking.name, name: booking.name}, ref);
+    sendConfirmationEmail({...cleanAppt, client: booking.name, name: booking.name}, ref);
   }catch(e){
     console.error('Booking error:',e);
-    window.booking = appt;
-    console.log('Booking saved (fallback):', appt);
+    window.booking = cleanAppt;
+    console.log('Booking saved (fallback):', cleanAppt);
     clearTimeout(timeout);
     showSuccess(ref);
-    sendConfirmationEmail({...appt, client: booking.name, name: booking.name}, ref);
+    sendConfirmationEmail({...cleanAppt, client: booking.name, name: booking.name}, ref);
   }
 }
 
