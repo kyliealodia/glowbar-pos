@@ -432,78 +432,66 @@ const DEMO_DATA = {
     {id:702,name:'Face and Neck Unli',cat:'Glow Clear',price:2500,durationMins:75,inPOS:true,description:'Unlimited wart removal for face and neck'},
   ],
   packages:[
-    // ── Diode Hair Removal (5+1 free) ──
-    {id:1,name:'Underarms Diode Package',price:6000,sessions:5,freeSessions:1,active:true},
-    {id:2,name:'Upper Lip Diode Package',price:4000,sessions:5,freeSessions:1,active:true},
-    {id:3,name:'Lower Lip Diode Package',price:4000,sessions:5,freeSessions:1,active:true},
-    {id:4,name:'Cheeks Diode Package',price:5000,sessions:5,freeSessions:1,active:true},
-    {id:5,name:'Arms Full Diode Package',price:11000,sessions:5,freeSessions:1,active:true},
-    {id:6,name:'Arms Half Diode Package',price:7500,sessions:5,freeSessions:1,active:true},
-    {id:7,name:'Legs Full Diode Package',price:17500,sessions:5,freeSessions:1,active:true},
-    {id:8,name:'Legs Half Diode Package',price:12500,sessions:5,freeSessions:1,active:true},
-    // ── Skin Rejuvenation (5+1 free) ──
-    {id:9,name:'Underarms Rejuvenation Package',price:6000,sessions:5,freeSessions:1,active:true},
-    {id:10,name:'Elbows Rejuvenation Package',price:5000,sessions:5,freeSessions:1,active:true},
-    {id:11,name:'Inner Thighs Rejuvenation Package',price:6500,sessions:5,freeSessions:1,active:true},
-    {id:12,name:'Remove & Rejuve Combo Package',price:11000,sessions:5,freeSessions:1,active:true},
-    // ── Exilis (5+1 free) ──
-    {id:13,name:'Full Face with Neck Exilis Package',price:16000,sessions:5,freeSessions:1,active:true},
-    {id:14,name:'Full Face Exilis Package',price:14000,sessions:5,freeSessions:1,active:true},
-    {id:15,name:'Double Chin with Neck Exilis Package',price:10000,sessions:5,freeSessions:1,active:true},
-    {id:16,name:'Face Per Area Exilis Package',price:7500,sessions:5,freeSessions:1,active:true},
-    {id:17,name:'Arms Exilis Package',price:9000,sessions:5,freeSessions:1,active:true},
-    {id:18,name:'Abdomen Exilis Package',price:12500,sessions:5,freeSessions:1,active:true},
-    {id:19,name:'Inner Thigh Exilis Package',price:12000,sessions:5,freeSessions:1,active:true},
-    {id:20,name:'Love Handle Exilis Package',price:11000,sessions:5,freeSessions:1,active:true},
-    {id:21,name:'Buttocks Exilis Package',price:12000,sessions:5,freeSessions:1,active:true},
-    {id:22,name:'Lower Leg Exilis Package',price:8000,sessions:5,freeSessions:1,active:true},
-    // ── Pico Laser (5+1 free) ──
-    {id:23,name:'Black Doll Carbon Laser Package',price:7500,sessions:5,freeSessions:1,active:true},
-    {id:24,name:'Melasma/Freckles Face Package',price:8000,sessions:5,freeSessions:1,active:true},
-    {id:25,name:'Melasma/Freckles Shoulders Package',price:9500,sessions:5,freeSessions:1,active:true},
-    {id:26,name:'Melasma/Freckles Back Package',price:12500,sessions:5,freeSessions:1,active:true},
-    {id:27,name:'Scar Lightening Face Package',price:7500,sessions:5,freeSessions:1,active:true},
-    {id:28,name:'Scar Lightening Arms Package',price:5000,sessions:5,freeSessions:1,active:true},
-    {id:29,name:'Scar Lightening Legs Package',price:7500,sessions:5,freeSessions:1,active:true},
-    {id:30,name:'Scar Lightening Knees Package',price:6500,sessions:5,freeSessions:1,active:true},
-    // ── Combo Packages ──
-    {id:31,name:'Diode + Carbon Laser — 5 Sessions Each',price:10000,sessions:5,freeSessions:0,saves:3500,description:'5 sessions Diode Hair Removal + 5 sessions Carbon Laser Deep Renewal',active:true},
-    {id:32,name:'Diode + Carbon Laser — 10 Sessions Each',price:20000,sessions:10,freeSessions:0,saves:7000,description:'10 sessions Diode Hair Removal + 10 sessions Carbon Laser Deep Renewal',active:true},
-    {id:33,name:'Diode + Carbon + Pico — 5 Sessions Each',price:16500,sessions:5,freeSessions:0,saves:5000,description:'5 sessions Diode + 5 sessions Carbon Laser + 5 sessions Pico Laser',active:true},
-    {id:34,name:'Diode + Carbon + Pico — 10 Sessions Each',price:33000,sessions:10,freeSessions:0,saves:10000,description:'10 sessions Diode + 10 sessions Carbon Laser + 10 sessions Pico Laser',active:true},
-    // ── Diode 10+2 ──
-    {id:35,name:'Underarms Diode 10+2',price:12000,sessions:10,freeSessions:2,active:true},
-    {id:36,name:'Upper Lip Diode 10+2',price:8000,sessions:10,freeSessions:2,active:true},
-    {id:37,name:'Lower Lip Diode 10+2',price:8000,sessions:10,freeSessions:2,active:true},
-    {id:38,name:'Cheeks Diode 10+2',price:10000,sessions:10,freeSessions:2,active:true},
-    {id:39,name:'Arms Half Diode 10+2',price:15000,sessions:10,freeSessions:2,active:true},
-    {id:40,name:'Arms Full Diode 10+2',price:22000,sessions:10,freeSessions:2,active:true},
-    {id:41,name:'Legs Half Diode 10+2',price:25000,sessions:10,freeSessions:2,active:true},
-    {id:42,name:'Legs Full Diode 10+2',price:35000,sessions:10,freeSessions:2,active:true},
-    // ── Carbon Laser / Skin Rejuvenation 10+2 ──
-    {id:43,name:'Underarms Rejuvenation 10+2',price:12000,sessions:10,freeSessions:2,active:true},
-    {id:44,name:'Elbows Rejuvenation 10+2',price:10000,sessions:10,freeSessions:2,active:true},
-    {id:45,name:'Inner Thighs Rejuvenation 10+2',price:13000,sessions:10,freeSessions:2,active:true},
-    // ── Pico Laser 10+2 ──
-    {id:46,name:'Black Doll Carbon Laser 10+2',price:15000,sessions:10,freeSessions:2,active:true},
-    {id:47,name:'Melasma/Freckles Face 10+2',price:16000,sessions:10,freeSessions:2,active:true},
-    {id:48,name:'Melasma/Freckles Shoulders 10+2',price:19000,sessions:10,freeSessions:2,active:true},
-    {id:49,name:'Melasma/Freckles Back 10+2',price:25000,sessions:10,freeSessions:2,active:true},
-    {id:50,name:'Scar Lightening Face 10+2',price:15000,sessions:10,freeSessions:2,active:true},
-    {id:51,name:'Scar Lightening Arms 10+2',price:10000,sessions:10,freeSessions:2,active:true},
-    {id:52,name:'Scar Lightening Legs 10+2',price:15000,sessions:10,freeSessions:2,active:true},
-    {id:53,name:'Scar Lightening Knees 10+2',price:13000,sessions:10,freeSessions:2,active:true},
-    // ── Exilis 10+2 ──
-    {id:54,name:'Full Face with Neck Exilis 10+2',price:32000,sessions:10,freeSessions:2,active:true},
-    {id:55,name:'Full Face Exilis 10+2',price:28000,sessions:10,freeSessions:2,active:true},
-    {id:56,name:'Double Chin with Neck Exilis 10+2',price:20000,sessions:10,freeSessions:2,active:true},
-    {id:57,name:'Face Per Area Exilis 10+2',price:15000,sessions:10,freeSessions:2,active:true},
-    {id:58,name:'Arms Exilis 10+2',price:18000,sessions:10,freeSessions:2,active:true},
-    {id:59,name:'Abdomen Exilis 10+2',price:25000,sessions:10,freeSessions:2,active:true},
-    {id:60,name:'Inner Thigh Exilis 10+2',price:24000,sessions:10,freeSessions:2,active:true},
-    {id:61,name:'Love Handle Exilis 10+2',price:22000,sessions:10,freeSessions:2,active:true},
-    {id:62,name:'Buttocks Exilis 10+2',price:24000,sessions:10,freeSessions:2,active:true},
-    {id:63,name:'Lower Leg Exilis 10+2',price:16000,sessions:10,freeSessions:2,active:true},
+    // ── Diode Hair Removal ──
+    {id:1, name:'Underarms',       group:'Diode Hair Removal',tab:'diode',price:6000, sessions:5, freeSessions:1,active:true},
+    {id:35,name:'Underarms',       group:'Diode Hair Removal',tab:'diode',price:12000,sessions:10,freeSessions:2,active:true},
+    {id:2, name:'Upper/Lower Lip', group:'Diode Hair Removal',tab:'diode',price:4000, sessions:5, freeSessions:1,active:true},
+    {id:36,name:'Upper/Lower Lip', group:'Diode Hair Removal',tab:'diode',price:8000, sessions:10,freeSessions:2,active:true},
+    {id:4, name:'Cheeks',          group:'Diode Hair Removal',tab:'diode',price:5000, sessions:5, freeSessions:1,active:true},
+    {id:38,name:'Cheeks',          group:'Diode Hair Removal',tab:'diode',price:10000,sessions:10,freeSessions:2,active:true},
+    {id:6, name:'Half Arms',       group:'Diode Hair Removal',tab:'diode',price:7500, sessions:5, freeSessions:1,active:true},
+    {id:39,name:'Half Arms',       group:'Diode Hair Removal',tab:'diode',price:15000,sessions:10,freeSessions:2,active:true},
+    {id:5, name:'Full Arms',       group:'Diode Hair Removal',tab:'diode',price:11000,sessions:5, freeSessions:1,active:true},
+    {id:40,name:'Full Arms',       group:'Diode Hair Removal',tab:'diode',price:22000,sessions:10,freeSessions:2,active:true},
+    {id:8, name:'Half Legs',       group:'Diode Hair Removal',tab:'diode',price:12500,sessions:5, freeSessions:1,active:true},
+    {id:41,name:'Half Legs',       group:'Diode Hair Removal',tab:'diode',price:25000,sessions:10,freeSessions:2,active:true},
+    {id:7, name:'Full Legs',       group:'Diode Hair Removal',tab:'diode',price:17500,sessions:5, freeSessions:1,active:true},
+    {id:42,name:'Full Legs',       group:'Diode Hair Removal',tab:'diode',price:35000,sessions:10,freeSessions:2,active:true},
+    // ── Carbon Laser (Skin Rejuvenation) ──
+    {id:9, name:'Underarms',       group:'Carbon Laser',tab:'pico',price:6000, sessions:5, freeSessions:1,active:true},
+    {id:43,name:'Underarms',       group:'Carbon Laser',tab:'pico',price:12000,sessions:10,freeSessions:2,active:true},
+    {id:10,name:'Elbows',          group:'Carbon Laser',tab:'pico',price:5000, sessions:5, freeSessions:1,active:true},
+    {id:44,name:'Elbows',          group:'Carbon Laser',tab:'pico',price:10000,sessions:10,freeSessions:2,active:true},
+    {id:11,name:'Inner Thighs',    group:'Carbon Laser',tab:'pico',price:6500, sessions:5, freeSessions:1,active:true},
+    {id:45,name:'Inner Thighs',    group:'Carbon Laser',tab:'pico',price:13000,sessions:10,freeSessions:2,active:true},
+    // ── Pico Laser ──
+    {id:23,name:'Black Doll',      group:'Pico Laser',tab:'pico',price:7500, sessions:5, freeSessions:1,active:true},
+    {id:46,name:'Black Doll',      group:'Pico Laser',tab:'pico',price:15000,sessions:10,freeSessions:2,active:true},
+    {id:24,name:'Melasma Face',    group:'Pico Laser',tab:'pico',price:8000, sessions:5, freeSessions:1,active:true},
+    {id:47,name:'Melasma Face',    group:'Pico Laser',tab:'pico',price:16000,sessions:10,freeSessions:2,active:true},
+    {id:25,name:'Melasma Shoulders',group:'Pico Laser',tab:'pico',price:9500, sessions:5, freeSessions:1,active:true},
+    {id:48,name:'Melasma Shoulders',group:'Pico Laser',tab:'pico',price:19000,sessions:10,freeSessions:2,active:true},
+    {id:26,name:'Melasma Back',    group:'Pico Laser',tab:'pico',price:12500,sessions:5, freeSessions:1,active:true},
+    {id:49,name:'Melasma Back',    group:'Pico Laser',tab:'pico',price:25000,sessions:10,freeSessions:2,active:true},
+    {id:27,name:'Scar Face',       group:'Pico Laser',tab:'pico',price:7500, sessions:5, freeSessions:1,active:true},
+    {id:50,name:'Scar Face',       group:'Pico Laser',tab:'pico',price:15000,sessions:10,freeSessions:2,active:true},
+    {id:28,name:'Scar Arms',       group:'Pico Laser',tab:'pico',price:5000, sessions:5, freeSessions:1,active:true},
+    {id:51,name:'Scar Arms',       group:'Pico Laser',tab:'pico',price:10000,sessions:10,freeSessions:2,active:true},
+    {id:29,name:'Scar Legs',       group:'Pico Laser',tab:'pico',price:7500, sessions:5, freeSessions:1,active:true},
+    {id:52,name:'Scar Legs',       group:'Pico Laser',tab:'pico',price:15000,sessions:10,freeSessions:2,active:true},
+    {id:30,name:'Scar Knees',      group:'Pico Laser',tab:'pico',price:6500, sessions:5, freeSessions:1,active:true},
+    {id:53,name:'Scar Knees',      group:'Pico Laser',tab:'pico',price:13000,sessions:10,freeSessions:2,active:true},
+    // ── Exilis ──
+    {id:13,name:'Full Face with Neck',   group:'Exilis',tab:'exilis',price:16000,sessions:5, freeSessions:1,active:true},
+    {id:54,name:'Full Face with Neck',   group:'Exilis',tab:'exilis',price:32000,sessions:10,freeSessions:2,active:true},
+    {id:14,name:'Full Face',             group:'Exilis',tab:'exilis',price:14000,sessions:5, freeSessions:1,active:true},
+    {id:55,name:'Full Face',             group:'Exilis',tab:'exilis',price:28000,sessions:10,freeSessions:2,active:true},
+    {id:15,name:'Double Chin with Neck', group:'Exilis',tab:'exilis',price:10000,sessions:5, freeSessions:1,active:true},
+    {id:56,name:'Double Chin with Neck', group:'Exilis',tab:'exilis',price:20000,sessions:10,freeSessions:2,active:true},
+    {id:16,name:'Face Per Area',         group:'Exilis',tab:'exilis',price:7500, sessions:5, freeSessions:1,active:true},
+    {id:57,name:'Face Per Area',         group:'Exilis',tab:'exilis',price:15000,sessions:10,freeSessions:2,active:true},
+    {id:17,name:'Arms',                  group:'Exilis',tab:'exilis',price:9000, sessions:5, freeSessions:1,active:true},
+    {id:58,name:'Arms',                  group:'Exilis',tab:'exilis',price:18000,sessions:10,freeSessions:2,active:true},
+    {id:18,name:'Abdomen',               group:'Exilis',tab:'exilis',price:12500,sessions:5, freeSessions:1,active:true},
+    {id:59,name:'Abdomen',               group:'Exilis',tab:'exilis',price:25000,sessions:10,freeSessions:2,active:true},
+    {id:19,name:'Inner Thigh',           group:'Exilis',tab:'exilis',price:12000,sessions:5, freeSessions:1,active:true},
+    {id:60,name:'Inner Thigh',           group:'Exilis',tab:'exilis',price:24000,sessions:10,freeSessions:2,active:true},
+    {id:20,name:'Love Handle',           group:'Exilis',tab:'exilis',price:11000,sessions:5, freeSessions:1,active:true},
+    {id:61,name:'Love Handle',           group:'Exilis',tab:'exilis',price:22000,sessions:10,freeSessions:2,active:true},
+    {id:21,name:'Buttocks',              group:'Exilis',tab:'exilis',price:12000,sessions:5, freeSessions:1,active:true},
+    {id:62,name:'Buttocks',              group:'Exilis',tab:'exilis',price:24000,sessions:10,freeSessions:2,active:true},
+    {id:22,name:'Lower Leg',             group:'Exilis',tab:'exilis',price:8000, sessions:5, freeSessions:1,active:true},
+    {id:63,name:'Lower Leg',             group:'Exilis',tab:'exilis',price:16000,sessions:10,freeSessions:2,active:true},
   ],
   users:[
     {id:1,name:'Staff 1',role:'staff',specialty:'Aesthetician',color:'#C4778A'},
@@ -651,8 +639,7 @@ function showStep1(){
     const activeTab=orderedTabs.find(t=>t.id===activeSvcCat);
     if(activeTab){
       const isLaserTab=['diode','rejuv','pico','exilis','tattoo'].includes(activeSvcCat);
-      const tabPkgs=[];
-      tabPkgs.sort((a,b)=>Number(a.id)-Number(b.id));
+      const tabPkgs=DEMO_DATA.packages.filter(p=>p.tab===activeSvcCat&&p.active!==false);
       const subcatMap={};
       activeTab.services.forEach(p=>{
         const sc=p.subcat||'';
@@ -680,29 +667,34 @@ function showStep1(){
         html+=`</div>`;
       });
       if(tabPkgs.length){
-        html+=`<div class="subcat-hdr">Packages</div><div class="svc-grid" style="margin-top:16px;">`;
-        tabPkgs.forEach(p=>{
-          const pkgId='pkg_'+p.id;
-          const sel=booking.services.some(s=>s.id===pkgId)?'sel':'';
-          const paid=p.sessions||5;
-          const free=p.freeSessions||0;
-          const total=paid+free;
-          let sessLabel=free>0?`${paid}+${free} free sessions (${total} total)`:`${total} sessions`;
-          let badge='';
-          if(free===1) badge='<span class="save-badge">🎁 Get 1 FREE session</span>';
-          else if(free===2) badge='<span class="save-badge">🎁 Get 2 FREE sessions</span>';
-          else if(free>0) badge=`<span class="save-badge">🎁 Get ${free} FREE sessions</span>`;
-          if(p.saves>0) badge+=` <span class="save-badge">💰 Save ${fmtPrice(p.saves)}</span>`;
-          const terms=isLaserTab?'<span class="pay-terms">50% downpayment to start · Balance by 4th session · Full payment = FREE facial of your choice</span>':'';
-          html+=`<button class="svc-btn ${sel}" onclick="selectService('${pkgId}','${p.name.replace(/'/g,"\\'")}',${p.price})">
-            ${sel?'<span style="float:right;color:var(--gold-dk);font-size:14px;">✓</span>':''}
-            <span class="svc-name">${p.name}</span>
-            ${p.includes?`<span class="svc-desc">Includes: ${p.includes}</span>`:p.description?`<span class="svc-desc">${p.description}</span>`:''}
-            <span class="svc-price">${fmtPrice(p.price)} · ${sessLabel}</span>
-            ${badge}${terms}
-          </button>`;
+        // Group packages by their 'group' field (e.g. Diode Hair Removal, Carbon Laser, Pico Laser, Exilis)
+        const pkgGroupMap={};
+        tabPkgs.forEach(p=>{const g=p.group||'Packages';if(!pkgGroupMap[g])pkgGroupMap[g]=[];pkgGroupMap[g].push(p);});
+        Object.entries(pkgGroupMap).forEach(([grpName,grpPkgs])=>{
+          html+=`<div class="subcat-hdr">${grpName} Packages</div><div class="svc-grid" style="margin-top:8px;">`;
+          grpPkgs.forEach(p=>{
+            const pkgId='pkg_'+p.id;
+            const sel=booking.services.some(s=>s.id===pkgId)?'sel':'';
+            const paid=p.sessions||5;
+            const free=p.freeSessions||0;
+            const total=paid+free;
+            const sessLabel=free>0?`${paid}+${free} free sessions (${total} total)`:`${total} sessions`;
+            let badge='';
+            if(free===1) badge='<span class="save-badge">🎁 Get 1 FREE session</span>';
+            else if(free===2) badge='<span class="save-badge">🎁 Get 2 FREE sessions</span>';
+            else if(free>0) badge=`<span class="save-badge">🎁 Get ${free} FREE sessions</span>`;
+            if(p.saves>0) badge+=` <span class="save-badge">💰 Save ${fmtPrice(p.saves)}</span>`;
+            const fullName=`${p.name} — ${grpName}`;
+            html+=`<button class="svc-btn ${sel}" onclick="selectService('${pkgId}','${fullName.replace(/'/g,"\\'")}',${p.price})">
+              ${sel?'<span style="float:right;color:var(--gold-dk);font-size:14px;">✓</span>':''}
+              <span class="svc-name">${p.name}</span>
+              <span class="svc-price">${fmtPrice(p.price)} · ${sessLabel}</span>
+              ${badge}
+              <span class="pay-terms">50% downpayment to start · Balance by 4th session · Full payment = FREE facial of your choice</span>
+            </button>`;
+          });
+          html+=`</div>`;
         });
-        html+=`</div>`;
       }
     }
   }
@@ -1153,7 +1145,7 @@ async function submitBooking(){
   // Safety timeout — show success after 8 seconds regardless
   // Safety timeout — will show success if network is slow
   let ref = 'GB'+String(Math.floor(Math.random()*100000000)).padStart(8,'0');
-  const timeout=setTimeout(()=>{try{showSuccess(ref);sendConfirmationEmail({...appt,client:booking.name,name:booking.name},ref);}catch(e){} },8000);
+  const timeout=setTimeout(()=>{try{window.booking=window.booking||{ref};showSuccess(ref);sendConfirmationEmail({ref,client:booking.name,name:booking.name,date:booking.date,time:booking.time,service:booking.service,price:booking.servicePrice},ref);}catch(e){} },8000);
 
   // Prefer explicit global selections if available
   const selSvc = (window && window.selectedService) ? window.selectedService : (booking.services[0]||null);
@@ -1167,19 +1159,19 @@ async function submitBooking(){
     client:booking.name,
     phone:booking.phone,
     email:booking.email||'',
-    // single service fields (backwards compat — first/primary service name; price = total)
     service: booking.services.length ? booking.services[0].name : booking.service,
-    price: booking.servicePrice,
-    // preserve full services array and totals
     services:booking.services,
+    price: booking.servicePrice,
     totalPrice:booking.servicePrice,
     finalPrice:booking.finalPrice!=null?booking.finalPrice:booking.servicePrice,
-    staff:booking.staff||'',
-    aesthetician:combo?(booking.aesthetician||''):undefined,
-    nailTech:combo?(booking.nailTech||''):undefined,
+    promoApplied:booking.promoApplied||null,
+    discountAmount:booking.discountAmount||0,
     date:selDate,
     time:selTime,
     duration:booking.duration||60,
+    staff:booking.staff||'',
+    aesthetician:combo?(booking.aesthetician||''):undefined,
+    nailTech:combo?(booking.nailTech||''):undefined,
     serviceType:svcMeta.type,
     groupSize:booking.groupSize||1,
     source:'online',
@@ -1189,27 +1181,23 @@ async function submitBooking(){
     ref,
     createdAt:new Date().toISOString()
   };
-  // promo fields (if present on booking)
-  if(booking.promoApplied){
-    appt.promoApplied = booking.promoApplied;
-    if(booking.originalPrice!=null) appt.originalPrice = booking.originalPrice;
-    if(booking.discountAmount!=null) appt.discountAmount = booking.discountAmount;
-    if(booking.finalPrice!=null) appt.finalPrice = booking.finalPrice;
-  }
   console.log('Prepared booking payload', appt);
   try{
     if(db){
-      // Use Firebase push() — generates unique key
       const pushRes = await db.ref('gb/bookings').push(appt);
       console.log('Firebase push result key:', pushRes && pushRes.key);
     } else {
       console.log('No Firebase DB available — simulated push', appt);
     }
+    window.booking = appt;
+    console.log('Booking saved:', appt);
     clearTimeout(timeout);
     showSuccess(ref);
     sendConfirmationEmail({...appt, client: booking.name, name: booking.name}, ref);
   }catch(e){
     console.error('Booking error:',e);
+    window.booking = appt;
+    console.log('Booking saved (fallback):', appt);
     clearTimeout(timeout);
     showSuccess(ref);
     sendConfirmationEmail({...appt, client: booking.name, name: booking.name}, ref);
