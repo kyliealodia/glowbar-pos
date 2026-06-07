@@ -262,6 +262,8 @@ const CATEGORY_TABS = [
   {id:'tattoo',  label:'Tattoo Laser',         icon:'🖋',
     test:p=>{ const c=(p.cat||'').toLowerCase(),n=(p.name||'').toLowerCase();
       return c.includes('ink')||n.includes('tattoo'); }},
+  {id:'glow_clear', label:'Glow Clear',       icon:'🌿',
+    test:p=>{ return (p.cat||'').toLowerCase()==='glow clear'; }},
 ];
 
 function getCatTabId(p){
@@ -372,12 +374,17 @@ const DEMO_DATA = {
     {id:218,name:'Brazilian',cat:'Hair Waxing',price:1000,durationMins:30,inPOS:true,description:'Complete intimate area hair removal for lasting smoothness'},
     // ── GLOW FACIALS ──
     {id:301,name:'Regular Facial',cat:'Glow Facials',subcat:'Facials',price:700,durationMins:60,inPOS:true,description:'Deep cleansing with steam, extractions, and moisturizing'},
-    {id:302,name:'Whitening Facial',cat:'Glow Facials',subcat:'Facials',price:999,durationMins:75,inPOS:true,description:'Brightening treatment to even skin tone and lighten dark spots'},
+    {id:302,name:'Whitening Facial',cat:'Glow Facials',subcat:'Facials',price:900,durationMins:75,inPOS:true,description:'Brightening treatment to even skin tone and lighten dark spots'},
     {id:303,name:'Anti-Acne Facial',cat:'Glow Facials',subcat:'Facials',price:1000,durationMins:75,inPOS:true,description:'Clarifying facial to target breakouts, excess oil, and blemishes'},
     {id:304,name:'Anti-Aging Facial',cat:'Glow Facials',subcat:'Facials',price:900,durationMins:75,inPOS:true,description:'Firming and lifting facial to reduce fine lines and wrinkles'},
+    {id:309,name:'Signature Glow Facial',cat:'Glow Facials',subcat:'Facials',price:1500,durationMins:90,inPOS:true,description:'Signature multi-step facial for deep radiance and glow'},
+    {id:310,name:'Diamond Peel Facial',cat:'Glow Facials',subcat:'Facials',price:1000,durationMins:75,inPOS:true,description:'Microdermabrasion facial to exfoliate, refine pores, and brighten skin'},
     // ── GLOW FACIALS — Add-ons ──
     {id:306,name:'LED Therapy',cat:'Glow Facials',subcat:'Add-ons',price:200,durationMins:15,inPOS:true,description:'Light therapy to boost collagen and calm inflammation'},
     {id:308,name:'Collagen Mask',cat:'Glow Facials',subcat:'Add-ons',price:250,durationMins:20,inPOS:true,description:'Intensive collagen mask for deep hydration and firmness'},
+    {id:311,name:'Moisturizing Mask',cat:'Glow Facials',subcat:'Add-ons',price:200,durationMins:15,inPOS:true,description:'Hydrating mask add-on for soft and supple skin'},
+    {id:312,name:'Whitening Mask',cat:'Glow Facials',subcat:'Add-ons',price:250,durationMins:15,inPOS:true,description:'Brightening mask add-on to even skin tone and reduce dark spots'},
+    {id:313,name:'24K Gold Mask',cat:'Glow Facials',subcat:'Add-ons',price:300,durationMins:20,inPOS:true,description:'Luxurious gold mask add-on for anti-aging and radiance boost'},
     // ── GLOW SKIN — Skin Rejuvenation ──
     {id:401,name:'Skin Rejuvenation — Single',cat:'Glow Skin',subcat:'Skin Rejuvenation',price:1000,durationMins:45,inPOS:true,description:'Laser-assisted treatment to lighten, smooth, and rejuvenate skin'},
     {id:402,name:'Underarms Rejuvenation',cat:'Glow Skin',subcat:'Skin Rejuvenation',price:1200,durationMins:20,inPOS:true,description:'Skin lightening and smoothing treatment for underarms'},
@@ -420,6 +427,9 @@ const DEMO_DATA = {
     {id:610,name:'Love Handle Exilis',cat:'Exilis Glow',price:2200,durationMins:40,inPOS:true,description:'Targeted RF to reduce love handles and flanks'},
     {id:611,name:'Buttocks Exilis',cat:'Exilis Glow',price:2400,durationMins:40,inPOS:true,description:'Exilis RF lifting and firming for the buttocks'},
     {id:612,name:'Lower Leg Exilis',cat:'Exilis Glow',price:1600,durationMins:40,inPOS:true,description:'RF contouring and tightening for the lower legs'},
+    // ── GLOW CLEAR — Wart Removal ──
+    {id:701,name:'Face Unli',cat:'Glow Clear',price:1500,durationMins:60,inPOS:true,description:'Unlimited wart removal for the face'},
+    {id:702,name:'Face and Neck Unli',cat:'Glow Clear',price:2500,durationMins:75,inPOS:true,description:'Unlimited wart removal for face and neck'},
   ],
   packages:[
     // ── Diode Hair Removal (5+1 free) ──
@@ -582,51 +592,30 @@ async function loadData(){
 // ── STEP 1: SERVICE ──
 function showStep1(){
   setStep(1);
-  // nailServices and waxingServices are intentionally empty here to prevent Firebase from adding these categories
-  const nailServices = [];
-  const waxingServices = [];
-
-  // Filter to bookable services only
-  const services = DATA.products.filter(p=>
-    p.inPOS!==false && p.active!==false && p.available!==false && p.unavailable!==true
-  );
 
   let html = `<div class="card">
     <div class="card-title">Choose a Service</div>
     <div class="card-sub">Select the treatment you'd like to book.</div>`;
 
-  if(!services.length){
-    html += `<div class="notice" style="text-align:center;padding:20px;">
-      <div style="font-size:32px;margin-bottom:10px;">🌸</div>
-      <div style="font-weight:600;margin-bottom:6px;">Services coming soon</div>
-      <div style="font-size:13px;color:var(--ink3);">Our service menu is being set up. Please contact us directly to book your appointment.</div>
-    </div>`;
-  } else {
-    // Build tab map: tabId -> list of services
-    const tabMap = {};
-    services.forEach(p=>{
-      const tid=getCatTabId(p);
-      if(!tabMap[tid]) tabMap[tid]=[];
-      tabMap[tid].push(p);
-    });
+  {
+    // All tabs are fully hardcoded from DEMO_DATA — Firebase cannot inject services into any tab
+    const SPA_IDS = new Set([105, 106, 130, 131, 132]);
+    const tabMap = {
+      nails:      DEMO_DATA.products.filter(p => p.cat==='Glow Nails' && !SPA_IDS.has(p.id)),
+      spa:        DEMO_DATA.products.filter(p => SPA_IDS.has(p.id)),
+      waxing:     DEMO_DATA.products.filter(p => p.cat==='Hair Waxing'),
+      facial:     DEMO_DATA.products.filter(p => p.cat==='Glow Facials'),
+      diode:      DEMO_DATA.products.filter(p => p.subcat==='Diode Laser'),
+      pico:       DEMO_DATA.products.filter(p => p.subcat==='Pico Laser'),
+      exilis:     DEMO_DATA.products.filter(p => p.cat==='Exilis Glow' && p.id >= 603),
+      tattoo:     DEMO_DATA.products.filter(p => p.id===504),
+      glow_clear: DEMO_DATA.products.filter(p => p.cat==='Glow Clear'),
+    };
 
-    // Nail services are hardcoded only. Prevent Firebase from adding any nail services.
-    if(tabMap['nails']){
-      tabMap['nails'] = nailServices.concat(DEMO_DATA.products.filter(isNailService));
-    }
-    if(tabMap['waxing']){
-      tabMap['waxing'] = waxingServices.concat(DEMO_DATA.products.filter(isWaxService));
-    }
-    // Facial services are hardcoded only. Prevent Firebase from adding extra facial services.
-    if(tabMap['facial']){
-      tabMap['facial'] = DEMO_DATA.products.filter(isFacialService);
-    }
-
-    // Build tabs in preferred order + any extras
+    // Build tabs in preferred order
     const pkgs=DATA.packages.filter(p=>p.active!==false);
     const orderedTabs=[];
-    CATEGORY_TABS.forEach(t=>{ if(tabMap[t.id]) orderedTabs.push({...t,services:tabMap[t.id]}); });
-    // Packages are shown inside their parent category tabs — no separate Packages tab
+    CATEGORY_TABS.forEach(t=>{ if(tabMap[t.id]&&tabMap[t.id].length) orderedTabs.push({...t,services:tabMap[t.id]}); });
 
     // Default active tab
     if(!activeSvcCat||!orderedTabs.find(t=>t.id===activeSvcCat)) activeSvcCat=orderedTabs[0]?.id||null;
@@ -662,7 +651,7 @@ function showStep1(){
     const activeTab=orderedTabs.find(t=>t.id===activeSvcCat);
     if(activeTab){
       const isLaserTab=['diode','rejuv','pico','exilis','tattoo'].includes(activeSvcCat);
-      const tabPkgs=(activeSvcCat==='nails' ? [] : pkgs.filter(p=>getPkgTabId(p)===activeSvcCat));
+      const tabPkgs=[];
       tabPkgs.sort((a,b)=>Number(a.id)-Number(b.id));
       const subcatMap={};
       activeTab.services.forEach(p=>{
