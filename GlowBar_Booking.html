@@ -230,7 +230,7 @@ let DATA = { products:[], packages:[], users:[], bookings:[], settings:{
   breakEnd:'',
   partTimer:{name:'',workDays:[],startTime:'09:00',endTime:'17:00'}
 }};
-let booking = { services:[], service:'', serviceId:null, servicePrice:0, duration:60, staff:'', staffColor:'', aesthetician:'', nailTech:'', date:'', time:'', name:'', phone:'', email:'', notes:'', groupSize:1 };
+let booking = { services:[], service:'', serviceId:null, servicePrice:0, originalPrice:null, discountAmount:0, finalPrice:null, promoApplied:null, duration:60, staff:'', staffColor:'', aesthetician:'', nailTech:'', date:'', time:'', name:'', phone:'', email:'', notes:'', groupSize:1 };
 let calYear, calMonth;
 let activeSvcCat = null; // currently active category tab id
 const TIMES = ['09:00','09:30','10:00','10:30','11:00','11:30','12:00','12:30','13:00','13:30','14:00','14:30','15:00','15:30','16:00','16:30','17:00','17:30','18:00'];
@@ -315,6 +315,45 @@ function isComboBooking(){
 }
 
 function fmtPrice(n){ return '₱'+(Math.round((n||0)*100)/100).toLocaleString('en-PH'); }
+
+// ── PROMO ENGINE ──
+// Returns the active promo for a given tab based on today's date, or null.
+function getActivePromo(tabId){
+  const d=new Date();
+  const ymd=d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate();
+  const major=new Set(['facial','waxing','diode','pico','exilis','glow_clear','tattoo']);
+  const nailSpa=new Set(['nails','spa']);
+  if(ymd<20260609) return {label:'30% OFF Pre-Opening Special',pct:30};
+  if(ymd>=20260610&&ymd<=20260623){
+    if(major.has(tabId)) return {label:'20% OFF Grand Opening',pct:20};
+    if(ymd<=20260616&&nailSpa.has(tabId)) return {label:'20% OFF Grand Opening — Nails & Spa',pct:20};
+  }
+  return null;
+}
+// Returns any active promo (for the banner) regardless of tab.
+function getGlobalPromoBanner(){
+  const d=new Date();
+  const ymd=d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate();
+  if(ymd<20260609) return '🎉 Pre-Opening Special — 30% OFF all services! Book before June 9.';
+  if(ymd>=20260610&&ymd<=20260616) return '🎉 Grand Opening — 20% OFF all services!';
+  if(ymd>=20260617&&ymd<=20260623) return '🎉 Grand Opening — 20% OFF facials, waxing, laser, Exilis, and more!';
+  return null;
+}
+function _recomputeBookingTotals(){
+  booking.service=booking.services.map(s=>s.name).join(', ');
+  booking.servicePrice=booking.services.reduce((t,s)=>t+s.price,0);
+  booking.serviceId=booking.services.length===1?booking.services[0].id:null;
+  booking.duration=Math.max(booking.services.reduce((t,s)=>t+(s.durationMins||60),0),30);
+  const origTotal=booking.services.reduce((t,s)=>t+(s.originalPrice||s.price),0);
+  if(origTotal>booking.servicePrice){
+    booking.originalPrice=origTotal;
+    booking.discountAmount=origTotal-booking.servicePrice;
+    booking.finalPrice=booking.servicePrice;
+    booking.promoApplied=booking.services.find(s=>s.promo)?.promo||null;
+  } else {
+    booking.originalPrice=null; booking.discountAmount=0; booking.finalPrice=null; booking.promoApplied=null;
+  }
+}
 function initials(n){ return (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase(); }
 
 function setStep(n){
@@ -608,6 +647,10 @@ function showStep1(){
     // Default active tab
     if(!activeSvcCat||!orderedTabs.find(t=>t.id===activeSvcCat)) activeSvcCat=orderedTabs[0]?.id||null;
 
+    // Promo banner
+    const _banner=getGlobalPromoBanner();
+    if(_banner) html+=`<div style="background:linear-gradient(135deg,#b8860b,#d4a017);color:#fff;border-radius:10px;padding:10px 16px;margin-bottom:14px;font-size:13px;font-weight:600;text-align:center;letter-spacing:0.3px;">${_banner}</div>`;
+
     // Category dropdown
     html+=`<div class="cat-select-wrap">
       <select class="cat-select" onchange="selectCat(this.value)">
@@ -650,18 +693,23 @@ function showStep1(){
         if(a==='Packages') return 1; if(b==='Packages') return -1; return 0;
       });
       const useSubcats=subcats.length>1||(subcats.length===1&&subcats[0]);
+      const _tabPromo=getActivePromo(activeSvcCat);
       subcats.forEach((sc,si)=>{
         if(useSubcats&&sc) html+=`<div class="subcat-hdr">${sc}</div>`;
         html+=`<div class="svc-grid" style="${si>0?'margin-top:8px;':''}">`;
         subcatMap[sc].forEach(p=>{
-          const sel=booking.services.some(s=>s.id===p.id)?'sel':'';
-          const hasSave=p.saves>0;
+          const sel=booking.services.some(s=>String(s.id)===String(p.id))?'sel':'';
+          const discPrice=_tabPromo?Math.round(p.price*(1-_tabPromo.pct/100)):p.price;
+          const saveAmt=p.price-discPrice;
           html+=`<button class="svc-btn ${sel}" onclick="selectService('${p.id}','${p.name.replace(/'/g,"\\'")}',${p.price},${p.durationMins||60})">
             ${sel?'<span style="float:right;color:var(--gold-dk);font-size:14px;">✓</span>':''}
             <span class="svc-name">${p.name}</span>
             ${p.includes?`<span class="svc-desc">Includes: ${p.includes}</span>`:p.description?`<span class="svc-desc">${p.description}</span>`:''}
-            <span class="svc-price">${fmtPrice(p.price)}</span>
-            ${hasSave?`<span class="save-badge">💰 Save ${fmtPrice(p.saves)}</span>`:''}
+            ${_tabPromo
+              ?`<span class="svc-price"><s style="color:var(--ink4);font-size:11px;font-weight:400;">${fmtPrice(p.price)}</s> <strong style="color:var(--gold-dk);">${fmtPrice(discPrice)}</strong></span>
+                <span class="save-badge">🎁 Save ${fmtPrice(saveAmt)} — ${_tabPromo.label}</span>`
+              :`<span class="svc-price">${fmtPrice(p.price)}</span>
+                ${p.saves>0?`<span class="save-badge">💰 Save ${fmtPrice(p.saves)}</span>`:''}`}
           </button>`;
         });
         html+=`</div>`;
@@ -674,21 +722,27 @@ function showStep1(){
           html+=`<div class="subcat-hdr">${grpName} Packages</div><div class="svc-grid" style="margin-top:8px;">`;
           grpPkgs.forEach(p=>{
             const pkgId='pkg_'+p.id;
-            const sel=booking.services.some(s=>s.id===pkgId)?'sel':'';
+            const sel=booking.services.some(s=>String(s.id)===pkgId)?'sel':'';
             const paid=p.sessions||5;
             const free=p.freeSessions||0;
             const total=paid+free;
             const sessLabel=free>0?`${paid}+${free} free sessions (${total} total)`:`${total} sessions`;
+            const pkgPromo=getActivePromo(activeSvcCat);
+            const pkgDiscPrice=pkgPromo?Math.round(p.price*(1-pkgPromo.pct/100)):p.price;
+            const pkgSaveAmt=p.price-pkgDiscPrice;
             let badge='';
             if(free===1) badge='<span class="save-badge">🎁 Get 1 FREE session</span>';
             else if(free===2) badge='<span class="save-badge">🎁 Get 2 FREE sessions</span>';
             else if(free>0) badge=`<span class="save-badge">🎁 Get ${free} FREE sessions</span>`;
-            if(p.saves>0) badge+=` <span class="save-badge">💰 Save ${fmtPrice(p.saves)}</span>`;
+            if(pkgPromo) badge+=` <span class="save-badge">🎁 Save ${fmtPrice(pkgSaveAmt)} — ${pkgPromo.label}</span>`;
+            else if(p.saves>0) badge+=` <span class="save-badge">💰 Save ${fmtPrice(p.saves)}</span>`;
             const fullName=`${p.name} — ${grpName}`;
             html+=`<button class="svc-btn ${sel}" onclick="selectService('${pkgId}','${fullName.replace(/'/g,"\\'")}',${p.price})">
               ${sel?'<span style="float:right;color:var(--gold-dk);font-size:14px;">✓</span>':''}
               <span class="svc-name">${p.name}</span>
-              <span class="svc-price">${fmtPrice(p.price)} · ${sessLabel}</span>
+              ${pkgPromo
+                ?`<span class="svc-price"><s style="color:var(--ink4);font-size:11px;font-weight:400;">${fmtPrice(p.price)}</s> <strong style="color:var(--gold-dk);">${fmtPrice(pkgDiscPrice)}</strong> · ${sessLabel}</span>`
+                :`<span class="svc-price">${fmtPrice(p.price)} · ${sessLabel}</span>`}
               ${badge}
               <span class="pay-terms">50% downpayment to start · Balance by 4th session · Full payment = FREE facial of your choice</span>
             </button>`;
@@ -715,12 +769,17 @@ function selectService(id, name, price, durationMins){
   if(_idx>=0){
     booking.services.splice(_idx,1);
   } else {
-    booking.services.push({id,name,price,durationMins:durationMins||60});
+    const promo=getActivePromo(activeSvcCat);
+    const discountedPrice=promo?Math.round(price*(1-promo.pct/100)):price;
+    booking.services.push({
+      id, name,
+      price:discountedPrice,
+      originalPrice:promo?price:null,
+      promo:promo?promo.label:null,
+      durationMins:durationMins||60
+    });
   }
-  booking.service=booking.services.map(s=>s.name).join(', ');
-  booking.servicePrice=booking.services.reduce((t,s)=>t+s.price,0);
-  booking.serviceId=booking.services.length===1?booking.services[0].id:null;
-  booking.duration=Math.max(booking.services.reduce((t,s)=>t+(s.durationMins||60),0),30);
+  _recomputeBookingTotals();
   // Expose selected service(s) globally for other steps / integrations
   if(window){
     if(booking.services.length===1){
@@ -741,10 +800,8 @@ function selectService(id, name, price, durationMins){
 }
 
 function removeService(id){
-  booking.services=booking.services.filter(s=>s.id!==id);
-  booking.service=booking.services.map(s=>s.name).join(', ');
-  booking.servicePrice=booking.services.reduce((t,s)=>t+s.price,0);
-  booking.duration=Math.max(booking.services.reduce((t,s)=>t+(s.durationMins||60),0),30);
+  booking.services=booking.services.filter(s=>String(s.id)!==String(id));
+  _recomputeBookingTotals();
   showStep1();
 }
 
@@ -882,13 +939,14 @@ function renderCal(){
     const isPast=dt<today;
     const isTooFar=dt>maxDate;
     const isWeekdayClosed=!openDays.includes(dt.getDay());
-    const isClosedDate=closedDates.includes(ds);
+    const isGrandOpeningDay=ds==='2026-06-09';
+    const isClosedDate=isGrandOpeningDay||closedDates.includes(ds);
     const isTod=dt.toDateString()===today.toDateString();
     const isSel=booking.date===ds;
     const disabled=isPast||isTooFar||isWeekdayClosed||isClosedDate;
-    const clickFn=disabled?'':`pickDate('${ds}')`;
+    const clickFn=isGrandOpeningDay?`alert('June 9 is our Grand Opening Celebration Day — services begin June 10! Please select another date.')`:disabled?'':`pickDate('${ds}')`;
     let cls=`date-btn${isPast||isTooFar?' past':isClosedDate?' closed':isWeekdayClosed?' past':''}${isTod?' today':''}${isSel?' sel':''}`;
-    let title=isClosedDate?'Closed — Holiday/Rest day':isWeekdayClosed?'Closed':isTooFar?'Outside booking window':'Available';
+    let title=isGrandOpeningDay?'Grand Opening Day — services begin June 10':isClosedDate?'Closed — Holiday/Rest day':isWeekdayClosed?'Closed':isTooFar?'Outside booking window':'Available';
     html+=`<button class="${cls}" onclick="${clickFn}" title="${title}">${i}${isClosedDate?'<br><span style=\'font-size:7px;color:#B84040;\'>✕</span>':isWeekdayClosed?'<br><span style=\'font-size:7px;color:#B84040;\'>✕</span>':''}</button>`;
   }
   grid.innerHTML=html;
@@ -1116,9 +1174,9 @@ function goStep4(){
     <div class="card-sub">Please review the details below before confirming.</div>
     <div class="summary-row"><span class="summary-lbl">Service${booking.services.length>1?'s':''}</span><span class="summary-val">${booking.services.map(s=>`${s.name} — ${fmtPrice(s.price)}`).join('<br>')}</span></div>
     ${booking.promoApplied
-      ?`<div class="summary-row"><span class="summary-lbl">Subtotal</span><span class="summary-val">${fmtPrice(booking.servicePrice)}</span></div>
+      ?`<div class="summary-row"><span class="summary-lbl">Subtotal</span><span class="summary-val"><s style="color:var(--ink4);font-size:12px;">${fmtPrice(booking.originalPrice||booking.servicePrice)}</s></span></div>
         <div class="summary-row"><span class="summary-lbl">Promo (${booking.promoApplied})</span><span class="summary-val" style="color:#2e7d32;">−${fmtPrice(booking.discountAmount||0)}</span></div>
-        <div class="summary-row"><span class="summary-lbl">Total</span><span class="summary-val" style="color:var(--gold-dk);font-weight:600;">${fmtPrice(booking.finalPrice!=null?booking.finalPrice:booking.servicePrice)}</span></div>`
+        <div class="summary-row"><span class="summary-lbl">Total</span><span class="summary-val" style="color:var(--gold-dk);font-weight:600;">${fmtPrice(booking.servicePrice)}</span></div>`
       :`<div class="summary-row"><span class="summary-lbl">Total</span><span class="summary-val" style="color:var(--gold-dk);font-weight:600;">${fmtPrice(booking.servicePrice)}</span></div>`}
     <div class="summary-row"><span class="summary-lbl">Date</span><span class="summary-val">${dateStr}</span></div>
     <div class="summary-row"><span class="summary-lbl">Time</span><span class="summary-val">${booking.time}${booking.duration?' ('+booking.duration+' min)':''}</span></div>
@@ -1165,6 +1223,7 @@ async function submitBooking(){
     totalPrice:booking.servicePrice||0,
     finalPrice:booking.finalPrice!=null?booking.finalPrice:booking.servicePrice||0,
     promoApplied:booking.promoApplied||null,
+    originalPrice:booking.originalPrice||null,
     discountAmount:booking.discountAmount||0,
     date:selDate||'',
     time:selTime||'',
