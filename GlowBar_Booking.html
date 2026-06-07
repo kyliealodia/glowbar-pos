@@ -288,6 +288,9 @@ function isNailService(p){
 function isWaxService(p){
   return getCatTabId(p) === 'waxing';
 }
+function isFacialService(p){
+  return getCatTabId(p) === 'facial';
+}
 
 function mergeSettings(defaults, incoming){
   if(!incoming || typeof incoming !== 'object' || Array.isArray(incoming)) return defaults;
@@ -372,10 +375,8 @@ const DEMO_DATA = {
     {id:302,name:'Whitening Facial',cat:'Glow Facials',subcat:'Facials',price:999,durationMins:75,inPOS:true,description:'Brightening treatment to even skin tone and lighten dark spots'},
     {id:303,name:'Anti-Acne Facial',cat:'Glow Facials',subcat:'Facials',price:1000,durationMins:75,inPOS:true,description:'Clarifying facial to target breakouts, excess oil, and blemishes'},
     {id:304,name:'Anti-Aging Facial',cat:'Glow Facials',subcat:'Facials',price:900,durationMins:75,inPOS:true,description:'Firming and lifting facial to reduce fine lines and wrinkles'},
-    {id:305,name:'HydraFacial',cat:'Glow Facials',subcat:'Facials',price:2000,durationMins:90,inPOS:true,description:'Multi-step facial with deep cleansing, exfoliation, and serum infusion'},
     // ── GLOW FACIALS — Add-ons ──
     {id:306,name:'LED Therapy',cat:'Glow Facials',subcat:'Add-ons',price:200,durationMins:15,inPOS:true,description:'Light therapy to boost collagen and calm inflammation'},
-    {id:307,name:'High Frequency',cat:'Glow Facials',subcat:'Add-ons',price:150,durationMins:10,inPOS:true,description:'Skin renewal treatment to combat acne and stimulate cell turnover'},
     {id:308,name:'Collagen Mask',cat:'Glow Facials',subcat:'Add-ons',price:250,durationMins:20,inPOS:true,description:'Intensive collagen mask for deep hydration and firmness'},
     // ── GLOW SKIN — Skin Rejuvenation ──
     {id:401,name:'Skin Rejuvenation — Single',cat:'Glow Skin',subcat:'Skin Rejuvenation',price:1000,durationMins:45,inPOS:true,description:'Laser-assisted treatment to lighten, smooth, and rejuvenate skin'},
@@ -616,6 +617,10 @@ function showStep1(){
     if(tabMap['waxing']){
       tabMap['waxing'] = waxingServices.concat(DEMO_DATA.products.filter(isWaxService));
     }
+    // Facial services are hardcoded only. Prevent Firebase from adding extra facial services.
+    if(tabMap['facial']){
+      tabMap['facial'] = DEMO_DATA.products.filter(isFacialService);
+    }
 
     // Build tabs in preferred order + any extras
     const pkgs=DATA.packages.filter(p=>p.active!==false);
@@ -724,12 +729,8 @@ function selectCat(tabId){
 }
 
 function selectService(id, name, price, durationMins){
-  const idx=booking.services.findIndex(s=>s.id===id);
-  if(idx>=0){
-    booking.services.splice(idx,1);
-  } else {
-    booking.services.push({id,name,price,durationMins:durationMins||60});
-  }
+  // Always replace — clicking any service card clears the previous selection
+  booking.services = [{id,name,price,durationMins:durationMins||60}];
   booking.service=booking.services.map(s=>s.name).join(', ');
   booking.servicePrice=booking.services.reduce((t,s)=>t+s.price,0);
   booking.serviceId=booking.services.length===1?booking.services[0].id:null;
