@@ -703,14 +703,7 @@ html{height:-webkit-fill-available;}
                 <input class="disc-inp" type="number" id="tipCustomInp" placeholder="Custom tip amount" min="0" oninput="recalc()">
               </div>
               <div class="tot-row" id="tipRow" style="display:none;"><span>Tip</span><span id="cartTip">₱0.00</span></div>
-              <div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;margin-bottom:2px;">
-                <span style="font-size:12px;color:var(--ink2);">VAT (12%)</span>
-                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
-                  <input type="checkbox" id="vatToggle" onchange="recalc()" style="accent-color:var(--gold);width:14px;height:14px;">
-                  <span style="font-size:11px;color:var(--ink3);">Include VAT</span>
-                </label>
-              </div>
-              <div class="tot-row" id="vatRow" style="display:none;"><span>VAT (12%)</span><span id="cartVat">₱0.00</span></div>
+              <div class="tot-row" id="vatRow" style="display:none;"><span>VAT</span><span id="cartVat">₱0.00</span></div>
               <div class="tot-row total"><span>TOTAL</span><span id="cartTotal">₱0.00</span></div>
               <div id="loyaltyRow" style="display:none;padding:6px 0;border-top:1px dashed var(--border);">
                 <button class="btn btn-outline btn-sm" style="width:100%;font-size:11px;" onclick="openLoyalty()">✨ Redeem Loyalty Points (<span id="loyaltyPtsAvail">0</span> pts available)</button>
@@ -2161,18 +2154,23 @@ html{height:-webkit-fill-available;}
     <div style="font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:500;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--border);">🏥 Clinic Information</div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">Clinic Name</label><input class="form-input" id="ps-clinicName" placeholder="GlowBar Beauty Clinic"></div>
+      <div class="form-group"><label class="form-label">Tagline</label><input class="form-input" id="ps-tagline" placeholder="Beauty · Confidence · Glow"></div>
+    </div>
+    <div class="form-row">
       <div class="form-group"><label class="form-label">Phone Number</label><input class="form-input" id="ps-phone" type="tel" placeholder="0917 801 3197"></div>
-    </div>
-    <div class="form-row">
       <div class="form-group"><label class="form-label">Email Address</label><input class="form-input" id="ps-email" type="email" placeholder="hello@glowbarph.com"></div>
+    </div>
+    <div class="form-row">
       <div class="form-group"><label class="form-label">Address</label><input class="form-input" id="ps-address" placeholder="Brgy. Kaylaway, Nasugbu, Batangas"></div>
-    </div>
-    <div class="form-row">
       <div class="form-group"><label class="form-label">TIN Number</label><input class="form-input" id="ps-tin" placeholder="000-000-000-000"></div>
-      <div class="form-group"><label class="form-label">BIR Permit No.</label><input class="form-input" id="ps-birPermit" placeholder="e.g. 12345678"></div>
     </div>
     <div class="form-row">
+      <div class="form-group"><label class="form-label">BIR Permit No.</label><input class="form-input" id="ps-birPermit" placeholder="e.g. 12345678"></div>
       <div class="form-group"><label class="form-label">LGU Business Permit No.</label><input class="form-input" id="ps-lguPermit" placeholder="e.g. BP-2024-00123"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Currency</label><input class="form-input" id="ps-currency" placeholder="PHP"></div>
+      <div class="form-group"><label class="form-label">Default Staff Commission (%)</label><input class="form-input" type="number" id="ps-commission" placeholder="10" min="0" max="100"><div style="font-size:11px;color:var(--ink3);margin-top:4px;">Default rate for new staff. Each staff can override individually.</div></div>
     </div>
   </div>
 
@@ -4416,7 +4414,7 @@ function recalc(){
   if(tipMode==='custom') tipAmount=parseFloat(document.getElementById('tipCustomInp')?.value)||0;
   const tip=tipAmount;
   // VAT
-  const vatOn=document.getElementById('vatToggle')?.checked;
+  const vatOn=false;
   const vat=vatOn?afterDisc*0.12:0;
   const total=afterDisc+tip+vat;
   if(document.getElementById('cartSub'))document.getElementById('cartSub').textContent=fmtPrice(sub);
@@ -4452,7 +4450,7 @@ function _openPaymentCore(){
   const dv=parseFloat(document.getElementById('discInp').value)||0;
   const disc=discType==='pct'?afterSurge*(dv/100):Math.min(dv,afterSurge);
   const afterDisc=afterSurge-disc;
-  const vatOn=document.getElementById('vatToggle')?.checked;
+  const vatOn=false;
   const vat=vatOn?afterDisc*0.12:0;
   const total=afterDisc+vat;
   const cn=esc(selClient?selClient.name:'Walk-in Client');
@@ -4625,7 +4623,7 @@ function getCartBaseTotal(){
   const disc=discType==='pct'?sub*(dv/100):Math.min(dv,sub);
   const afterDisc=sub-disc;
   const tipAmt=tipMode==='custom'?parseFloat(document.getElementById('tipCustomInp')?.value)||0:tipAmount;
-  const vatOn=document.getElementById('vatToggle')?.checked;
+  const vatOn=false;
   const vat=vatOn?afterDisc*0.12:0;
   const dep=window._linkedDepositAmt||0;
   return Math.max(0,afterDisc+tipAmt+vat-dep);
@@ -4809,7 +4807,7 @@ function confirmPay(){
   if(scpwdEnabled&&!scpwdId){showToast('SC/PWD ID number is required','err');return;}
   const scpwdDiscAmt=scpwdEnabled?Math.round(afterDisc*0.20*100)/100:0;
   const afterScpwd=afterDisc-scpwdDiscAmt;
-  let vatOn=document.getElementById('vatToggle')?.checked;
+  const vatOn=false;
   if(scpwdEnabled) vatOn=false;
   const vat=vatOn?afterScpwd*0.12:0;
   const total=afterScpwd+tip+vat;
@@ -5050,7 +5048,6 @@ function confirmPay(){
   cart=[]; selClient=null; tipAmount=0; tipMode='none';
   document.getElementById('selClientTxt').textContent='Select client…';
   document.getElementById('discInp').value='';
-  document.getElementById('vatToggle').checked=false;
   document.getElementById('tipCustomWrap').style.display='none';
   ['0','50','100','Custom'].forEach(v=>{const el=document.getElementById('tip'+v);if(el)el.classList.remove('active');});
   document.getElementById('tip0')?.classList.add('active');
@@ -5065,7 +5062,6 @@ function clearCart(){
   const _el=id=>document.getElementById(id);
   if(_el('selClientTxt')) _el('selClientTxt').textContent='Select client…';
   if(_el('discInp')) _el('discInp').value='';
-  if(_el('vatToggle')) _el('vatToggle').checked=false;
   if(_el('tipCustomWrap')) _el('tipCustomWrap').style.display='none';
   if(_el('tipCustomInp')) _el('tipCustomInp').value='';
   ['0','50','100','Custom'].forEach(v=>{const b=_el('tip'+v);if(b)b.classList.remove('active');});
@@ -6032,21 +6028,46 @@ function updateContainerLabel(){
 
 // ── CLINIC SETTINGS PAGE ─────────────────────────────────────────
 function loadClinicSettingsPage(){
-  const cfg=S.settings||{};
+  // If Firebase returned no settings, write defaults now so they persist on next load
+  const hadNoSettings=!S.settings||Object.keys(S.settings).length===0;
+  if(hadNoSettings){
+    S.settings={
+      clinicName:'GlowBar Beauty Clinic',
+      tagline:'Beauty · Confidence · Glow',
+      clinicEmail:'hello@glowbarph.com',
+      businessAddress:'Brgy. Kaylaway, Nasugbu, Batangas',
+      openDays:[2,3,4,5,6,0],
+      openTime:'10:00',
+      closeTime:'19:00',
+      slotDuration:60,
+      maxStaff:2,
+      currency:'PHP',
+      orPrefix:'GB',
+      tin:'',
+      commission:10,
+      breakStart:'',
+      breakEnd:''
+    };
+    sync('settings');
+  }
+  const cfg=S.settings;
   document.getElementById('ps-clinicName').value=cfg.clinicName||'GlowBar Beauty Clinic';
+  document.getElementById('ps-tagline').value=cfg.tagline||'Beauty · Confidence · Glow';
   document.getElementById('ps-phone').value=cfg.clinicPhone||'';
-  document.getElementById('ps-email').value=cfg.clinicEmail||'';
-  document.getElementById('ps-address').value=cfg.businessAddress||'';
+  document.getElementById('ps-email').value=cfg.clinicEmail||'hello@glowbarph.com';
+  document.getElementById('ps-address').value=cfg.businessAddress||'Brgy. Kaylaway, Nasugbu, Batangas';
   document.getElementById('ps-tin').value=cfg.tin||'';
   document.getElementById('ps-birPermit').value=cfg.birPermit||'';
   document.getElementById('ps-lguPermit').value=cfg.lguPermit||'';
+  document.getElementById('ps-currency').value=cfg.currency||'PHP';
+  document.getElementById('ps-commission').value=String(cfg.commission!=null?cfg.commission:10);
   // Operating hours
-  const openDays=cfg.openDays||[1,2,3,4,5,6];
+  const openDays=cfg.openDays||[2,3,4,5,6,0];
   for(let i=0;i<7;i++){
     const cb=document.getElementById('ps-day-'+i);
     if(cb) cb.checked=openDays.includes(i);
   }
-  document.getElementById('ps-openTime').value=cfg.openTime||'09:00';
+  document.getElementById('ps-openTime').value=cfg.openTime||'10:00';
   document.getElementById('ps-closeTime').value=cfg.closeTime||'19:00';
   document.getElementById('ps-breakStart').value=cfg.breakStart||'';
   document.getElementById('ps-breakEnd').value=cfg.breakEnd||'';
@@ -6056,7 +6077,7 @@ function loadClinicSettingsPage(){
   document.getElementById('ps-slotDuration').value=String(cfg.slotDuration||30);
   renderPsClosedDates();
   // OR settings
-  document.getElementById('ps-orPrefix').value=cfg.orPrefix||'';
+  document.getElementById('ps-orPrefix').value=cfg.orPrefix||'GB';
   document.getElementById('ps-orStart').value=String(cfg.orStart||1);
 }
 
@@ -6110,12 +6131,15 @@ function saveClinicSettingsPage(){
   S.settings={
     ...(S.settings||{}),
     clinicName:document.getElementById('ps-clinicName').value.trim()||'GlowBar Beauty Clinic',
+    tagline:document.getElementById('ps-tagline').value.trim()||'Beauty · Confidence · Glow',
     clinicPhone:document.getElementById('ps-phone').value.trim(),
-    clinicEmail:document.getElementById('ps-email').value.trim(),
-    businessAddress:document.getElementById('ps-address').value.trim(),
+    clinicEmail:document.getElementById('ps-email').value.trim()||'hello@glowbarph.com',
+    businessAddress:document.getElementById('ps-address').value.trim()||'Brgy. Kaylaway, Nasugbu, Batangas',
     tin:document.getElementById('ps-tin').value.trim(),
     birPermit:document.getElementById('ps-birPermit').value.trim(),
     lguPermit:document.getElementById('ps-lguPermit').value.trim(),
+    currency:document.getElementById('ps-currency').value.trim()||'PHP',
+    commission:parseFloat(document.getElementById('ps-commission').value)||10,
     openDays,
     openTime,
     closeTime,
@@ -6124,7 +6148,7 @@ function saveClinicSettingsPage(){
     maxStaff:parseInt(document.getElementById('ps-maxStaff').value)||2,
     bookingWindowDays:parseInt(document.getElementById('ps-bookingWindow').value)||30,
     slotDuration:parseInt(document.getElementById('ps-slotDuration').value)||30,
-    orPrefix:document.getElementById('ps-orPrefix').value.trim(),
+    orPrefix:document.getElementById('ps-orPrefix').value.trim()||'GB',
     orStart:orStartNew,
     orCounter:S.settings?.orCounter||orStartNew,
     // Preserve existing fields not shown on this page
@@ -9828,7 +9852,23 @@ let editSopId=null;
 
 function initSOPs(){
   if(!S.sops) S.sops=[];
-  if(!S.settings) S.settings={openDays:[1,2,3,4,5,6],openTime:'09:00',closeTime:'19:00',slotDuration:60,maxStaff:2,clinicName:'GlowBar Beauty Clinic',breakStart:'',breakEnd:''};
+  if(!S.settings) S.settings={
+    clinicName:'GlowBar Beauty Clinic',
+    tagline:'Beauty · Confidence · Glow',
+    clinicEmail:'hello@glowbarph.com',
+    businessAddress:'Brgy. Kaylaway, Nasugbu, Batangas',
+    openDays:[2,3,4,5,6,0],
+    openTime:'10:00',
+    closeTime:'19:00',
+    slotDuration:60,
+    maxStaff:2,
+    currency:'PHP',
+    orPrefix:'GB',
+    tin:'',
+    commission:10,
+    breakStart:'',
+    breakEnd:''
+  };
   if(S.sops.length===0) S.sops=DEFAULT_SOPS;
 }
 
