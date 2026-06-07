@@ -785,6 +785,13 @@ html{height:-webkit-fill-available;}
                 <option value="">All staff</option>
               </select>
             </div>
+            <div class="form-group"><label class="form-label">Source</label>
+              <select class="form-select" id="bkFilterSource" onchange="renderBookings()">
+                <option value="">All sources</option>
+                <option value="online">Online</option>
+                <option value="pos">In-clinic</option>
+              </select>
+            </div>
             <button class="btn btn-gold" onclick="openNewAppt()" style="width:100%;margin-top:4px;">+ New Appointment</button>
             <button class="btn btn-outline" onclick="openClinicSettings()" style="width:100%;margin-top:6px;font-size:12px;">⚙ Clinic Hours & Settings</button>
           </div>
@@ -3455,6 +3462,15 @@ window.addEventListener('DOMContentLoaded',()=>{
       return defaultVal;
     }
 
+    function normalizeSettings(cfg){
+      if(!cfg) return cfg;
+      // Firebase stores JS arrays as numeric-key objects — convert back to arrays
+      if(cfg.openDays && !Array.isArray(cfg.openDays)) cfg.openDays=Object.values(cfg.openDays).map(Number);
+      if(cfg.closedDates && !Array.isArray(cfg.closedDates)) cfg.closedDates=Object.values(cfg.closedDates);
+      if(cfg.partTimer?.workDays && !Array.isArray(cfg.partTimer.workDays)) cfg.partTimer.workDays=Object.values(cfg.partTimer.workDays).map(Number);
+      return cfg;
+    }
+
     const onceKeys=['users','products','packages','rooms','transactions','deletedTransactions','messages','loginLogs','machines','sops','capital','settings'];
     let loaded=0;
 
@@ -3467,6 +3483,7 @@ window.addEventListener('DOMContentLoaded',()=>{
             S[key]=fbVal(val,[]);
           } else {
             S[key]=val||S[key];
+            if(key==='settings') normalizeSettings(S.settings);
           }
         }
         loaded++;
@@ -6406,6 +6423,7 @@ function renderBookings(){
   const dateF=document.getElementById('bkFilterDate')?.value||td();
   const statusF=document.getElementById('bkFilterStatus')?.value||'';
   const staffF=document.getElementById('bkFilterStaff')?.value||'';
+  const sourceF=document.getElementById('bkFilterSource')?.value||'';
   let bks=[...S.bookings];
 
   // Range filter
@@ -6432,18 +6450,23 @@ function renderBookings(){
 
   if(statusF) bks=bks.filter(b=>b.status===statusF);
   if(staffF) bks=bks.filter(b=>b.staff===staffF);
-  bks=bks.sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time));
+  if(sourceF) bks=bks.filter(b=>(b.source||'pos')===sourceF);
+  bks=bks.sort((a,b)=>(a.date||'').localeCompare(b.date||'')||(a.time||'').localeCompare(b.time||''));
   document.getElementById('bkCount').textContent=bks.length+' appointment'+(bks.length!==1?'s':'');
   const el=document.getElementById('bkList');
-  el.innerHTML=bks.length?bks.map(b=>`
+  el.innerHTML=bks.length?bks.map(b=>{
+    if(!b.client) return '';
+    return `
     <div class="bk-entry">
-      <div class="bk-time">${b.time}<div style="font-size:10px;color:var(--ink3);">${fmtDate(b.date)}</div></div>
+      <div class="bk-time">${b.time||'—'}<div style="font-size:10px;color:var(--ink3);">${fmtDate(b.date)}</div></div>
       <div style="flex:1;">
-        <div class="bk-client">${b.client}</div>
+        <div class="bk-client">${b.client}${b.source==='online'?` <span style="font-size:10px;background:rgba(201,168,76,0.12);color:var(--gold-dk);border-radius:5px;padding:1px 6px;font-weight:600;">🌐 Online</span>`:''}</div>
         <div class="bk-svc">${b.service} · ${b.staff||'Unassigned'}${b.seriesId?` <span style="font-size:10px;background:rgba(201,168,76,0.15);color:var(--gold-dk);border-radius:6px;padding:1px 6px;font-weight:600;">📅 Series ${b.seriesNum||''}/${b.seriesTotal||''}</span>`:''}</div>
+        ${b.source==='online'&&(b.phone||b.email)?`<div style="font-size:11px;color:var(--ink3);margin-top:2px;">${b.phone||''}${b.phone&&b.email?' · ':''}${b.email||''}</div>`:''}
+        ${b.ref?`<div style="font-size:10px;color:var(--ink4);">Ref: ${b.ref}</div>`:''}
         ${b.notes?`<div style="font-size:10px;color:var(--ink3);">${b.notes}</div>`:''}
         ${(()=>{if(!b.depositAmt)return'';const p=S.products.find(x=>x.name===b.service);const bal=p?.price?Math.max(0,p.price-b.depositAmt):null;return`<div style="font-size:10px;color:var(--success);margin-top:2px;">💰 Deposit: ${fmtPrice(b.depositAmt)}${bal!==null?` · Balance due: ${fmtPrice(bal)}`:''}</div>`;})()}
-        ${(()=>{if(b.status==='completed'||b.status==='cancelled')return'';const f=getApptInstFlag(b.client,b.date);return f?`<div style="font-size:10px;font-weight:600;color:${f.overdue?'var(--danger)':'var(--warn)'};margin-top:2px;">💳 Installment ${f.overdue?'overdue':'due'}: ${fmtPrice(f.total)}</div>`:''})()}
+        ${(()=>{try{if(b.status==='completed'||b.status==='cancelled')return'';const f=getApptInstFlag(b.client,b.date);return f?`<div style="font-size:10px;font-weight:600;color:${f.overdue?'var(--danger)':'var(--warn)'};margin-top:2px;">💳 Installment ${f.overdue?'overdue':'due'}: ${fmtPrice(f.total)}</div>`:''}catch(e){return''}})()}
       </div>
       <span class="pill pill-${b.status==='confirmed'?'green':b.status==='pending'?'amber':b.status==='completed'?'gray':'red'}">${cap(b.status)}</span>
       <div style="display:flex;gap:5px;margin-left:8px;flex-wrap:wrap;">
@@ -6454,7 +6477,7 @@ function renderBookings(){
         ${b.seriesId&&b.status!=='cancelled'&&b.status!=='completed'?`<button class="btn btn-danger btn-sm" style="font-size:10px;" onclick="cancelSeries('${b.seriesId}')">Cancel Series</button>`:''}
         <button class="btn btn-outline btn-sm" onclick="openApptDetail('${b.id}')">Edit</button>
       </div>
-    </div>`).join(''):'<div style="padding:30px;text-align:center;color:var(--ink3);font-size:13px;">No appointments found</div>';
+    </div>`;}).join(''):'<div style="padding:30px;text-align:center;color:var(--ink3);font-size:13px;">No appointments found</div>';
 }
 function updBk(id,status){
   const b=S.bookings.find(x=>String(x.id)===String(id));
