@@ -315,6 +315,7 @@ function isComboBooking(){
 }
 
 function fmtPrice(n){ return '₱'+(Math.round((n||0)*100)/100).toLocaleString('en-PH'); }
+function fmt12h(t){ if(!t) return ''; const [h,m]=t.split(':').map(Number); const ampm=h<12?'AM':'PM'; const hr=h%12||12; return `${hr}:${String(m).padStart(2,'0')} ${ampm}`; }
 
 // ── PROMO ENGINE ──
 // Returns the active promo for a given tab based on today's date, or null.
@@ -1149,7 +1150,7 @@ function goStep3(){
       </div>
     </div>
     <div class="form-group"><label class="form-label">Special Requests / Notes</label><textarea class="form-textarea" id="bkNotes" placeholder="Allergies, preferences, questions…" oninput="booking.notes=this.value">${booking.notes}</textarea></div>
-    <div class="notice">📅 You're booking <strong>${booking.services.map(s=>s.name).join(', ')}</strong> on <strong>${dateStr}</strong> at <strong>${booking.time}</strong>${isComboBooking()?(booking.aesthetician||booking.nailTech?' — Aesthetician: <strong>'+(booking.aesthetician||'Any')+'</strong>, Nail Tech: <strong>'+(booking.nailTech||'Any')+'</strong>':''):booking.staff?' with <strong>'+booking.staff+'</strong>':''}.</div>
+    <div class="notice">📅 You're booking <strong>${booking.services.map(s=>s.name).join(', ')}</strong> on <strong>${dateStr}</strong> at <strong>${fmt12h(booking.time)}</strong>${isComboBooking()?(booking.aesthetician||booking.nailTech?' — Aesthetician: <strong>'+(booking.aesthetician||'Any')+'</strong>, Nail Tech: <strong>'+(booking.nailTech||'Any')+'</strong>':''):booking.staff?' with <strong>'+booking.staff+'</strong>':''}.</div>
     <button class="btn-gold" onclick="goStep4()" ${booking.name&&booking.phone?'':'disabled'} id="step3next">Review Booking →</button>
     <button class="btn-outline" onclick="goStep2()">← Back</button>
   </div>`);
@@ -1179,7 +1180,7 @@ function goStep4(){
         <div class="summary-row"><span class="summary-lbl">Total</span><span class="summary-val" style="color:var(--gold-dk);font-weight:600;">${fmtPrice(booking.servicePrice)}</span></div>`
       :`<div class="summary-row"><span class="summary-lbl">Total</span><span class="summary-val" style="color:var(--gold-dk);font-weight:600;">${fmtPrice(booking.servicePrice)}</span></div>`}
     <div class="summary-row"><span class="summary-lbl">Date</span><span class="summary-val">${dateStr}</span></div>
-    <div class="summary-row"><span class="summary-lbl">Time</span><span class="summary-val">${booking.time}${booking.duration?' ('+booking.duration+' min)':''}</span></div>
+    <div class="summary-row"><span class="summary-lbl">Time</span><span class="summary-val">${fmt12h(booking.time)}</span></div>
     ${booking.groupSize>1?`<div class="summary-row"><span class="summary-lbl">Group</span><span class="summary-val">👥 ${booking.groupSize} clients</span></div>`:''}
     ${isComboBooking()?
       `<div class="summary-row"><span class="summary-lbl">Aesthetician</span><span class="summary-val">${booking.aesthetician||'No preference'}</span></div>
@@ -1283,7 +1284,7 @@ function showSuccess(ref){
       <div class="summary-row" style="text-align:left;"><span class="summary-lbl">Service${booking.services.length>1?'s':''}</span><span class="summary-val">${booking.services.map(s=>s.name).join(', ')}</span></div>
       <div class="summary-row" style="text-align:left;"><span class="summary-lbl">Total</span><span class="summary-val" style="color:var(--gold-dk);font-weight:600;">${fmtPrice(booking.servicePrice)}</span></div>
       <div class="summary-row" style="text-align:left;"><span class="summary-lbl">Date</span><span class="summary-val">${dateStr}</span></div>
-      <div class="summary-row" style="text-align:left;"><span class="summary-lbl">Time</span><span class="summary-val">${booking.time}</span></div>
+      <div class="summary-row" style="text-align:left;"><span class="summary-lbl">Time</span><span class="summary-val">${fmt12h(booking.time)}</span></div>
       ${isComboBooking()
         ?`${booking.aesthetician?`<div class="summary-row" style="text-align:left;"><span class="summary-lbl">Aesthetician</span><span class="summary-val">${booking.aesthetician}</span></div>`:''}
           ${booking.nailTech?`<div class="summary-row" style="text-align:left;"><span class="summary-lbl">Nail Tech</span><span class="summary-val">${booking.nailTech}</span></div>`:''}`
