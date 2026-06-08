@@ -3297,6 +3297,9 @@ function saveMonthlyLog(){
   // Sync to POS
   clearTimeout(window._posMonthlyTimer);
   window._posMonthlyTimer = setTimeout(()=>{ if(window.pushMonthlyToPOS) window.pushMonthlyToPOS(); }, 2000);
+  // Sync to Firebase so payment statuses survive reload
+  clearTimeout(window._fbMonthlyTimer);
+  window._fbMonthlyTimer = setTimeout(()=>{ if(window.saveToFirebase) window.saveToFirebase(); }, 3000);
 }
 function toggleAddEntry(){
   const f=document.getElementById('add-entry-form');
@@ -3877,6 +3880,9 @@ function saveConsState(){
   // Save both edit-state AND the current items list so deletions/additions survive reload
   const snapshot=CONS_DATA.map(g=>({id:g.id,items:g.items}));
   localStorage.setItem('glowbar_cons', JSON.stringify({state:consState,snapshot}));
+  // Sync to Firebase so payment statuses survive reload
+  clearTimeout(window._fbConsTimer);
+  window._fbConsTimer = setTimeout(()=>{ if(window.saveToFirebase) window.saveToFirebase(); }, 3000);
 }
 function getCS(gid,i){ return consState[gid+'_'+i]||{newQty:'',newUnit:'',supplier:'',paymentStatus:'unpaid'}; }
 function setCS(gid,i,f,v){
