@@ -244,9 +244,8 @@ const CATEGORY_TABS = [
   {id:'spa',    label:'Spa Treatments',       icon:'🧖',
     test:p=>{ const n=(p.name||'').toLowerCase();
       return n.includes('hand spa')||n.includes('foot spa')||n.includes('hand paraffin')||n.includes('foot paraffin')||n.includes('foot jelly'); }},
-  {id:'waxing',   label:'Hair Waxing',         icon:'✂',
-    test:p=>{ const c=(p.cat||'').toLowerCase(),n=(p.name||'').toLowerCase(),s=(p.subcat||'').toLowerCase();
-      return (c.includes('wax')||n.includes('wax')||((n.includes('brazilian')||n.includes('bikini'))&&!n.includes('diode')&&!s.includes('diode'))||(n.includes('upper lip')&&!n.includes('diode')))&&!n.includes('foot spa'); }},
+  {id:'glow_wax', label:'Glow Wax',           icon:'✨',
+    test:p=>{ return (p.cat||'').toLowerCase()==='glow wax'; }},
   {id:'facial',  label:'Facial',               icon:'🌸',
     test:p=>{ const c=(p.cat||'').toLowerCase(),s=(p.subcat||'').toLowerCase(),n=(p.name||'').toLowerCase();
       return c.includes('facial')||s.includes('facial')||n.includes('facial')||n.includes('hydra'); }},
@@ -288,7 +287,7 @@ function isNailService(p){
   return getCatTabId(p) === 'nails';
 }
 function isWaxService(p){
-  return getCatTabId(p) === 'waxing';
+  return getCatTabId(p) === 'glow_wax';
 }
 function isFacialService(p){
   return getCatTabId(p) === 'facial';
@@ -322,7 +321,7 @@ function fmt12h(t){ if(!t) return ''; const [h,m]=t.split(':').map(Number); cons
 function getActivePromo(tabId){
   const d=new Date();
   const ymd=d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate();
-  const major=new Set(['facial','waxing','diode','pico','exilis','glow_clear','tattoo']);
+  const major=new Set(['facial','glow_wax','diode','pico','exilis','glow_clear','tattoo']);
   const nailSpa=new Set(['nails','spa']);
   if(ymd<20260609) return {label:'30% OFF Pre-Opening Special',pct:30};
   if(ymd>=20260610&&ymd<=20260623){
@@ -407,13 +406,13 @@ const DEMO_DATA = {
     {id:123,name:'Glow Feet Package',cat:'Glow Nails',subcat:'Packages',price:1650,durationMins:230,inPOS:true,includes:'Gel Manicure + Gel Pedicure + Foot Spa + Foot Paraffin',saves:330},
     {id:124,name:'Glow Spa Package',cat:'Glow Nails',subcat:'Packages',price:1700,durationMins:270,inPOS:true,includes:'Gel Manicure + Gel Pedicure + Hand Spa + Foot Spa',saves:280},
     {id:125,name:'GlowBar Signature Nail Package',cat:'Glow Nails',subcat:'Packages',price:2000,durationMins:310,inPOS:true,includes:'Gel Manicure + Gel Pedicure + Hand Spa + Foot Spa + Hand Paraffin + Foot Paraffin',saves:430},
-    // ── HAIR WAXING ──
-    {id:211,name:'Underarm',cat:'Hair Waxing',price:500,durationMins:30,inPOS:true,description:'Smooth underarm hair removal with warm wax'},
-    {id:214,name:'Half Arms',cat:'Hair Waxing',price:600,durationMins:30,inPOS:true,description:'Wrist to elbow hair removal with warm wax'},
-    {id:215,name:'Full Arms',cat:'Hair Waxing',price:850,durationMins:40,inPOS:true,description:'Complete arm hair removal from wrists to shoulders'},
-    {id:216,name:'Half Legs',cat:'Hair Waxing',price:700,durationMins:30,inPOS:true,description:'Ankle to knee hair removal for smooth legs'},
-    {id:217,name:'Full Legs',cat:'Hair Waxing',price:1000,durationMins:40,inPOS:true,description:'Full leg hair removal from ankles to upper thighs'},
-    {id:218,name:'Brazilian',cat:'Hair Waxing',price:1000,durationMins:30,inPOS:true,description:'Complete intimate area hair removal for lasting smoothness'},
+    // ── GLOW WAX ──
+    {id:211,name:'Underarm',cat:'Glow Wax',price:500,durationMins:20,inPOS:true,description:'Smooth underarm hair removal with warm wax'},
+    {id:214,name:'Half Arms',cat:'Glow Wax',price:600,durationMins:30,inPOS:true,description:'Wrist to elbow hair removal with warm wax'},
+    {id:215,name:'Full Arms',cat:'Glow Wax',price:850,durationMins:40,inPOS:true,description:'Complete arm hair removal from wrists to shoulders'},
+    {id:216,name:'Half Legs',cat:'Glow Wax',price:700,durationMins:30,inPOS:true,description:'Ankle to knee hair removal for smooth legs'},
+    {id:217,name:'Full Legs',cat:'Glow Wax',price:1000,durationMins:40,inPOS:true,description:'Full leg hair removal from ankles to upper thighs'},
+    {id:218,name:'Brazilian',cat:'Glow Wax',price:1000,durationMins:30,inPOS:true,description:'Complete intimate area hair removal for lasting smoothness'},
     // ── GLOW FACIALS ──
     {id:301,name:'Regular Facial',cat:'Glow Facials',subcat:'Facials',price:700,durationMins:60,inPOS:true,description:'Deep cleansing with steam, extractions, and moisturizing'},
     {id:302,name:'Whitening Facial',cat:'Glow Facials',subcat:'Facials',price:900,durationMins:75,inPOS:true,description:'Brightening treatment to even skin tone and lighten dark spots'},
@@ -591,7 +590,7 @@ async function loadData(){
     const waxProducts = DEMO_DATA.products.filter(isWaxService);
     const nonNailNonWaxDbProds = dbProds ? dbProds.filter(p=>{
       const tid = getCatTabId(p);
-      return tid !== 'nails' && tid !== 'waxing';
+      return tid !== 'nails';
     }) : [];
     const nonNailDbPackages = pkgs ? pkgs.filter(p=>getPkgTabId(p)!=='nails') : [];
     DATA.products = dbProds
@@ -627,7 +626,7 @@ function showStep1(){
     const tabMap = {
       nails:      DEMO_DATA.products.filter(p => p.cat==='Glow Nails' && !SPA_IDS.has(p.id)),
       spa:        DEMO_DATA.products.filter(p => SPA_IDS.has(p.id)),
-      waxing:     DEMO_DATA.products.filter(p => p.cat==='Hair Waxing'),
+      glow_wax:   DEMO_DATA.products.filter(p => p.cat==='Glow Wax'),
       facial:     DEMO_DATA.products.filter(p => p.cat==='Glow Facials'),
       diode:      DEMO_DATA.products.filter(p => p.subcat==='Diode Laser'),
       pico:       DEMO_DATA.products.filter(p => p.subcat==='Pico Laser'),
