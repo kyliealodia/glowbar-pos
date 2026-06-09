@@ -201,6 +201,7 @@ window.pushPackagesToPOS = async function(){
       {name:'Legs Full Diode Package',price:17500,sessions:6,validity:365,services:['Legs Full Diode'],desc:'5+1 free diode hair removal — full legs',active:true},
       {name:'Brazilian Diode Package',price:12500,sessions:6,validity:365,services:['Brazilian Diode'],desc:'5+1 free diode hair removal — Brazilian',active:true},
       {name:'Underarms 10+2 Package',price:12000,sessions:10,validity:365,services:['Underarms Diode'],desc:'10+2 free diode hair removal — underarms',active:true},
+      {name:'Brazilian Diode 10+2 Package',price:25000,sessions:10,validity:365,services:['Brazilian Diode'],desc:'10+2 free diode hair removal — Brazilian',active:true},
       {name:'Cheeks 10+2 Package',price:10000,sessions:10,validity:365,services:['Cheeks Diode'],desc:'10+2 free diode hair removal — cheeks',active:true},
       {name:'Half Arms 10+2 Package',price:15000,sessions:10,validity:365,services:['Arms Half Diode'],desc:'10+2 free diode hair removal — half arms',active:true},
       {name:'Full Arms 10+2 Package',price:22000,sessions:10,validity:365,services:['Arms Full Diode'],desc:'10+2 free diode hair removal — full arms',active:true},
@@ -210,11 +211,6 @@ window.pushPackagesToPOS = async function(){
       {name:'Diode + Carbon Laser 10 sessions',price:20000,sessions:10,validity:365,services:['Diode + Carbon Laser'],desc:'10 sessions Diode Hair Removal + 10 sessions Carbon Laser',active:true},
       {name:'Diode + Carbon + Pico 5 sessions',price:16500,sessions:5,validity:365,services:['Diode + Carbon + Pico'],desc:'5 sessions Diode + 5 sessions Carbon Laser + 5 sessions Pico',active:true},
       {name:'Diode + Carbon + Pico 10 sessions',price:33000,sessions:10,validity:365,services:['Diode + Carbon + Pico'],desc:'10 sessions Diode + 10 sessions Carbon Laser + 10 sessions Pico',active:true},
-      // Skin Rejuvenation / Whitening
-      {name:'Underarms Rejuvenation Package',price:6000,sessions:6,validity:365,services:['Underarms Rejuvenation'],desc:'5+1 free skin rejuvenation — underarms',active:true},
-      {name:'Elbows Rejuvenation Package',price:5000,sessions:6,validity:365,services:['Elbows Rejuvenation'],desc:'5+1 free skin rejuvenation — elbows',active:true},
-      {name:'Inner Thighs Rejuvenation Package',price:6500,sessions:6,validity:365,services:['Inner Thighs Rejuvenation'],desc:'5+1 free skin rejuvenation — inner thighs',active:true},
-      {name:'Remove & Rejuve Combo Package',price:11000,sessions:6,validity:365,services:['Remove & Rejuve Combo Underarms'],desc:'5+1 free remove & rejuvenate combo — underarms',active:true},
       // Exilis
       {name:'Full Face with Neck Exilis Package',price:16000,sessions:6,validity:365,services:['Full Face with Neck'],desc:'5+1 free Exilis — full face with neck',active:true},
       {name:'Full Face Exilis Package',price:14000,sessions:6,validity:365,services:['Full Face'],desc:'5+1 free Exilis — full face',active:true},
@@ -1156,15 +1152,18 @@ async function initFirebase(){
   if(!localStorage.getItem('_gbSvcCleanup_v1')){
     const staleNames=new Set([
       'Face','Underarm','Arms & Legs','Bikini','Full Body',
-      'Nail Extensions',
+      'Nail Extensions','Polygel Extension','Softgel Extension',
       'Nail Art','Glitter / Foil','Nail Stickers',
       'HydraFacial','High Frequency',
       'Upper Lip Wax','Lower Lip Wax','Bikini Wax',
       'Upper Lip Diode','Lower Lip Diode',
       'Classic Spa Package',
       'Mani + Pedi Package','Gel Mani + Pedi Package',
-      'Skin Rejuvenation — Single','Skin Rejuvenation Package','Remove & Rejuve Combo Underarms',
+      'Skin Rejuvenation — Single','Skin Rejuvenation Package',
+      'Underarms Rejuvenation','Elbows Rejuvenation','Inner Thighs Rejuvenation',
+      'Remove & Rejuve Combo Underarms',
       'Diode Single','Diode Package',
+      'Brazilian 5+1 Package','Brazilian 10+2 Package',
       'Single Session','Package',
       'Fat Reduction','Lifting','Fat Reduction — Package (4+1 free)','Lifting — Package (4+1 free)',
       'Tattoo Removal — Small','Tattoo Removal — Medium','Tattoo Removal — Large',
@@ -1900,8 +1899,7 @@ let SVC_CATS = [
     {id:'fp1',name:'Foot Paraffin',price:450,durationMins:20,staffRole:'',consumables:[{groupId:'nails',iIdx:28,amt:'150',unit:'g'},{groupId:'nails',iIdx:27,amt:'1',unit:'pcs'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'}],desc:''},
   ]},
   {id:'nails_ext', name:'Glow Nails — Extensions', group:'Glow Nails', type:'standard', canAddServices:true, services:[
-    {id:'s9',name:'Polygel Extension',price:1000,durationMins:90,staffRole:'',consumables:[{groupId:'nails',iIdx:50,amt:'0.5',unit:'ml'},{groupId:'nails',iIdx:51,amt:'0.5',unit:'ml'},{groupId:'nails',iIdx:52,amt:'0.5',unit:'ml'},{groupId:'nails',iIdx:48,amt:'0.5',unit:'ml'},{groupId:'nails',iIdx:49,amt:'0.5',unit:'ml'},{groupId:'nails',iIdx:5,amt:'0.5',unit:'ml'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'},{groupId:'nails',iIdx:38,amt:'3',unit:'pcs'},{groupId:'nails',iIdx:39,amt:'1',unit:'pcs'},{groupId:'nails',iIdx:7,amt:'1',unit:'pcs'},{groupId:'nails',iIdx:8,amt:'1',unit:'pcs'}],desc:'Acrylic or gel nail extensions for added length and strength'},
-    {id:'sg1',name:'Softgel Extension',price:1000,durationMins:60,staffRole:'',consumables:[{groupId:'nails',iIdx:53,amt:'10',unit:'pcs'},{groupId:'nails',iIdx:58,amt:'10',unit:'pcs'},{groupId:'nails',iIdx:52,amt:'0.5',unit:'ml'},{groupId:'nails',iIdx:48,amt:'0.5',unit:'ml'},{groupId:'nails',iIdx:49,amt:'0.5',unit:'ml'},{groupId:'nails',iIdx:5,amt:'0.5',unit:'ml'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'},{groupId:'nails',iIdx:38,amt:'3',unit:'pcs'},{groupId:'nails',iIdx:39,amt:'1',unit:'pcs'},{groupId:'nails',iIdx:7,amt:'1',unit:'pcs'},{groupId:'nails',iIdx:8,amt:'1',unit:'pcs'}],desc:'Soft gel nail tips for a flexible, natural-looking extension'},
+    {id:'s9',name:'Softgel/Polygel Extension',price:1000,durationMins:90,staffRole:'',consumables:[{groupId:'nails',iIdx:50,amt:'0.5',unit:'ml'},{groupId:'nails',iIdx:51,amt:'0.5',unit:'ml'},{groupId:'nails',iIdx:52,amt:'0.5',unit:'ml'},{groupId:'nails',iIdx:48,amt:'0.5',unit:'ml'},{groupId:'nails',iIdx:49,amt:'0.5',unit:'ml'},{groupId:'nails',iIdx:5,amt:'0.5',unit:'ml'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'},{groupId:'nails',iIdx:38,amt:'3',unit:'pcs'},{groupId:'nails',iIdx:39,amt:'1',unit:'pcs'},{groupId:'nails',iIdx:7,amt:'1',unit:'pcs'},{groupId:'nails',iIdx:8,amt:'1',unit:'pcs'}],desc:'Softgel or polygel nail extensions for added length and strength'},
   ]},
   {id:'nails_art', name:'Glow Nails — Nail Art', group:'Glow Nails', type:'addon', canAddServices:true, services:[
     {id:'s13',name:'Nail Art per nail',price:50,durationMins:5,staffRole:'',consumables:[{groupId:'nails',iIdx:54,amt:'1',unit:'pcs'},{groupId:'nails',iIdx:55,amt:'2',unit:'pcs'}],desc:'Custom hand-painted nail design per nail'},
@@ -1962,14 +1960,6 @@ let SVC_CATS = [
     {id:'gm1',name:'24K Gold Mask',price:300,durationMins:10,staffRole:'',consumables:[{groupId:'facial',iIdx:49,amt:'1',unit:'pcs'}],desc:'Luxurious 24K gold sheet mask for anti-aging and radiance'},
   ]},
   // ── GLOW SKIN ─────────────────────────────────────────────────
-  {id:'skin_rej', name:'Glow Skin — Skin Rejuvenation', group:'Glow Skin', type:'laser', canAddServices:true, services:[
-    {id:'s29',name:'Skin Rejuvenation — Single',price:1000,durationMins:45,staffRole:'',consumables:[{groupId:'waxing',iIdx:4,amt:'2',unit:'pcs'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'},{groupId:'nails',iIdx:38,amt:'2',unit:'pcs'},{groupId:'facial',iIdx:47,amt:'1',unit:'pcs'}],desc:'Laser-assisted treatment to lighten, smooth, and rejuvenate skin'},
-    {id:'s30',name:'Skin Rejuvenation Package',price:5000,durationMins:45,staffRole:'',consumables:[{groupId:'waxing',iIdx:4,amt:'2',unit:'pcs'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'},{groupId:'nails',iIdx:38,amt:'2',unit:'pcs'},{groupId:'facial',iIdx:47,amt:'1',unit:'pcs'}],sessions:5,freeSessions:1,desc:'5+1 free sessions of laser skin rejuvenation'},
-    {id:'sr1',name:'Underarms Rejuvenation',price:1200,durationMins:20,staffRole:'',consumables:[{groupId:'waxing',iIdx:4,amt:'2',unit:'pcs'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'},{groupId:'nails',iIdx:38,amt:'2',unit:'pcs'},{groupId:'facial',iIdx:47,amt:'1',unit:'pcs'},{groupId:'machine',iIdx:4,amt:'5',unit:'ml'}],desc:'Skin lightening and smoothing treatment for underarms'},
-    {id:'sr2',name:'Elbows Rejuvenation',price:1000,durationMins:40,staffRole:'',consumables:[{groupId:'waxing',iIdx:4,amt:'2',unit:'pcs'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'},{groupId:'nails',iIdx:38,amt:'2',unit:'pcs'},{groupId:'facial',iIdx:47,amt:'1',unit:'pcs'},{groupId:'machine',iIdx:4,amt:'3',unit:'ml'}],desc:'Brightening treatment to reduce darkness and roughness on elbows'},
-    {id:'sr3',name:'Inner Thighs Rejuvenation',price:1300,durationMins:40,staffRole:'',consumables:[{groupId:'waxing',iIdx:4,amt:'2',unit:'pcs'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'},{groupId:'nails',iIdx:38,amt:'2',unit:'pcs'},{groupId:'facial',iIdx:47,amt:'1',unit:'pcs'},{groupId:'machine',iIdx:4,amt:'10',unit:'ml'}],desc:'Lightening and evening treatment for inner thigh skin'},
-    {id:'sr4',name:'Remove & Rejuve Combo Underarms',price:2200,durationMins:60,staffRole:'',consumables:[{groupId:'waxing',iIdx:4,amt:'2',unit:'pcs'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'},{groupId:'nails',iIdx:38,amt:'2',unit:'pcs'},{groupId:'facial',iIdx:47,amt:'1',unit:'pcs'},{groupId:'machine',iIdx:1,amt:'1',unit:'pcs'},{groupId:'machine',iIdx:4,amt:'5',unit:'ml'}],desc:'Combo laser hair removal and skin rejuvenation for underarms'},
-  ]},
   {id:'diode', name:'Glow Skin — Diode Laser', group:'Glow Skin', type:'laser', canAddServices:true, services:[
     {id:'d1',name:'Underarms Diode',price:1200,durationMins:20,staffRole:'r2',consumables:[{groupId:'machine',iIdx:1,amt:'1',unit:'pcs'},{groupId:'waxing',iIdx:4,amt:'2',unit:'pcs'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'},{groupId:'nails',iIdx:38,amt:'2',unit:'pcs'},{groupId:'facial',iIdx:47,amt:'1',unit:'pcs'},{groupId:'machine',iIdx:4,amt:'5',unit:'ml'}],desc:'Permanent hair reduction for the underarm area'},
     {id:'d4',name:'Cheeks Diode',price:1000,durationMins:20,staffRole:'r2',consumables:[{groupId:'machine',iIdx:1,amt:'1',unit:'pcs'},{groupId:'waxing',iIdx:4,amt:'2',unit:'pcs'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'},{groupId:'nails',iIdx:38,amt:'2',unit:'pcs'},{groupId:'facial',iIdx:47,amt:'1',unit:'pcs'},{groupId:'machine',iIdx:4,amt:'3',unit:'ml'}],desc:'Diode laser hair removal for the cheeks'},
@@ -1984,8 +1974,8 @@ let SVC_CATS = [
     {id:'d14',name:'Half Legs 10+2 Package',price:25000,sessions:10,freeSessions:2,staffRole:'r2',consumables:[{groupId:'machine',iIdx:1,amt:'1',unit:'pcs'},{groupId:'waxing',iIdx:4,amt:'2',unit:'pcs'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'},{groupId:'nails',iIdx:38,amt:'2',unit:'pcs'},{groupId:'facial',iIdx:47,amt:'1',unit:'pcs'}],desc:'10+2 free diode laser sessions for half legs'},
     {id:'d15',name:'Full Legs 10+2 Package',price:35000,sessions:10,freeSessions:2,staffRole:'r2',consumables:[{groupId:'machine',iIdx:1,amt:'1',unit:'pcs'},{groupId:'waxing',iIdx:4,amt:'2',unit:'pcs'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'},{groupId:'nails',iIdx:38,amt:'2',unit:'pcs'},{groupId:'facial',iIdx:47,amt:'1',unit:'pcs'}],desc:'10+2 free diode laser sessions for full legs'},
     {id:'d16',name:'Brazilian Diode',price:2500,durationMins:30,staffRole:'r2',consumables:[{groupId:'machine',iIdx:1,amt:'1',unit:'pcs'},{groupId:'waxing',iIdx:4,amt:'2',unit:'pcs'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'},{groupId:'nails',iIdx:38,amt:'2',unit:'pcs'},{groupId:'facial',iIdx:47,amt:'1',unit:'pcs'},{groupId:'machine',iIdx:4,amt:'15',unit:'ml'}],desc:'Diode laser hair removal for the Brazilian area'},
-    {id:'d17',name:'Brazilian 5+1 Package',price:12500,sessions:5,freeSessions:1,staffRole:'r2',consumables:[{groupId:'machine',iIdx:1,amt:'1',unit:'pcs'},{groupId:'waxing',iIdx:4,amt:'2',unit:'pcs'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'},{groupId:'nails',iIdx:38,amt:'2',unit:'pcs'},{groupId:'facial',iIdx:47,amt:'1',unit:'pcs'}],desc:'5+1 free diode laser sessions for Brazilian'},
-    {id:'d18',name:'Brazilian 10+2 Package',price:25000,sessions:10,freeSessions:2,staffRole:'r2',consumables:[{groupId:'machine',iIdx:1,amt:'1',unit:'pcs'},{groupId:'waxing',iIdx:4,amt:'2',unit:'pcs'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'},{groupId:'nails',iIdx:38,amt:'2',unit:'pcs'},{groupId:'facial',iIdx:47,amt:'1',unit:'pcs'}],desc:'10+2 free diode laser sessions for Brazilian'},
+    {id:'d17',name:'Brazilian Diode 5+1 Package',price:12500,sessions:5,freeSessions:1,staffRole:'r2',consumables:[{groupId:'machine',iIdx:1,amt:'1',unit:'pcs'},{groupId:'waxing',iIdx:4,amt:'2',unit:'pcs'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'},{groupId:'nails',iIdx:38,amt:'2',unit:'pcs'},{groupId:'facial',iIdx:47,amt:'1',unit:'pcs'}],desc:'5+1 free diode laser sessions for Brazilian'},
+    {id:'d18',name:'Brazilian Diode 10+2 Package',price:25000,sessions:10,freeSessions:2,staffRole:'r2',consumables:[{groupId:'machine',iIdx:1,amt:'1',unit:'pcs'},{groupId:'waxing',iIdx:4,amt:'2',unit:'pcs'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'},{groupId:'nails',iIdx:38,amt:'2',unit:'pcs'},{groupId:'facial',iIdx:47,amt:'1',unit:'pcs'}],desc:'10+2 free diode laser sessions for Brazilian'},
   ]},
   {id:'pico', name:'Glow Skin — Pico Laser', group:'Glow Skin', type:'laser', canAddServices:true, services:[
     {id:'p1',name:'Black Doll Carbon Laser',price:1500,durationMins:60,staffRole:'',consumables:[{groupId:'waxing',iIdx:4,amt:'2',unit:'pcs'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'},{groupId:'nails',iIdx:38,amt:'2',unit:'pcs'},{groupId:'facial',iIdx:47,amt:'1',unit:'pcs'},{groupId:'facial',iIdx:43,amt:'1',unit:'g'},{groupId:'machine',iIdx:3,amt:'5',unit:'g'}],desc:'Carbon peel laser to refine pores, brighten, and smooth skin'},
