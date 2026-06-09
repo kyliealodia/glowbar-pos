@@ -801,7 +801,7 @@ html{height:-webkit-fill-available;}
         <div style="margin-bottom:10px;"><input class="form-input" type="search" id="clientSearchInput" placeholder="Search by name, phone, or email…" oninput="_clientSearch=this.value;_clientPage=0;renderClientsTable();" style="max-width:320px;font-size:13px;"></div>
         <div class="card" style="overflow:hidden;">
           <table class="inv-table" style="width:100%;">
-            <thead><tr><th>Client</th><th>Contact</th><th>Visits</th><th>Total Spent</th><th>Status</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Client</th><th>Phone</th><th>Service</th><th>Date Added</th><th>Status</th><th>Actions</th></tr></thead>
             <tbody id="clientsBody"></tbody>
           </table>
           <div id="clientsPagination" style="padding:10px 14px;border-top:1px solid var(--border);"></div>
@@ -3497,9 +3497,16 @@ window.addEventListener('DOMContentLoaded',()=>{
     db.ref('gb/clients').on('value', snap=>{
       const val=snap.val();
       if(val) S.clients=fbVal(val,[]);
-      // Backfill: clients with consents.general.signed but no intakeComplete flag
-      S.clients.forEach(c=>{if(c.intakeComplete==null)c.intakeComplete=!!(c.consents?.general?.signed);});
-      if(document.getElementById('page-clients')?.classList.contains('active')) renderClientsTable();
+      // Backfill: ensure all clients have required display fields
+      S.clients.forEach(c=>{
+        if(c.intakeComplete==null) c.intakeComplete=!!(c.consents?.general?.signed);
+        if(!c.visits) c.visits=0;
+        if(!c.totalSpent) c.totalSpent=0;
+        if(c.vip==null) c.vip=false;
+        if(!c.color) c.color=['#C4778A','#7B8EBB','#6BAA88','#B8904A','#9B6EAF'][Math.abs((c.id||0))%5];
+        if(!c.name && (c.firstName||c.lastName)) c.name=((c.firstName||'')+' '+(c.lastName||'')).trim();
+      });
+      renderClientsTable();
       if(document.getElementById('page-dashboard')?.classList.contains('active')) renderDashboard();
     });
 
@@ -6607,13 +6614,21 @@ function renderClientsTable(){
   const totalPages=Math.ceil(filtered.length/PAGE)||1;
   if(_clientPage>=totalPages) _clientPage=Math.max(0,totalPages-1);
   const page=filtered.slice(_clientPage*PAGE,(_clientPage+1)*PAGE);
-  document.getElementById('clientsBody').innerHTML=page.map(c=>`
-    <tr>
-      <td><div style="display:flex;align-items:center;gap:9px;"><div style="width:32px;height:32px;border-radius:50%;background:${c.color};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#fff;">${initials(c.name)}</div><div><div style="font-size:13px;font-weight:500;">${esc(c.name)}${c.vip?' ✨':''}</div><div style="font-size:10px;color:var(--ink3);">${esc(c.email)||'—'}</div></div></div></td>
-      <td><div style="font-size:12px;">${esc(c.phone||'')}</div><div style="font-size:10px;color:var(--ink3);">${esc(c.messenger)||'—'}</div></td>
-      <td style="font-size:13px;">${c.visits}</td>
-      <td style="font-size:13px;">${fmtPrice(c.totalSpent)}</td>
-      <td><div style="display:flex;flex-direction:column;gap:4px;"><span class="pill ${c.vip?'pill-gold':'pill-gray'}">${c.vip?'VIP':'Regular'}</span><span class="pill ${c.intakeComplete?'pill-green':'pill-amber'}">${c.intakeComplete?'✓ Intake':'Intake needed'}</span></div></td>
+  document.getElementById('clientsBody').innerHTML=page.map(c=>{
+    const avatarColor=c.color||'#B8904A';
+    const addedDate=c.submittedAt||c.createdAt||'';
+    const addedFmt=addedDate?new Date(addedDate).toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'numeric'}):'—';
+    const isKiosk=c.source==='kiosk';
+    return `<tr>
+      <td><div style="display:flex;align-items:center;gap:9px;"><div style="width:32px;height:32px;border-radius:50%;background:${avatarColor};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#fff;">${initials(c.name||'?')}</div><div><div style="font-size:13px;font-weight:500;">${esc(c.name||'')}${c.vip?' ✨':''}</div><div style="font-size:10px;color:var(--ink3);">${esc(c.email||'')||'—'}</div></div></div></td>
+      <td><div style="font-size:12px;">${esc(c.phone||'')}</div></td>
+      <td><div style="font-size:12px;">${esc(c.todayService||'—')}</div></td>
+      <td><div style="font-size:12px;">${addedFmt}</div></td>
+      <td><div style="display:flex;flex-direction:column;gap:4px;">
+        ${isKiosk?'<span class="pill pill-green" style="font-size:10px;">🖥 Intake</span>':''}
+        <span class="pill ${c.vip?'pill-gold':'pill-gray'}">${c.vip?'VIP':'Regular'}</span>
+        <span class="pill ${c.intakeComplete?'pill-green':'pill-amber'}">${c.intakeComplete?'✓ Consent':'Consent needed'}</span>
+      </div></td>
       <td><div style="display:flex;gap:5px;flex-wrap:wrap;">
         <button class="btn btn-gold btn-sm" onclick="viewClientProfile(${c.id})">👁 Profile</button>
         <button class="btn btn-outline btn-sm" onclick="editClient(${c.id})">Edit</button>
@@ -6621,7 +6636,8 @@ function renderClientsTable(){
         <button class="btn btn-outline btn-sm" onclick="msgClient(${c.id})">💬 Msg</button>
         ${c.skinAnalysis?`<button class="btn btn-sm" style="background:rgba(201,168,76,0.12);border:1px solid rgba(201,168,76,0.3);color:var(--gold-dk);font-size:11px;" onclick="viewSkinAnalysis(${c.id})">🔬 Analysis</button>`:''}
       </div></td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
   const pEl=document.getElementById('clientsPagination');
   if(pEl) pEl.innerHTML=_buildPager(totalPages,_clientPage,'goClientPage',filtered.length);
 }
