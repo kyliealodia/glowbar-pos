@@ -245,8 +245,8 @@ const CATEGORY_TABS = [
     test:p=>{ const n=(p.name||'').toLowerCase();
       return n.includes('hand spa')||n.includes('foot spa')||n.includes('hand paraffin')||n.includes('foot paraffin')||n.includes('foot jelly'); }},
   {id:'waxing',   label:'Hair Waxing',         icon:'✂',
-    test:p=>{ const c=(p.cat||'').toLowerCase(),n=(p.name||'').toLowerCase();
-      return (c.includes('wax')||n.includes('wax')||n.includes('brazilian')||n.includes('bikini')||n.includes('upper lip')&&!n.includes('diode'))&&!n.includes('foot spa'); }},
+    test:p=>{ const c=(p.cat||'').toLowerCase(),n=(p.name||'').toLowerCase(),s=(p.subcat||'').toLowerCase();
+      return (c.includes('wax')||n.includes('wax')||((n.includes('brazilian')||n.includes('bikini'))&&!n.includes('diode')&&!s.includes('diode'))||(n.includes('upper lip')&&!n.includes('diode')))&&!n.includes('foot spa'); }},
   {id:'facial',  label:'Facial',               icon:'🌸',
     test:p=>{ const c=(p.cat||'').toLowerCase(),s=(p.subcat||'').toLowerCase(),n=(p.name||'').toLowerCase();
       return c.includes('facial')||s.includes('facial')||n.includes('facial')||n.includes('hydra'); }},
@@ -385,12 +385,14 @@ const DEMO_DATA = {
     {id:133,name:'Softgel Extension',cat:'Glow Nails',subcat:'Extensions',price:1000,durationMins:90,inPOS:true,description:'Softgel extension treatment for lightweight and flexible nail enhancement'},
     // ── GLOW NAILS — Nail Art ──
     {id:108,name:'Nail Art',cat:'Glow Nails',subcat:'Nail Art',price:50,durationMins:5,inPOS:true,description:'Custom hand-painted nail design per nail'},
-    {id:110,name:'Chrome Powder',cat:'Glow Nails',subcat:'Nail Art',price:100,durationMins:10,inPOS:true,description:'High-shine chrome mirror finish per nail'},
     {id:126,name:'Nail Art (Whole Hand)',cat:'Glow Nails',subcat:'Nail Art',price:250,durationMins:20,inPOS:true,description:'Custom nail art design for all 5 nails'},
+    {id:110,name:'Chrome Powder',cat:'Glow Nails',subcat:'Nail Art',price:100,durationMins:10,inPOS:true,description:'High-shine chrome mirror finish per nail'},
     {id:127,name:'Stones / Stickers / Charms',cat:'Glow Nails',subcat:'Nail Art',price:100,durationMins:5,inPOS:true,description:'Rhinestones, stickers, or charms per nail'},
+    {id:128,name:'Unli Stones/Stickers Small',cat:'Glow Nails',subcat:'Nail Art',price:250,durationMins:10,inPOS:true,description:'Unlimited small stones, stickers, or charms for all nails'},
+    {id:129,name:'Unli Stones/Stickers Big',cat:'Glow Nails',subcat:'Nail Art',price:350,durationMins:10,inPOS:true,description:'Unlimited big stones, stickers, or charms for all nails'},
     // ── GLOW NAILS — Packages ──
-    {id:112,name:'Mani + Pedi Package',cat:'Glow Nails',subcat:'Packages',price:510,durationMins:90,inPOS:true,description:'Classic manicure and pedicure combined at a bundled rate'},
-    {id:113,name:'Gel Mani + Pedi Package',cat:'Glow Nails',subcat:'Packages',price:800,durationMins:120,inPOS:true,description:'Gel manicure and gel pedicure for long-lasting color'},
+    {id:112,name:'Mani + Pedi Package',cat:'Glow Nails',subcat:'Packages',price:500,durationMins:90,inPOS:true,description:'Classic manicure and pedicure combined at a bundled rate'},
+    {id:113,name:'Gel Mani + Pedi Package',cat:'Glow Nails',subcat:'Packages',price:900,durationMins:120,inPOS:true,description:'Gel manicure and gel pedicure for long-lasting color'},
     // ── CLASSIC NAIL PACKAGES ──
     {id:114,name:'Regular Mani + Pedi & Hand Spa',cat:'Glow Nails',subcat:'Packages',price:850,durationMins:165,inPOS:true,includes:'Regular Manicure + Regular Pedicure + Hand Spa',saves:70},
     {id:115,name:'Classic Hands Package',cat:'Glow Nails',subcat:'Packages',price:1100,durationMins:185,inPOS:true,includes:'Regular Manicure + Regular Pedicure + Hand Spa + Hand Paraffin',saves:120},
@@ -433,13 +435,12 @@ const DEMO_DATA = {
     {id:405,name:'Remove & Rejuve Combo Underarms',cat:'Glow Skin',subcat:'Skin Rejuvenation',price:2200,durationMins:60,inPOS:true,description:'Combo laser hair removal and skin rejuvenation for underarms'},
     // ── GLOW SKIN — Diode Laser ──
     {id:411,name:'Underarms Diode',cat:'Glow Skin',subcat:'Diode Laser',price:1200,durationMins:20,inPOS:true,description:'Permanent hair reduction for the underarm area'},
-    {id:412,name:'Upper Lip Diode',cat:'Glow Skin',subcat:'Diode Laser',price:800,durationMins:20,inPOS:true,description:'Targeted diode laser for upper lip hair removal'},
-    {id:413,name:'Lower Lip Diode',cat:'Glow Skin',subcat:'Diode Laser',price:800,durationMins:20,inPOS:true,description:'Diode laser treatment for lower lip hair removal'},
     {id:414,name:'Cheeks Diode',cat:'Glow Skin',subcat:'Diode Laser',price:1000,durationMins:30,inPOS:true,description:'Diode laser hair removal for the cheek area'},
-    {id:415,name:'Arms Full Diode',cat:'Glow Skin',subcat:'Diode Laser',price:2200,durationMins:60,inPOS:true,description:'Complete arm hair reduction with diode laser'},
     {id:416,name:'Arms Half Diode',cat:'Glow Skin',subcat:'Diode Laser',price:1500,durationMins:40,inPOS:true,description:'Diode laser hair removal from wrist to elbow'},
-    {id:417,name:'Legs Full Diode',cat:'Glow Skin',subcat:'Diode Laser',price:3500,durationMins:60,inPOS:true,description:'Full leg diode laser hair removal for lasting smoothness'},
+    {id:415,name:'Arms Full Diode',cat:'Glow Skin',subcat:'Diode Laser',price:2200,durationMins:60,inPOS:true,description:'Complete arm hair reduction with diode laser'},
     {id:418,name:'Legs Half Diode',cat:'Glow Skin',subcat:'Diode Laser',price:2500,durationMins:60,inPOS:true,description:'Diode laser hair removal from ankle to knee'},
+    {id:417,name:'Legs Full Diode',cat:'Glow Skin',subcat:'Diode Laser',price:3500,durationMins:60,inPOS:true,description:'Full leg diode laser hair removal for lasting smoothness'},
+    {id:419,name:'Brazilian Diode',cat:'Glow Skin',subcat:'Diode Laser',price:2500,durationMins:30,inPOS:true,description:'Diode laser hair removal for the Brazilian area'},
     // ── GLOW SKIN — Pico Laser ──
     {id:421,name:'Black Doll Carbon Laser',cat:'Glow Skin',subcat:'Pico Laser',price:1500,durationMins:60,inPOS:true,description:'Carbon peel laser to refine pores, brighten, and smooth skin'},
     {id:422,name:'Melasma/Freckles Face',cat:'Glow Skin',subcat:'Pico Laser',price:1600,durationMins:30,inPOS:true,description:'Pico laser to fade melasma, freckles, and pigmentation on the face'},
@@ -450,13 +451,8 @@ const DEMO_DATA = {
     {id:427,name:'Scar Lightening Legs',cat:'Glow Skin',subcat:'Pico Laser',price:1500,durationMins:40,inPOS:true,description:'Pico laser to lighten scars on the legs'},
     {id:428,name:'Scar Lightening Knees',cat:'Glow Skin',subcat:'Pico Laser',price:1300,durationMins:40,inPOS:true,description:'Targeted pico laser for darkened knee scars'},
     // ── GLOW INK — Tattoo Removal ──
-    {id:501,name:'Tattoo Removal — Small',cat:'Glow Ink',price:500,durationMins:20,inPOS:true,description:'Laser removal for small tattoos'},
-    {id:502,name:'Tattoo Removal — Medium',cat:'Glow Ink',price:1000,durationMins:30,inPOS:true,description:'Laser removal for medium-sized tattoos'},
-    {id:503,name:'Tattoo Removal — Large',cat:'Glow Ink',price:2000,durationMins:45,inPOS:true,description:'Laser removal for large or complex tattoos'},
-    {id:504,name:'Tattoo Laser Removal',cat:'Glow Ink',price:1500,durationMins:60,inPOS:true,description:'Professional tattoo laser removal per session'},
+    {id:504,name:'Tattoo Laser Removal',cat:'Glow Ink',price:1500,durationMins:60,inPOS:true,description:'Professional tattoo laser removal — starts at ₱1,500 per session upon consultation'},
     // ── EXILIS GLOW ──
-    {id:601,name:'Fat Reduction',cat:'Exilis Glow',price:2800,durationMins:60,inPOS:true,description:'Radiofrequency body contouring to reduce stubborn fat'},
-    {id:602,name:'Lifting',cat:'Exilis Glow',price:1800,durationMins:45,inPOS:true,description:'RF skin tightening and lifting treatment'},
     {id:603,name:'Full Face with Neck',cat:'Exilis Glow',price:3200,durationMins:60,inPOS:true,description:'RF tightening and lifting for the full face and neck'},
     {id:604,name:'Full Face',cat:'Exilis Glow',price:2800,durationMins:40,inPOS:true,description:'Exilis radiofrequency treatment for full face firming'},
     {id:605,name:'Double Chin with Neck',cat:'Exilis Glow',price:2000,durationMins:40,inPOS:true,description:'RF treatment to reduce double chin and firm the neck'},
@@ -467,7 +463,7 @@ const DEMO_DATA = {
     {id:610,name:'Love Handle Exilis',cat:'Exilis Glow',price:2200,durationMins:40,inPOS:true,description:'Targeted RF to reduce love handles and flanks'},
     {id:611,name:'Buttocks Exilis',cat:'Exilis Glow',price:2400,durationMins:40,inPOS:true,description:'Exilis RF lifting and firming for the buttocks'},
     {id:612,name:'Lower Leg Exilis',cat:'Exilis Glow',price:1600,durationMins:40,inPOS:true,description:'RF contouring and tightening for the lower legs'},
-    // ── GLOW CLEAR — Wart Removal ──
+    // ── GLOW CLEAR ──
     {id:701,name:'Face Unli',cat:'Glow Clear',price:1500,durationMins:60,inPOS:true,description:'Unlimited wart removal for the face'},
     {id:702,name:'Face and Neck Unli',cat:'Glow Clear',price:2500,durationMins:75,inPOS:true,description:'Unlimited wart removal for face and neck'},
   ],
@@ -475,8 +471,6 @@ const DEMO_DATA = {
     // ── Diode Hair Removal ──
     {id:1, name:'Underarms',       group:'Diode Hair Removal',tab:'diode',price:6000, sessions:5, freeSessions:1,active:true},
     {id:35,name:'Underarms',       group:'Diode Hair Removal',tab:'diode',price:12000,sessions:10,freeSessions:2,active:true},
-    {id:2, name:'Upper/Lower Lip', group:'Diode Hair Removal',tab:'diode',price:4000, sessions:5, freeSessions:1,active:true},
-    {id:36,name:'Upper/Lower Lip', group:'Diode Hair Removal',tab:'diode',price:8000, sessions:10,freeSessions:2,active:true},
     {id:4, name:'Cheeks',          group:'Diode Hair Removal',tab:'diode',price:5000, sessions:5, freeSessions:1,active:true},
     {id:38,name:'Cheeks',          group:'Diode Hair Removal',tab:'diode',price:10000,sessions:10,freeSessions:2,active:true},
     {id:6, name:'Half Arms',       group:'Diode Hair Removal',tab:'diode',price:7500, sessions:5, freeSessions:1,active:true},
@@ -487,6 +481,8 @@ const DEMO_DATA = {
     {id:41,name:'Half Legs',       group:'Diode Hair Removal',tab:'diode',price:25000,sessions:10,freeSessions:2,active:true},
     {id:7, name:'Full Legs',       group:'Diode Hair Removal',tab:'diode',price:17500,sessions:5, freeSessions:1,active:true},
     {id:42,name:'Full Legs',       group:'Diode Hair Removal',tab:'diode',price:35000,sessions:10,freeSessions:2,active:true},
+    {id:64,name:'Brazilian',       group:'Diode Hair Removal',tab:'diode',price:12500,sessions:5, freeSessions:1,active:true},
+    {id:65,name:'Brazilian',       group:'Diode Hair Removal',tab:'diode',price:25000,sessions:10,freeSessions:2,active:true},
     // ── Carbon Laser (Skin Rejuvenation) ──
     {id:9, name:'Underarms',       group:'Carbon Laser',tab:'pico',price:6000, sessions:5, freeSessions:1,active:true},
     {id:43,name:'Underarms',       group:'Carbon Laser',tab:'pico',price:12000,sessions:10,freeSessions:2,active:true},
