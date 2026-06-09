@@ -355,8 +355,20 @@ body{
     </div>
     <div class="fg"><label class="fl">Emergency Contact Name & Number</label><input class="fi" id="s1Emergency" placeholder="Full name — 09xx xxx xxxx"></div>
 
+    <div class="fg"><label class="fl">What service are you here for today? *</label>
+      <select class="fs" id="s1Service">
+        <option value="">Select today's service…</option>
+        <option value="Nail Services">Nail Services (Manicure, Pedicure, Extensions, Nail Art, Spa)</option>
+        <option value="Facial / Skin Treatment">Facial / Skin Treatment</option>
+        <option value="Laser Treatment">Laser Treatment (Diode, Carbon, Pico)</option>
+        <option value="Exilis / Body Contouring">Exilis / Body Contouring</option>
+        <option value="Waxing">Waxing</option>
+        <option value="Tattoo / Wart Removal">Tattoo / Wart Removal</option>
+      </select>
+    </div>
+
     <div class="nav-row">
-      <button class="btn-next" onclick="goSec(2)" id="sec1next">Next — Skin & Health →</button>
+      <button class="btn-next" onclick="goSecFromStep1()" id="sec1next">Next →</button>
     </div>
   </div>
 
@@ -466,12 +478,6 @@ body{
 
     <div class="fg"><label class="fl">What are your main beauty goals? <span style="color:var(--ink4);font-weight:400;text-transform:none;">(in your own words)</span></label>
       <textarea class="ft" id="s3Goals" placeholder="e.g. I want clearer skin, reduce dark spots, lose inches on my waist, look more refreshed…" style="min-height:80px;"></textarea>
-    </div>
-
-    <div class="fg"><label class="fl">Today's service / treatment</label>
-      <select class="fs" id="s3Service">
-        <option value="">Select today's service…</option>
-      </select>
     </div>
 
     <div class="nav-row">
@@ -882,6 +888,26 @@ function runAnalysis(){
 }
 
 // ── STEP NAVIGATION ──
+function _serviceSkipsHealthSteps(){
+  const svc=document.getElementById('s1Service').value;
+  return svc==='Nail Services'||svc==='Waxing';
+}
+function goSecFromStep1(){
+  const fn=document.getElementById('s1FirstName').value.trim();
+  const ln=document.getElementById('s1LastName').value.trim();
+  const ph=document.getElementById('s1Phone').value.trim();
+  const bd=document.getElementById('s1Bday').value;
+  const svc=document.getElementById('s1Service').value;
+  if(!fn||!ln||!ph||!bd){
+    alert('Please fill in First Name, Last Name, Birthday, and Phone Number to continue.');
+    return;
+  }
+  if(!svc){
+    alert('Please select today\'s service to continue.');
+    return;
+  }
+  goSec(_serviceSkipsHealthSteps()?4:2);
+}
 function goSec(n){
   // Validate step 1
   if(n>1){
@@ -1020,7 +1046,7 @@ async function submitForm(){
     sunExposure,
     currentProducts,
     goals:document.getElementById('s3Goals').value.trim(),
-    todayService:document.getElementById('s3Service').value,
+    todayService:document.getElementById('s1Service').value,
     // Consent — stored in the same structure as the main POS app
     consentSigned:true,
     signature:sig,
@@ -1107,7 +1133,7 @@ function showSuccess(ref, name){
 function resetForm(){
   // Reset all fields
   ['s1FirstName','s1LastName','s1Phone','s1Email','s1Address','s1Messenger','s1Emergency','s2Allergies','s2Meds','s2PrevTx','s3Goals'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
-  ['s1Bday','s1Gender','s1Source','s2SkinType','s2Fitz','s3Service'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['s1Bday','s1Gender','s1Source','s1Service','s2SkinType','s2Fitz'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.querySelectorAll('.check-item.checked').forEach(el=>{el.classList.remove('checked');el.querySelector('input').checked=false;});
   document.querySelectorAll('.rating-btn.sel').forEach(b=>b.classList.remove('sel'));
   document.querySelectorAll('.consent-check.checked').forEach(el=>el.classList.remove('checked'));
@@ -1120,39 +1146,8 @@ function resetForm(){
   document.getElementById('submitBtn').textContent='✓ Submit Form';
 }
 
-// ── LOAD SERVICES ──
-async function loadServices(){
-  document.getElementById('consentBox').textContent=WAIVERS.general;
-  const FALLBACK_SERVICES=[
-    'HydraFacial Treatment','Brightening Facial','Moisturising / Hydrating Facial',
-    'Anti-Ageing / Collagen Facial','Acne Control / Deep Cleansing Facial',
-    'Calming / Sensitive Skin Facial','Exfoliating / Resurfacing Facial',
-    'Pore Refining / Oil Control Facial','Glow / Radiance Facial',
-    'Chemical Peel (Medium)','Microneedling','Carbon Laser Facial',
-    'Pico Laser','Laser Hair Removal','RF Body Contouring / Exilis',
-    'Botox — Forehead','Botox — Brows / Bunny Lines','Lip Filler',
-    'Cheek / Jawline Filler','Glutathione IV Drip','Skin Booster IV',
-  ];
-  const sel=document.getElementById('s3Service');
-  let services=[];
-  try{
-    if(db){
-      const snap=await db.ref('gb/serviceNames').once('value');
-      const val=snap.val()||[];
-      const arr=Array.isArray(val)?val:Object.values(val);
-      services=arr.filter(p=>p&&p.name).map(p=>p.name);
-    }
-  }catch(e){}
-  // Use Firebase services if available, otherwise fallback
-  const list=services.length?services:FALLBACK_SERVICES;
-  list.forEach(name=>{
-    const opt=document.createElement('option');
-    opt.value=name; opt.textContent=name;
-    sel.appendChild(opt);
-  });
-}
-
-loadServices();
+// Service dropdown is hardcoded in HTML — set initial waiver on load
+document.getElementById('consentBox').textContent=WAIVERS.general;
 </script>
 </body>
 </html>
