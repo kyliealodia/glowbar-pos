@@ -11644,7 +11644,7 @@ function _showConsentPrompt(unsigned, client, callback){
 }
 
 function startConsentQueue(){closeM('consentRequiredModal');processConsentQueue();}
-function skipConsentQueue(){closeM('consentRequiredModal');_cfQueue=[];_cfQueueClient=null;_cfQueueCallback=null;}
+function skipConsentQueue(){closeM('consentRequiredModal');_cfQueue=[];_cfQueueClient=null;const cb=_cfQueueCallback;_cfQueueCallback=null;if(cb)cb();}
 
 function processConsentQueue(){
   if(!_cfQueue.length){
