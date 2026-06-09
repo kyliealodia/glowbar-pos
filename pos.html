@@ -3567,6 +3567,59 @@ function afterLoad(){
     if(S.walkInQueue.length!==before) sync('walkInQueue');
   }
   updateQueueBadge();
+  if(useCloud) cleanupFirebaseProducts();
+}
+
+async function cleanupFirebaseProducts(){
+  try{
+    const flagSnap=await db.ref('gb/prodCleanV3').once('value');
+    if(flagSnap.val()===true) return; // already ran
+  } catch(e){ return; }
+
+  const STALE=new Set([
+    'Face','Underarm','Arms & Legs','Bikini','Full Body',
+    'Upper Lip Wax','Lower Lip Wax','Bikini Wax',
+    'HydraFacial','High Frequency',
+    'Diode Single','Diode Package','Single Session','Package',
+    'Fat Reduction','Lifting','Fat Reduction Package','Lifting Package',
+    'Tattoo Removal Small','Tattoo Removal Medium','Tattoo Removal Large',
+    'Wart Removal Small','Wart Removal Medium','Wart Removal Large',
+    'Glitter/Foil','Nail Stickers',
+    'Skin Rejuvenation Single','Skin Rejuvenation Package',
+    'Remove and Rejuve Combo Underarms'
+  ]);
+  const PRICES={
+    'Classic Manicure':240,'Classic Pedicure':270,
+    'Gel Manicure':450,'Gel Pedicure':480,
+    'Hand Spa':450,'Foot Spa':600,
+    'Hand Paraffin':350,'Foot Paraffin':450,
+    'Classic Mani and Pedi':500,'Gel Manicure and Pedicure':900,
+    'Brazilian':1000,'Brazilian Wax':1000,
+    'Full Face with Neck':3200,'Full Face':2800
+  };
+  try{
+    const snap=await db.ref('gb/products').once('value');
+    let prods=[];
+    if(snap.exists()){
+      const v=snap.val();
+      prods=(Array.isArray(v)?v:Object.values(v)).filter(p=>p!=null);
+    }
+    prods=prods
+      .filter(p=>!STALE.has(p.name))
+      .map(p=>PRICES[p.name]?{...p,price:PRICES[p.name]}:p);
+    await db.ref('gb/products').set(prods);
+    // Reload S.products from cleaned Firebase data
+    const snap2=await db.ref('gb/products').once('value');
+    if(snap2.exists()){
+      const v2=snap2.val();
+      S.products=(Array.isArray(v2)?v2:Object.values(v2)).filter(p=>p!=null);
+    }
+    await db.ref('gb/prodCleanV3').set(true);
+    if(document.getElementById('page-pos')?.classList.contains('active')) renderPOS();
+    showToast('✅ Services updated','ok');
+  } catch(e){
+    console.warn('cleanupFirebaseProducts failed',e);
+  }
 }
 
 function updateClock(){const el=document.getElementById('sbClock');if(el)el.textContent=new Date().toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'});}
@@ -4260,11 +4313,12 @@ function renderSvcs(){
         <div class="sc-pr">${fmtPrice(data.price)}</div>
         <div class="sc-st">${data.sessions} sessions</div></div>`;
     }
-    const isService=data.unit==='sessions';
+    const _PHYS_UNITS=['pcs','ml','g','vials','syringes','bottles','boxes','sets'];
+    const isService=!_PHYS_UNITS.includes(data.unit||'');
     const sc=isService?'':(data.stock===0?'out':data.stock<=data.lowAt?'low':'');
     const sl=isService?'':(data.stock===0?'Out of stock':data.stock<=data.lowAt?`⚠ ${data.stock} ${data.unit}`:data.stock+' '+data.unit);
     const oos=!isService&&data.stock===0;
-    return `<div class="svc-card${oos?' oos':''}" onclick="${!oos?`addToCart('product',${data.id})`:''}">
+    return `<div class="svc-card${oos?' oos':''}" onclick="addToCart('product',${data.id})">
       ${data.subcat?`<div class="sc-cat" style="color:var(--gold-dk);font-size:9px;">${data.subcat}</div>`:`<div class="sc-cat">${data.cat}</div>`}
       <div class="sc-nm">${data.name}</div>
       <div class="sc-pr">${fmtPrice(data.price)}</div>
@@ -4275,7 +4329,8 @@ function renderSvcs(){
 function addToCart(type,id,skipAddons=false){
   if(type==='product'){
     const p=S.products.find(x=>x.id===id);
-    const isService=p&&p.unit==='sessions';
+    const _PHYS=['pcs','ml','g','vials','syringes','bottles','boxes','sets'];
+    const isService=p&&!_PHYS.includes(p.unit||'');
     if(!p||(p.stock===0&&!isService))return;
     // Show add-ons popup if service has add-ons defined and not already skipped
     if(!skipAddons && p.addons && p.addons.length){
