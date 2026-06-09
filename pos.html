@@ -4307,7 +4307,7 @@ function renderSvcs(){
   }
   g.innerHTML=items.map(({type,data})=>{
     if(type==='package'){
-      return `<div class="svc-card pkg" onclick="addToCart('pkg',${data.id})">
+      return `<div class="svc-card pkg" onclick="addToCart('${data.id}')">
         <div class="sc-cat" style="color:var(--gold-dk);">✨ Package</div>
         <div class="sc-nm">${data.name}</div>
         <div class="sc-pr">${fmtPrice(data.price)}</div>
@@ -4318,7 +4318,7 @@ function renderSvcs(){
     const sc=isService?'':(data.stock===0?'out':data.stock<=data.lowAt?'low':'');
     const sl=isService?'':(data.stock===0?'Out of stock':data.stock<=data.lowAt?`⚠ ${data.stock} ${data.unit}`:data.stock+' '+data.unit);
     const oos=!isService&&data.stock===0;
-    return `<div class="svc-card${oos?' oos':''}" onclick="addToCart('product',${data.id})">
+    return `<div class="svc-card${oos?' oos':''}" onclick="addToCart('${data.id}')">
       ${data.subcat?`<div class="sc-cat" style="color:var(--gold-dk);font-size:9px;">${data.subcat}</div>`:`<div class="sc-cat">${data.cat}</div>`}
       <div class="sc-nm">${data.name}</div>
       <div class="sc-pr">${fmtPrice(data.price)}</div>
@@ -4326,28 +4326,29 @@ function renderSvcs(){
   }).join('')||'<div style="grid-column:1/-1;text-align:center;color:var(--ink3);padding:30px;font-size:13px;">No items found</div>';
 }
 
-function addToCart(type,id,skipAddons=false){
-  if(type==='product'){
-    const p=S.products.find(x=>x.id===id);
-    const _PHYS=['pcs','ml','g','vials','syringes','bottles','boxes','sets'];
-    const isService=p&&!_PHYS.includes(p.unit||'');
-    if(!p||(p.stock===0&&!isService))return;
-    // Show add-ons popup if service has add-ons defined and not already skipped
-    if(!skipAddons && p.addons && p.addons.length){
-      openAddonModal(p);
-      return;
-    }
-    const ex=cart.find(c=>c.type==='product'&&c.id===id);
+function addToCart(id,skipAddons=false){
+  const sid=String(id);
+  const _PHYS=['pcs','ml','g','vials','syringes','bottles','boxes','sets'];
+  // Search products first
+  const p=S.products.find(x=>String(x.id)===sid);
+  if(p){
+    const isService=!_PHYS.includes(p.unit||'');
+    if(p.stock===0&&!isService)return;
+    if(!skipAddons&&p.addons&&p.addons.length){openAddonModal(p);return;}
+    const ex=cart.find(c=>c.type==='product'&&String(c.id)===sid);
     if(ex){if(!isService&&ex.qty>=p.stock){showToast(`Only ${p.stock} ${p.unit} available`,'err');return;}ex.qty++;}
-    else cart.push({type:'product',id,name:p.name,price:p.price,qty:1,unit:p.unit,addons:[]});
-  } else {
-    const p=S.packages.find(x=>x.id===id);
-    const ex=cart.find(c=>c.type==='package'&&c.id===id);
-    if(ex)ex.qty++;
-    else cart.push({type:'package',id,name:p.name,price:p.price,qty:1,unit:'package',addons:[]});
+    else cart.push({type:'product',id:p.id,name:p.name,price:p.price,qty:1,unit:p.unit,addons:[]});
+    renderCart();
+    showToast('Added ✓ — tap Order tab to checkout');
+    return;
   }
+  // Fall back to packages
+  const pkg=S.packages.find(x=>String(x.id)===sid);
+  if(!pkg)return;
+  const ex=cart.find(c=>c.type==='package'&&String(c.id)===sid);
+  if(ex)ex.qty++;
+  else cart.push({type:'package',id:pkg.id,name:pkg.name,price:pkg.price,qty:1,unit:'package',addons:[]});
   renderCart();
-  // On mobile, briefly flash the Order tab badge — don't auto-switch so they can keep adding
   showToast('Added ✓ — tap Order tab to checkout');
 }
 
@@ -4399,14 +4400,14 @@ function updateAddonTotal(basePrice){
 }
 
 function confirmAddons(){
-  const pid=parseInt(document.getElementById('addonModal').dataset.productId);
-  const p=S.products.find(x=>x.id===pid);
+  const sid=String(document.getElementById('addonModal').dataset.productId);
+  const p=S.products.find(x=>String(x.id)===sid);
   if(!p)return;
   const selectedAddons=[...window._selectedAddons].map(i=>p.addons[i]).filter(Boolean);
   const addonsTotal=selectedAddons.reduce((s,a)=>s+a.price,0);
-  const ex=cart.find(c=>c.type==='product'&&c.id===pid);
+  const ex=cart.find(c=>c.type==='product'&&String(c.id)===sid);
   if(ex){ex.qty++;ex.addons=[...ex.addons,...selectedAddons];}
-  else cart.push({type:'product',id:pid,name:p.name,price:p.price+addonsTotal,basePrice:p.price,qty:1,unit:p.unit,addons:selectedAddons});
+  else cart.push({type:'product',id:p.id,name:p.name,price:p.price+addonsTotal,basePrice:p.price,qty:1,unit:p.unit,addons:selectedAddons});
   closeM('addonModal');
   renderCart();
   const addonNames=selectedAddons.length?` + ${selectedAddons.map(a=>a.name).join(', ')}`:'';
@@ -5792,7 +5793,7 @@ function addRoomToCart(rid){
   if(p){
     selClient=S.clients.find(c=>c.name===r.session.client)||null;
     if(selClient)document.getElementById('selClientTxt').innerHTML=`<strong>${selClient.name}</strong>`;
-    addToCart('product',p.id);goPage('pos');showToast('Service added to order');
+    addToCart(p.id);goPage('pos');showToast('Service added to order');
   }else showToast('Service not found in products','err');
 }
 function openAddRoom(){document.getElementById('newRoomName').value='';openM('addRoomModal');}
@@ -7338,12 +7339,12 @@ function applyCalcCost(){
 }
 
 function skipAddons(){
-  const pid=parseInt(document.getElementById('addonModal').dataset.productId);
+  const sid=String(document.getElementById('addonModal').dataset.productId);
   closeM('addonModal');
-  const p=S.products.find(x=>x.id===pid);if(!p)return;
-  const ex=cart.find(c=>c.type==='product'&&c.id===pid);
+  const p=S.products.find(x=>String(x.id)===sid);if(!p)return;
+  const ex=cart.find(c=>c.type==='product'&&String(c.id)===sid);
   if(ex){ex.qty++;}
-  else cart.push({type:'product',id:pid,name:p.name,price:p.price,qty:1,unit:p.unit,addons:[]});
+  else cart.push({type:'product',id:p.id,name:p.name,price:p.price,qty:1,unit:p.unit,addons:[]});
   renderCart();showToast(p.name+' added');
 }
 
