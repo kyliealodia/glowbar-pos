@@ -3510,6 +3510,7 @@ window.addEventListener('DOMContentLoaded',()=>{
         if(!c.name && (c.firstName||c.lastName)) c.name=((c.firstName||'')+' '+(c.lastName||'')).trim();
       });
       renderClientsTable();
+      populateForms();
       if(document.getElementById('page-dashboard')?.classList.contains('active')) renderDashboard();
     });
 
@@ -4207,6 +4208,7 @@ function goPage(name){
   if(name==='products'){setProdView('service');}
   if(name==='attendance'){document.getElementById('attFilterDate').value=td();renderAttendance();}
   if(name==='payslip'){initPayPeriods();renderPayslip();}
+  if(name==='clients'){renderClientsTable();}
   if(name==='users'){renderCashAdvanceAdmin();}
   if(name==='capital'){initCapital();renderCapital();}
   if(name==='sop'){initSOPs();renderSOPs();}
@@ -6676,11 +6678,13 @@ function renderClientsTable(){
   const totalPages=Math.ceil(filtered.length/PAGE)||1;
   if(_clientPage>=totalPages) _clientPage=Math.max(0,totalPages-1);
   const page=filtered.slice(_clientPage*PAGE,(_clientPage+1)*PAGE);
-  document.getElementById('clientsBody').innerHTML=page.map(c=>{
+  const clientsBody=document.getElementById('clientsBody');
+  if(!clientsBody) return;
+  clientsBody.innerHTML=page.map(c=>{
     const avatarColor=c.color||'#B8904A';
     const addedDate=c.submittedAt||c.createdAt||'';
     const addedFmt=addedDate?new Date(addedDate).toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'numeric'}):'—';
-    const isKiosk=c.source==='kiosk';
+    const isKiosk=c.source==='kiosk'||c.source==='intake';
     return `<tr>
       <td><div style="display:flex;align-items:center;gap:9px;"><div style="width:32px;height:32px;border-radius:50%;background:${avatarColor};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#fff;">${initials(c.name||'?')}</div><div><div style="font-size:13px;font-weight:500;">${esc(c.name||'')}${c.vip?' ✨':''}</div><div style="font-size:10px;color:var(--ink3);">${esc(c.email||'')||'—'}</div></div></div></td>
       <td><div style="font-size:12px;">${esc(c.phone||'')}</div></td>
