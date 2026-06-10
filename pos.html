@@ -359,11 +359,11 @@ html{height:-webkit-fill-available;}
 .ci-nm{font-size:12px;font-weight:500;}
 .ci-pr{font-size:10px;color:var(--ink3);}
 .ci-qty{display:flex;align-items:center;gap:5px;margin-top:5px;}
-.qb{width:20px;height:20px;border-radius:5px;background:#fff;border:1px solid var(--border2);cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;transition:background .15s;}
+.qb{min-width:32px;min-height:32px;border-radius:5px;background:#fff;border:1px solid var(--border2);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;transition:background .15s;padding:0;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
 .qb:hover{background:var(--cream3);}
-.qn{font-size:12px;font-weight:600;min-width:16px;text-align:center;}
+.qn{font-size:12px;font-weight:600;min-width:20px;text-align:center;}
 .ci-sub{font-size:12px;font-weight:600;color:var(--gold-dk);}
-.ci-rm{cursor:pointer;font-size:14px;color:var(--ink3);transition:color .2s;}
+.ci-rm{cursor:pointer;font-size:16px;color:var(--ink3);transition:color .2s;background:none;border:none;padding:4px 6px;min-width:32px;min-height:32px;display:flex;align-items:center;justify-content:center;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
 .ci-rm:hover{color:var(--danger);}
 .cart-footer{border-top:1px solid var(--border);padding:12px 16px;}
 .tot-row{display:flex;justify-content:space-between;font-size:12px;color:var(--ink2);margin-bottom:4px;}
@@ -4525,8 +4525,8 @@ function confirmAddons(){
   const addonNames=selectedAddons.length?` + ${selectedAddons.map(a=>a.name).join(', ')}`:'';
   showToast(`${p.name}${addonNames} added`,'ok');
 }
-function chgQty(type,id,d){const i=cart.findIndex(c=>c.type===type&&c.id===id);if(i<0)return;cart[i].qty+=d;if(cart[i].qty<=0)cart.splice(i,1);renderCart();}
-function rmCart(type,id){cart=cart.filter(c=>!(c.type===type&&c.id===id));renderCart();}
+function chgQty(type,id,d){const sid=String(id);const i=cart.findIndex(c=>c.type===type&&String(c.id)===sid);if(i<0)return;cart[i].qty+=d;if(cart[i].qty<=0)cart.splice(i,1);renderCart();}
+function rmCart(type,id){const sid=String(id);cart=cart.filter(c=>!(c.type===type&&String(c.id)===sid));renderCart();}
 
 function renderCart(){
   const el=document.getElementById('cartItems');
@@ -4546,10 +4546,10 @@ function renderCart(){
       <div class="ci-info">
         <div class="ci-nm">${item.name}${item.type==='package'?' ✨':''}</div>
         <div class="ci-pr">${fmtPrice(item.price)} each</div>
-        <div class="ci-qty"><div class="qb" onclick="chgQty('${item.type}',${item.id},-1)">−</div><div class="qn">${item.qty}</div><div class="qb" onclick="chgQty('${item.type}',${item.id},1)">+</div></div>
+        <div class="ci-qty"><button class="qb" onclick="chgQty('${item.type}','${item.id}',-1)">−</button><div class="qn">${item.qty}</div><button class="qb" onclick="chgQty('${item.type}','${item.id}',1)">+</button></div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;">
-        <span class="ci-rm" onclick="rmCart('${item.type}',${item.id})">✕</span>
+        <button class="ci-rm" onclick="rmCart('${item.type}','${item.id}')">✕</button>
         <span class="ci-sub">${fmtPrice(item.price*item.qty)}</span>
       </div>
     </div>`).join('');
