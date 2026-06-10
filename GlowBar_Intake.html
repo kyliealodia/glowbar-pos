@@ -441,6 +441,7 @@ function resetIdleTimer(){
       </select>
     </div>
 
+    <div id="step1Error" style="display:none;background:#fdecea;border:1.5px solid #e05555;border-radius:10px;padding:12px 16px;margin-top:10px;font-size:13px;color:#c0392b;font-weight:500;"></div>
     <div class="nav-row">
       <button class="btn-next" ontouchend="event.preventDefault();goSecFromStep1()" onclick="goSecFromStep1()" id="sec1next">Next →</button>
     </div>
@@ -956,20 +957,29 @@ function _serviceSkipsHealthSteps(){
   const svc=document.getElementById('s1Service').value;
   return svc==='Nail Services'||svc==='Waxing';
 }
+function showStep1Error(msg){
+  const el=document.getElementById('step1Error');
+  if(!el) return;
+  el.textContent=msg;
+  el.style.display='block';
+  el.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+function clearStep1Error(){
+  const el=document.getElementById('step1Error');
+  if(el){el.style.display='none';el.textContent='';}
+}
 function goSecFromStep1(){
+  clearStep1Error();
   const fn=document.getElementById('s1FirstName').value.trim();
   const ln=document.getElementById('s1LastName').value.trim();
   const ph=document.getElementById('s1Phone').value.trim();
   const bd=document.getElementById('s1Bday').value;
   const svc=document.getElementById('s1Service').value;
-  if(!fn||!ln||!ph||!bd){
-    alert('Please fill in First Name, Last Name, Birthday, and Phone Number to continue.');
-    return;
-  }
-  if(!svc){
-    alert('Please select today\'s service to continue.');
-    return;
-  }
+  if(!fn){showStep1Error('⚠️ Please enter your First Name.');document.getElementById('s1FirstName').focus();return;}
+  if(!ln){showStep1Error('⚠️ Please enter your Last Name.');document.getElementById('s1LastName').focus();return;}
+  if(!bd){showStep1Error('⚠️ Please enter your Birthday.');document.getElementById('s1Bday').focus();return;}
+  if(!ph){showStep1Error('⚠️ Please enter your Phone Number.');document.getElementById('s1Phone').focus();return;}
+  if(!svc){showStep1Error('⚠️ Please select the service you are here for today.');document.getElementById('s1Service').focus();return;}
   goSec(_serviceSkipsHealthSteps()?4:2);
 }
 function goSec(n){
@@ -980,7 +990,7 @@ function goSec(n){
     const ph=document.getElementById('s1Phone').value.trim();
     const bd=document.getElementById('s1Bday').value;
     if(!fn||!ln||!ph||!bd){
-      alert('Please fill in First Name, Last Name, Birthday, and Phone Number to continue.');
+      showStep1Error('⚠️ Please fill in First Name, Last Name, Birthday, and Phone Number to continue.');
       goSec(1); return;
     }
   }
@@ -994,6 +1004,7 @@ function goSec(n){
   document.getElementById('sec'+n).classList.add('active');
   document.getElementById('progressFill').style.width=(n/4*100)+'%';
   document.querySelector('.kiosk-body').scrollTop=0;
+  if(n===1) clearStep1Error();
   if(n===4){ initSig(); updateSubmitBtn(); }
 }
 
