@@ -194,14 +194,46 @@ nav{flex:1;padding:12px 0;overflow-y:auto;}
 @media(max-width:768px){
   .sidebar{transform:translateX(-100%);transition:transform .3s;}
   .sidebar.open{transform:translateX(0);}
-  .main{margin-left:0;padding:16px;}
+  .main{margin-left:0;padding:12px 12px 80px;}
   .metrics{grid-template-columns:repeat(2,1fr);}
   .form-row{grid-template-columns:1fr;}
   .mob-hdr{display:flex;align-items:center;gap:10px;margin-bottom:16px;}
-  .mob-menu-btn{background:none;border:none;font-size:22px;cursor:pointer;color:var(--ink);}
+  .mob-menu-btn{background:none;border:none;font-size:22px;cursor:pointer;color:var(--ink);min-height:44px;min-width:44px;}
   #sbOverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:99;}
+  .btn{min-height:44px;}
+  .nav-item{min-height:44px;}
+  .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  /* Bottom nav */
+  #mobBottomNav{display:flex;}
 }
-@media(min-width:769px){.mob-hdr{display:none;}}
+@media(min-width:769px){
+  .mob-hdr{display:none;}
+  #mobBottomNav{display:none;}
+}
+/* Bottom nav base */
+#mobBottomNav{
+  position:fixed;bottom:0;left:0;right:0;height:60px;
+  background:#fff;border-top:1px solid #e8e0d4;z-index:200;
+  align-items:center;justify-content:space-around;
+  box-shadow:0 -2px 8px rgba(0,0,0,0.08);
+}
+.mob-nav-btn{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  flex:1;height:60px;border:none;background:none;cursor:pointer;
+  font-size:10px;color:#888;gap:2px;padding:0;min-width:44px;
+}
+.mob-nav-btn.active{color:var(--gold-dk);}
+.mob-nav-btn .mni{font-size:20px;}
+.mob-nav-signout{color:#e05555;}
+/* Clock in/out button */
+#clockBtn{
+  width:100%;padding:16px;border-radius:12px;border:none;
+  font-size:16px;font-weight:700;font-family:inherit;cursor:pointer;
+  margin-bottom:16px;min-height:56px;
+  transition:background .2s;
+}
+#clockBtn.clocked-in{background:#e05555;color:#fff;}
+#clockBtn.clocked-out{background:#2ecc71;color:#fff;}
 </style>
 </head>
 <body>
@@ -238,6 +270,14 @@ nav{flex:1;padding:12px 0;overflow-y:auto;}
 <!-- APP -->
 <div id="app">
   <div id="sbOverlay" onclick="closeSidebar()"></div>
+  <!-- Mobile bottom navigation -->
+  <div id="mobBottomNav">
+    <button class="mob-nav-btn active" id="mbn-home" onclick="goPage('home')"><span class="mni">🏠</span>Home</button>
+    <button class="mob-nav-btn" id="mbn-attendance" onclick="goPage('attendance')"><span class="mni">🕐</span>Attendance</button>
+    <button class="mob-nav-btn" id="mbn-payslip" onclick="goPage('payslip')"><span class="mni">💰</span>Payslip</button>
+    <button class="mob-nav-btn" id="mbn-leave" onclick="goPage('leave')"><span class="mni">🌿</span>Leave</button>
+    <button class="mob-nav-btn mob-nav-signout" onclick="logout()"><span class="mni">🚪</span>Sign Out</button>
+  </div>
   <div class="app-layout">
 
     <!-- Sidebar -->
@@ -313,14 +353,18 @@ nav{flex:1;padding:12px 0;overflow-y:auto;}
             <select class="form-select" id="attMonth" onchange="renderAttendance()" style="width:160px;font-size:12px;"></select>
           </div>
         </div>
+        <!-- Clock In/Out Button -->
+        <button id="clockBtn" class="clocked-out" onclick="doClockToggle()">⏱ Clock In</button>
         <div class="metrics" id="attMetrics"></div>
         <div class="card">
           <div class="card-hdr"><h3>Log</h3></div>
           <div class="card-body" style="padding:0;">
-            <table class="tbl" id="attTable">
-              <thead><tr><th>Date</th><th>Clock In</th><th>Clock Out</th><th>Hours</th><th>Status</th></tr></thead>
-              <tbody id="attBody"></tbody>
-            </table>
+            <div class="tbl-wrap">
+              <table class="tbl" id="attTable">
+                <thead><tr><th>Date</th><th>Clock In</th><th>Clock Out</th><th>Hours</th><th>Status</th></tr></thead>
+                <tbody id="attBody"></tbody>
+              </table>
+            </div>
           </div>
         </div>
         <!-- Overtime Requests -->
@@ -330,10 +374,12 @@ nav{flex:1;padding:12px 0;overflow-y:auto;}
             <button class="btn btn-gold btn-sm" onclick="openOtModal()">+ Log Overtime</button>
           </div>
           <div class="card-body" style="padding:0;">
-            <table class="tbl">
-              <thead><tr><th>Date</th><th>Hours</th><th>OT Pay</th><th>Reason</th><th>Status</th></tr></thead>
-              <tbody id="otBody"></tbody>
-            </table>
+            <div class="tbl-wrap">
+              <table class="tbl">
+                <thead><tr><th>Date</th><th>Hours</th><th>OT Pay</th><th>Reason</th><th>Status</th></tr></thead>
+                <tbody id="otBody"></tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
@@ -349,10 +395,12 @@ nav{flex:1;padding:12px 0;overflow-y:auto;}
         <div class="card">
           <div class="card-hdr"><h3>Leave History</h3></div>
           <div class="card-body" style="padding:0;">
-            <table class="tbl">
-              <thead><tr><th>Type</th><th>Date(s)</th><th>Days</th><th>Reason</th><th>Status</th></tr></thead>
-              <tbody id="leaveHistory"></tbody>
-            </table>
+            <div class="tbl-wrap">
+              <table class="tbl">
+                <thead><tr><th>Type</th><th>Date(s)</th><th>Days</th><th>Reason</th><th>Status</th></tr></thead>
+                <tbody id="leaveHistory"></tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
@@ -367,10 +415,12 @@ nav{flex:1;padding:12px 0;overflow-y:auto;}
         <div class="card">
           <div class="card-hdr"><h3>My Cash Advance History</h3></div>
           <div class="card-body" style="padding:0;">
-            <table class="tbl">
-              <thead><tr><th>Amount</th><th>Reason</th><th>Date</th><th>Status</th></tr></thead>
-              <tbody id="cashAdvanceHistory"></tbody>
-            </table>
+            <div class="tbl-wrap">
+              <table class="tbl">
+                <thead><tr><th>Amount</th><th>Reason</th><th>Date</th><th>Status</th></tr></thead>
+                <tbody id="cashAdvanceHistory"></tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
@@ -1171,19 +1221,53 @@ function logout(){
 function goPage(name){
   document.querySelectorAll('.page').forEach(p=>p.style.display='none');
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.querySelectorAll('.mob-nav-btn').forEach(n=>n.classList.remove('active'));
   const pg=document.getElementById('page-'+name);
   if(pg) pg.style.display='block';
   const ni=document.querySelector(`.nav-item[onclick="goPage('${name}')"]`);
   if(ni) ni.classList.add('active');
+  const mni=document.getElementById('mbn-'+name);
+  if(mni) mni.classList.add('active');
   closeSidebar();
   if(name==='home') renderHome();
   else if(name==='payslip') renderPayslip();
-  else if(name==='attendance'){renderAttendance();renderOTHistory();}
+  else if(name==='attendance'){renderAttendance();renderOTHistory();updateClockBtn();}
   else if(name==='leave') renderLeave();
   else if(name==='schedule') renderSchedule();
   else if(name==='admin'){renderAdmin();renderAdminPayroll();}
   else if(name==='compliance') renderCompliance();
   else if(name==='cashadvance') renderCashAdvanceHistory();
+}
+
+// ══ CLOCK IN / CLOCK OUT ══
+function updateClockBtn(){
+  const btn=document.getElementById('clockBtn');
+  if(!btn||!currentUser) return;
+  const today=new Date().toDateString();
+  const logs=(S.loginLogs||[]).filter(l=>(l.userId===currentUser.id||l.user===currentUser.name||l.name===currentUser.name)&&new Date(l.time||l.date).toDateString()===today);
+  const lastIn=logs.filter(l=>l.action==='clockin'||l.action==='in').sort((a,b)=>new Date(b.time)-new Date(a.time))[0];
+  const lastOut=logs.filter(l=>l.action==='clockout'||l.action==='out').sort((a,b)=>new Date(b.time)-new Date(a.time))[0];
+  const isClockedIn=lastIn&&(!lastOut||new Date(lastIn.time)>new Date(lastOut.time));
+  btn.className=isClockedIn?'clocked-in':'clocked-out';
+  btn.textContent=isClockedIn?'⏹ Clock Out':'⏱ Clock In';
+}
+function doClockToggle(){
+  const btn=document.getElementById('clockBtn');
+  const isClockedIn=btn&&btn.classList.contains('clocked-in');
+  const action=isClockedIn?'clockout':'clockin';
+  const label=isClockedIn?'Clock Out':'Clock In';
+  if(!confirm(`Confirm ${label}?`)) return;
+  const now=new Date().toISOString();
+  const ref=db.ref('gb/loginLogs').push();
+  ref.set({action,userId:currentUser.id,user:currentUser.name,name:currentUser.name,time:now})
+    .then(()=>{
+      // update local cache
+      if(!S.loginLogs) S.loginLogs=[];
+      S.loginLogs.push({id:ref.key,action,userId:currentUser.id,user:currentUser.name,name:currentUser.name,time:now});
+      updateClockBtn();
+      renderAttendance();
+    })
+    .catch(e=>alert('Error: '+e.message));
 }
 
 function toggleSidebar(){
