@@ -203,7 +203,7 @@ body{
 .waiver-btn.sel{background:var(--gold);border-color:var(--gold);color:#fff;font-weight:500;}
 
 /* ── NAVIGATION ── */
-.nav-row{display:flex;gap:12px;margin-top:8px;}
+.nav-row{display:flex;gap:12px;margin-top:8px;position:sticky;bottom:0;z-index:10;background:#fff;padding:12px 0 6px;}
 .btn-next{
   flex:2;padding:16px;
   background:linear-gradient(135deg,#C9A84C,#B8935A);
@@ -391,7 +391,7 @@ function resetIdleTimer(){
       <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--ink4);">Reference Number</div>
       <div class="s-ref-num" id="refNum">—</div>
     </div>
-    <button class="btn-restart" ontouchend="event.preventDefault();resetForm()" onclick="resetForm()">New Client →</button>
+    <button class="btn-restart" ontouchstart="event.preventDefault();resetForm()" onclick="resetForm()">New Client →</button>
   </div>
 
   <!-- STEP 1 — PERSONAL INFO -->
@@ -443,7 +443,7 @@ function resetIdleTimer(){
 
     <div id="step1Error" style="display:none;background:#fdecea;border:1.5px solid #e05555;border-radius:10px;padding:12px 16px;margin-top:10px;font-size:13px;color:#c0392b;font-weight:500;"></div>
     <div class="nav-row">
-      <button class="btn-next" ontouchend="event.preventDefault();goSecFromStep1()" onclick="goSecFromStep1()" id="sec1next">Next →</button>
+      <button class="btn-next" ontouchstart="event.preventDefault();goSecFromStep1()" onclick="goSecFromStep1()" id="sec1next">Next →</button>
     </div>
   </div>
 
@@ -510,8 +510,8 @@ function resetIdleTimer(){
     <div class="fg"><label class="fl">Previous Aesthetic Treatments</label><textarea class="ft" id="s2PrevTx" placeholder="e.g. Botox 3 months ago, laser hair removal, chemical peels… or write None"></textarea></div>
 
     <div class="nav-row">
-      <button class="btn-back" ontouchend="event.preventDefault();goSec(1)" onclick="goSec(1)">← Back</button>
-      <button class="btn-next" ontouchend="event.preventDefault();runAnalysis();goSec(3)" onclick="runAnalysis();goSec(3)">Next — Lifestyle →</button>
+      <button class="btn-back" ontouchstart="event.preventDefault();goSec(1)" onclick="goSec(1)">← Back</button>
+      <button class="btn-next" ontouchstart="event.preventDefault();runAnalysis();goSec(3)" onclick="runAnalysis();goSec(3)">Next — Lifestyle →</button>
     </div>
   </div>
 
@@ -556,8 +556,8 @@ function resetIdleTimer(){
     </div>
 
     <div class="nav-row">
-      <button class="btn-back" ontouchend="event.preventDefault();goSec(2)" onclick="goSec(2)">← Back</button>
-      <button class="btn-next" ontouchend="event.preventDefault();goSec(4)" onclick="goSec(4)">Next — Consent & Sign →</button>
+      <button class="btn-back" ontouchstart="event.preventDefault();goSec(2)" onclick="goSec(2)">← Back</button>
+      <button class="btn-next" ontouchstart="event.preventDefault();goSec(4)" onclick="goSec(4)">Next — Consent & Sign →</button>
     </div>
   </div>
 
@@ -595,8 +595,8 @@ function resetIdleTimer(){
     </div>
 
     <div class="nav-row">
-      <button class="btn-back" ontouchend="event.preventDefault();goSec(3)" onclick="goSec(3)">← Back</button>
-      <button class="btn-next" ontouchend="event.preventDefault();submitForm()" onclick="submitForm()" id="submitBtn" disabled>✓ Submit Form</button>
+      <button class="btn-back" ontouchstart="event.preventDefault();goSec(3)" onclick="goSec(3)">← Back</button>
+      <button class="btn-next" ontouchstart="event.preventDefault();submitForm()" onclick="submitForm()" id="submitBtn" disabled>✓ Submit Form</button>
     </div>
   </div>
 
