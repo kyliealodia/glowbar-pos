@@ -3835,13 +3835,13 @@ function applyRoleNav(){
 // ══ LOGIN ══
 function renderStaff(){
   document.getElementById('staffGrid').innerHTML=S.users.map(u=>`
-    <div class="staff-btn" id="sbtn-${u.id}" onclick="selStaff(${u.id})">
+    <div class="staff-btn" id="sbtn-${u.id}" onclick="pickLoginStaff(${u.id})">
       <div class="staff-av" style="background:${u.color}">${initials(u.name)}</div>
       <div class="sn">${u.name}</div>
       ${u.role==='owner'?'<div style="font-size:9px;color:var(--gold-dk);letter-spacing:0.5px;">👑 Owner</div>':'<div style="font-size:9px;color:var(--ink4);">'+cap(u.role)+'</div>'}
     </div>`).join('');
 }
-function selStaff(id){
+function pickLoginStaff(id){
   const u=S.users.find(x=>x.id===id);
   document.querySelectorAll('.staff-btn').forEach(b=>b.classList.remove('sel'));
   document.getElementById('sbtn-'+id)?.classList.add('sel');
