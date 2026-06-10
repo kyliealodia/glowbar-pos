@@ -1207,7 +1207,12 @@ function updateDots(){
     d.classList.toggle('filled',i<pin.length);
   }
 }
-function pinEnter(){
+async function hashPin(pin){
+  const enc=new TextEncoder().encode(String(pin));
+  const buf=await crypto.subtle.digest('SHA-256',enc);
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+async function pinEnter(){
   if(useCloud&&!cloudUsersLoaded){
     document.getElementById('loginError').textContent='Connecting to server… Please wait a moment and try again.';
     pin=''; updateDots(); return;
@@ -1216,9 +1221,18 @@ function pinEnter(){
     document.getElementById('loginError').textContent='Please select your name above.';
     pin=''; updateDots(); return;
   }
-  const user=loginSelectedUser.pin===pin?loginSelectedUser:null;
-  if(user){
-    currentUser=user;
+  let pinOk=false;
+  const stored=loginSelectedUser.pin;
+  if(loginSelectedUser.pinHashed){
+    try{pinOk=(await hashPin(pin))===stored;}catch(e){pinOk=false;}
+  } else if(stored&&stored.length===64&&/^[0-9a-f]{64}$/.test(stored)){
+    // Hash stored but pinHashed flag missing
+    try{pinOk=(await hashPin(pin))===stored;}catch(e){pinOk=false;}
+  } else {
+    pinOk=pin===stored;
+  }
+  if(pinOk){
+    currentUser=loginSelectedUser;
     loginSelectedUser=null;
     pin='';
     updateDots();
