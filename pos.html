@@ -639,8 +639,17 @@ html{height:-webkit-fill-available;}
           <div class="metric"><div class="metric-lbl">Total Referrals</div><div class="metric-val" id="mRefCount" style="color:var(--gold-dk)">0</div><div class="metric-sub" id="mRefSub">0 pending</div></div>
           <div class="metric"><div class="metric-lbl">Credits Given</div><div class="metric-val" id="mRefCredits" style="color:var(--success)">₱0</div><div class="metric-sub" id="mRefCreditSub">0 active</div></div>
         </div>
-        <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
-          <button class="btn btn-outline btn-sm" onclick="openEOD()" style="font-size:12px;">📊 End of Day Summary</button>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+          <button class="btn btn-gold btn-sm" id="openShiftBtn" onclick="showOpenShiftModal()" style="font-size:12px;">💵 Open Cash Drawer</button>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-outline btn-sm" id="closeShiftBtn" onclick="openCloseShiftModal()" style="font-size:12px;display:none;">🔒 Close Shift</button>
+            <button class="btn btn-outline btn-sm" onclick="openEOD()" style="font-size:12px;">📊 End of Day</button>
+          </div>
+        </div>
+        <!-- Cash Drawer Card -->
+        <div class="card" id="cashDrawerCard" style="margin-bottom:16px;display:none;">
+          <div class="card-hdr"><h3>💵 Cash Drawer</h3><div id="cashDrawerStatus" style="font-size:11px;color:var(--success);font-weight:600;">● Open</div></div>
+          <div id="cashDrawerBody" style="padding:16px;"></div>
         </div>
         <div class="dash-grid">
           <div class="card"><div class="card-hdr"><h3>Recent Transactions</h3></div><div id="dashTxns"><div style="padding:24px;text-align:center;color:var(--ink3);font-size:12px;">No transactions yet today</div></div></div>
@@ -2817,6 +2826,74 @@ html{height:-webkit-fill-available;}
   </div>
 </div>
 
+<!-- Open Shift / Opening Cash Modal -->
+<div class="overlay hidden" id="openShiftModal">
+  <div class="modal modal-sm">
+    <div class="modal-hdr">
+      <div class="modal-title">💵 Opening Cash</div>
+      <div class="modal-x" onclick="skipOpenShift()">✕</div>
+    </div>
+    <div class="modal-body" style="padding:20px;">
+      <p style="font-size:13px;color:var(--ink2);margin-bottom:18px;">Count the cash in the drawer and enter the total below to start your shift.</p>
+      <div style="margin-bottom:16px;">
+        <label style="font-size:11px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;display:block;margin-bottom:6px;">Opening Cash Amount</label>
+        <div style="display:flex;align-items:center;border:1.5px solid var(--border2);border-radius:10px;overflow:hidden;background:#fff;">
+          <span style="padding:0 12px;font-size:16px;font-weight:600;color:var(--ink2);border-right:1px solid var(--border2);">₱</span>
+          <input type="number" id="openingCashInput" placeholder="0.00" min="0" step="0.01" style="flex:1;border:none;outline:none;padding:13px 12px;font-size:18px;font-weight:600;font-family:'Jost',sans-serif;color:var(--ink);">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:4px;">
+        <button class="btn btn-outline btn-sm" onclick="document.getElementById('openingCashInput').value=500" style="font-size:12px;">₱500</button>
+        <button class="btn btn-outline btn-sm" onclick="document.getElementById('openingCashInput').value=1000" style="font-size:12px;">₱1k</button>
+        <button class="btn btn-outline btn-sm" onclick="document.getElementById('openingCashInput').value=2000" style="font-size:12px;">₱2k</button>
+        <button class="btn btn-outline btn-sm" onclick="document.getElementById('openingCashInput').value=5000" style="font-size:12px;">₱5k</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="skipOpenShift()">Skip for Now</button>
+      <button class="btn btn-gold" onclick="confirmOpenShift()">▶ Start Shift</button>
+    </div>
+  </div>
+</div>
+
+<!-- Close Shift Modal -->
+<div class="overlay hidden" id="closeShiftModal">
+  <div class="modal modal-sm">
+    <div class="modal-hdr">
+      <div class="modal-title">🔒 Close Shift</div>
+      <div class="modal-x" onclick="closeM('closeShiftModal')">✕</div>
+    </div>
+    <div class="modal-body" style="padding:20px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px;">
+        <div style="text-align:center;padding:10px;background:var(--cream2);border-radius:9px;">
+          <div style="font-size:10px;color:var(--ink3);margin-bottom:3px;">Opening Cash</div>
+          <div style="font-size:15px;font-weight:700;" id="closeShiftOpeningCash">₱0</div>
+        </div>
+        <div style="text-align:center;padding:10px;background:var(--cream2);border-radius:9px;">
+          <div style="font-size:10px;color:var(--ink3);margin-bottom:3px;">Cash Sales</div>
+          <div style="font-size:15px;font-weight:700;color:var(--success);" id="closeShiftCashSales">₱0</div>
+        </div>
+        <div style="text-align:center;padding:10px;background:var(--gold-lt,#fdf6e3);border-radius:9px;border:1px solid rgba(201,168,76,0.3);">
+          <div style="font-size:10px;color:var(--ink3);margin-bottom:3px;">Expected</div>
+          <div style="font-size:15px;font-weight:700;color:var(--gold-dk);" id="closeShiftExpected">₱0</div>
+        </div>
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="font-size:11px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;display:block;margin-bottom:6px;">Actual Cash in Drawer</label>
+        <div style="display:flex;align-items:center;border:1.5px solid var(--border2);border-radius:10px;overflow:hidden;background:#fff;">
+          <span style="padding:0 12px;font-size:16px;font-weight:600;color:var(--ink2);border-right:1px solid var(--border2);">₱</span>
+          <input type="number" id="actualCashInput" placeholder="0.00" min="0" step="0.01" oninput="updateCashVariance()" style="flex:1;border:none;outline:none;padding:13px 12px;font-size:18px;font-weight:600;font-family:'Jost',sans-serif;color:var(--ink);">
+        </div>
+      </div>
+      <div id="cashVarianceDisplay" style="font-size:14px;font-weight:700;text-align:center;min-height:22px;padding:8px;border-radius:8px;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeM('closeShiftModal')">Cancel</button>
+      <button class="btn btn-gold" onclick="confirmCloseShift()">🔒 Close Shift</button>
+    </div>
+  </div>
+</div>
+
 <!-- End Session Modal -->
 <div class="overlay hidden" id="endSessionModal">
   <div class="modal modal-sm">
@@ -3347,6 +3424,7 @@ let S = {
   deletedTransactions:[],
   messages:[],
   loginLogs:[],
+  shifts:[],
   machines:[
     {id:'exilis', name:'Exilis', purchasePrice:350000, desc:'RF Skin Tightening & Body Contouring', icon:'⚡', records:[]},
     {id:'pico', name:'Pico Diode', purchasePrice:280000, desc:'Laser Hair Removal & Skin Rejuvenation', icon:'💡', records:[]}
@@ -3528,6 +3606,11 @@ window.addEventListener('DOMContentLoaded',()=>{
       if(document.getElementById('page-bookings')?.classList.contains('active')) renderBookings();
       if(document.getElementById('page-calendar')?.classList.contains('active')) renderCalendar();
       if(currentUser) checkNewBookings(S.bookings);
+    });
+
+    db.ref('gb/shifts').on('value', snap=>{
+      S.shifts=snap.exists()?Object.values(snap.val()):[];
+      if(document.getElementById('page-dashboard')?.classList.contains('active')) renderCashDrawer();
     });
 
     // Fallback — if Firebase takes more than 4s, load with whatever we have
@@ -3906,6 +3989,7 @@ async function doLogin(){
   startInactivityWatch();
   selStaff=null; updateStaffSel();
   showToast('Welcome, '+currentUser.name.split(' ')[0]+'! ✨','ok');
+  setTimeout(()=>showOpenShiftModal(),600);
 }
 
 function doLogout(){
@@ -7801,6 +7885,142 @@ function confirmSchedule(){
   showToast('Message scheduled for '+new Date(t).toLocaleString('en-PH'),'ok');
 }
 
+// ══ SHIFTS / CASH DRAWER ══
+function getTodayShift(){
+  const today=td();
+  return (S.shifts||[]).find(s=>s.date===today&&s.status==='open')||null;
+}
+function showOpenShiftModal(){
+  if(!currentUser) return;
+  // Skip if shift already open today
+  if(getTodayShift()) return;
+  document.getElementById('openingCashInput').value='';
+  openM('openShiftModal');
+  setTimeout(()=>document.getElementById('openingCashInput').focus(),200);
+}
+function skipOpenShift(){
+  closeM('openShiftModal');
+}
+function confirmOpenShift(){
+  const amt=parseFloat(document.getElementById('openingCashInput').value)||0;
+  const now=new Date();
+  const shiftRef=db.ref('gb/shifts').push();
+  const shift={
+    id:shiftRef.key,
+    date:td(),
+    openedBy:currentUser.name,
+    openedById:currentUser.id,
+    openTime:now.toISOString(),
+    openingCash:amt,
+    status:'open'
+  };
+  shiftRef.set(shift).then(()=>{
+    closeM('openShiftModal');
+    renderCashDrawer();
+    showToast('Shift started · Opening cash '+fmtPrice(amt),'ok');
+  }).catch(e=>showToast('Could not save shift: '+e.message,'err'));
+}
+function renderCashDrawer(){
+  const card=document.getElementById('cashDrawerCard');
+  const openBtn=document.getElementById('openShiftBtn');
+  const closeBtn=document.getElementById('closeShiftBtn');
+  if(!card) return;
+  const shift=getTodayShift();
+  const today=td();
+  const cashSales=S.transactions
+    .filter(t=>t.time?.startsWith(today)&&t.method==='cash')
+    .reduce((s,t)=>s+(t.total||0),0);
+  if(!shift){
+    card.style.display='none';
+    if(openBtn) openBtn.style.display='';
+    if(closeBtn) closeBtn.style.display='none';
+    return;
+  }
+  card.style.display='';
+  if(openBtn) openBtn.style.display='none';
+  if(closeBtn) closeBtn.style.display='';
+  const expected=shift.openingCash+cashSales;
+  const openAt=new Date(shift.openTime).toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'});
+  document.getElementById('cashDrawerBody').innerHTML=`
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;">
+      <div style="text-align:center;padding:12px 8px;background:var(--cream2);border-radius:10px;">
+        <div style="font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Opening Cash</div>
+        <div style="font-size:18px;font-weight:700;color:var(--ink);">${fmtPrice(shift.openingCash)}</div>
+      </div>
+      <div style="text-align:center;padding:12px 8px;background:var(--cream2);border-radius:10px;">
+        <div style="font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Cash Sales</div>
+        <div style="font-size:18px;font-weight:700;color:var(--success);">+${fmtPrice(cashSales)}</div>
+      </div>
+      <div style="text-align:center;padding:12px 8px;background:var(--gold-lt,#fdf6e3);border-radius:10px;border:1px solid rgba(201,168,76,0.2);">
+        <div style="font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Expected in Drawer</div>
+        <div style="font-size:18px;font-weight:700;color:var(--gold-dk);">${fmtPrice(expected)}</div>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--ink3);">Opened by <strong>${shift.openedBy}</strong> at ${openAt}</div>`;
+}
+function openCloseShiftModal(){
+  const shift=getTodayShift();
+  if(!shift){showToast('No open shift to close','warn');return;}
+  const today=td();
+  const cashSales=S.transactions.filter(t=>t.time?.startsWith(today)&&t.method==='cash').reduce((s,t)=>s+(t.total||0),0);
+  const expected=shift.openingCash+cashSales;
+  document.getElementById('closeShiftOpeningCash').textContent=fmtPrice(shift.openingCash);
+  document.getElementById('closeShiftCashSales').textContent='+'+fmtPrice(cashSales);
+  document.getElementById('closeShiftExpected').textContent=fmtPrice(expected);
+  document.getElementById('actualCashInput').value='';
+  document.getElementById('cashVarianceDisplay').textContent='';
+  document.getElementById('cashVarianceDisplay').style.background='';
+  openM('closeShiftModal');
+  setTimeout(()=>document.getElementById('actualCashInput').focus(),200);
+}
+function updateCashVariance(){
+  const shift=getTodayShift();
+  if(!shift) return;
+  const today=td();
+  const cashSales=S.transactions.filter(t=>t.time?.startsWith(today)&&t.method==='cash').reduce((s,t)=>s+(t.total||0),0);
+  const expected=shift.openingCash+cashSales;
+  const actual=parseFloat(document.getElementById('actualCashInput').value)||0;
+  const variance=actual-expected;
+  const el=document.getElementById('cashVarianceDisplay');
+  if(!document.getElementById('actualCashInput').value){el.textContent='';el.style.background='';return;}
+  if(variance>0){
+    el.textContent='Cash Over: +'+fmtPrice(variance);
+    el.style.color='var(--success)';el.style.background='rgba(58,125,82,0.08)';
+  } else if(variance<0){
+    el.textContent='Cash Short: -'+fmtPrice(Math.abs(variance));
+    el.style.color='var(--danger)';el.style.background='rgba(184,64,64,0.08)';
+  } else {
+    el.textContent='✓ Balanced';
+    el.style.color='var(--success)';el.style.background='rgba(58,125,82,0.08)';
+  }
+}
+function confirmCloseShift(){
+  const shift=getTodayShift();
+  if(!shift) return;
+  const today=td();
+  const cashSales=S.transactions.filter(t=>t.time?.startsWith(today)&&t.method==='cash').reduce((s,t)=>s+(t.total||0),0);
+  const expected=shift.openingCash+cashSales;
+  const actual=parseFloat(document.getElementById('actualCashInput').value)||0;
+  const variance=actual-expected;
+  const closed={
+    ...shift,
+    status:'closed',
+    closedBy:currentUser.name,
+    closedById:currentUser.id,
+    closeTime:new Date().toISOString(),
+    totalCashSales:cashSales,
+    expectedCash:expected,
+    closingCash:actual,
+    cashVariance:variance
+  };
+  db.ref('gb/shifts/'+shift.id).set(closed).then(()=>{
+    closeM('closeShiftModal');
+    renderCashDrawer();
+    const varLabel=variance>0?'Cash over '+fmtPrice(variance):variance<0?'Cash short '+fmtPrice(Math.abs(variance)):'Balanced';
+    showToast('Shift closed · '+varLabel,variance<0?'err':'ok');
+  }).catch(e=>showToast('Could not close shift: '+e.message,'err'));
+}
+
 // ══ DASHBOARD ══
 function renderDashboard(){
   const today=td();
@@ -7841,6 +8061,8 @@ function renderDashboard(){
       </div>`).join(''):'<div style="padding:24px;text-align:center;color:var(--ink3);font-size:12px;">No appointments today</div>';
   }
 
+  // ── Cash Drawer ──
+  renderCashDrawer();
   // ── Alerts panel ──
   renderDashAlerts();
 }
