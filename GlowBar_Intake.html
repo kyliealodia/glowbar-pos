@@ -16,6 +16,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;-webkit-appearance:none;}
+label{touch-action:manipulation;}
 :root{
   --gold:#C9A84C;--gold-dk:#9C7A2C;--gold-lt:#F5EDD8;
   --ink:#2C2318;--ink2:#5C4F3D;--ink3:#9C8C78;--ink4:#C4B49A;
@@ -122,6 +124,7 @@ body{
   font-size:13px;
   color:var(--ink2);
   user-select:none;
+  touch-action:manipulation;min-height:44px;
 }
 .check-item:hover{border-color:var(--gold);background:var(--gold-lt);}
 .check-item.checked{border-color:var(--gold);background:var(--gold-lt);color:var(--ink);}
@@ -144,6 +147,7 @@ body{
   border-radius:10px;cursor:pointer;text-align:center;
   font-size:13px;color:var(--ink2);
   transition:all .2s;font-family:'DM Sans',sans-serif;
+  touch-action:manipulation;min-height:44px;
 }
 .rating-btn:hover{border-color:var(--gold);}
 .rating-btn.sel{border-color:var(--gold);background:var(--gold-lt);font-weight:600;color:var(--gold-dk);}
@@ -194,7 +198,7 @@ body{
 
 /* ── WAIVER SELECTOR ── */
 .waiver-sel{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
-.waiver-btn{padding:7px 14px;border:1.5px solid var(--cream3);border-radius:20px;background:var(--cream);font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;color:var(--ink2);transition:all .2s;}
+.waiver-btn{padding:7px 14px;border:1.5px solid var(--cream3);border-radius:20px;background:var(--cream);font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;color:var(--ink2);transition:all .2s;touch-action:manipulation;min-height:44px;}
 .waiver-btn:hover{border-color:var(--gold);}
 .waiver-btn.sel{background:var(--gold);border-color:var(--gold);color:#fff;font-weight:500;}
 
@@ -206,6 +210,7 @@ body{
   color:#fff;border:none;border-radius:12px;
   font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;
   cursor:pointer;letter-spacing:0.3px;transition:all .2s;
+  touch-action:manipulation;min-height:56px;
 }
 .btn-next:hover{background:linear-gradient(135deg,#B8935A,#9C7A2C);}
 .btn-next:disabled{opacity:0.4;cursor:not-allowed;}
@@ -215,6 +220,7 @@ body{
   border:1.5px solid var(--cream3);border-radius:12px;
   font-family:'DM Sans',sans-serif;font-size:14px;
   cursor:pointer;transition:all .2s;
+  touch-action:manipulation;min-height:56px;
 }
 .btn-back:hover{border-color:var(--gold);}
 
@@ -240,7 +246,7 @@ body{
   background:linear-gradient(135deg,#C9A84C,#B8935A);
   color:#fff;border:none;border-radius:12px;
   font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;
-  cursor:pointer;
+  cursor:pointer;touch-action:manipulation;min-height:56px;
 }
 
 /* ── IDLE SCREEN ── */
@@ -385,7 +391,7 @@ function resetIdleTimer(){
       <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--ink4);">Reference Number</div>
       <div class="s-ref-num" id="refNum">—</div>
     </div>
-    <button class="btn-restart" onclick="resetForm()">New Client →</button>
+    <button class="btn-restart" ontouchend="event.preventDefault();resetForm()" onclick="resetForm()">New Client →</button>
   </div>
 
   <!-- STEP 1 — PERSONAL INFO -->
@@ -436,7 +442,7 @@ function resetIdleTimer(){
     </div>
 
     <div class="nav-row">
-      <button class="btn-next" onclick="goSecFromStep1()" id="sec1next">Next →</button>
+      <button class="btn-next" ontouchend="event.preventDefault();goSecFromStep1()" onclick="goSecFromStep1()" id="sec1next">Next →</button>
     </div>
   </div>
 
@@ -503,8 +509,8 @@ function resetIdleTimer(){
     <div class="fg"><label class="fl">Previous Aesthetic Treatments</label><textarea class="ft" id="s2PrevTx" placeholder="e.g. Botox 3 months ago, laser hair removal, chemical peels… or write None"></textarea></div>
 
     <div class="nav-row">
-      <button class="btn-back" onclick="goSec(1)">← Back</button>
-      <button class="btn-next" onclick="runAnalysis();goSec(3)">Next — Lifestyle →</button>
+      <button class="btn-back" ontouchend="event.preventDefault();goSec(1)" onclick="goSec(1)">← Back</button>
+      <button class="btn-next" ontouchend="event.preventDefault();runAnalysis();goSec(3)" onclick="runAnalysis();goSec(3)">Next — Lifestyle →</button>
     </div>
   </div>
 
@@ -549,8 +555,8 @@ function resetIdleTimer(){
     </div>
 
     <div class="nav-row">
-      <button class="btn-back" onclick="goSec(2)">← Back</button>
-      <button class="btn-next" onclick="goSec(4)">Next — Consent & Sign →</button>
+      <button class="btn-back" ontouchend="event.preventDefault();goSec(2)" onclick="goSec(2)">← Back</button>
+      <button class="btn-next" ontouchend="event.preventDefault();goSec(4)" onclick="goSec(4)">Next — Consent & Sign →</button>
     </div>
   </div>
 
@@ -588,8 +594,8 @@ function resetIdleTimer(){
     </div>
 
     <div class="nav-row">
-      <button class="btn-back" onclick="goSec(3)">← Back</button>
-      <button class="btn-next" onclick="submitForm()" id="submitBtn" disabled>✓ Submit Form</button>
+      <button class="btn-back" ontouchend="event.preventDefault();goSec(3)" onclick="goSec(3)">← Back</button>
+      <button class="btn-next" ontouchend="event.preventDefault();submitForm()" onclick="submitForm()" id="submitBtn" disabled>✓ Submit Form</button>
     </div>
   </div>
 
