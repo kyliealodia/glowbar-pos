@@ -23,15 +23,23 @@
   --success:#3A7D52;--danger:#B84040;
   --r:14px;
 }
-html,body{height:100%;height:-webkit-fill-available;overflow:hidden;}
+html{
+  width:100%;height:100%;
+  overflow:hidden;
+  box-sizing:border-box;
+}
 body{
+  margin:0;padding:0;
+  width:100vw;height:100vh;
+  /* Fallbacks for older WebKit */
+  min-height:-webkit-fill-available;
+  overflow:hidden;
   background:var(--cream);
   font-family:'DM Sans',sans-serif;
   color:var(--ink);
   display:flex;
   flex-direction:column;
-  padding-top:env(safe-area-inset-top);
-  padding-bottom:env(safe-area-inset-bottom);
+  box-sizing:border-box;
 }
 
 /* ── HEADER ── */
@@ -237,12 +245,18 @@ body{
 
 /* ── IDLE SCREEN ── */
 .idle-screen{
-  position:fixed;inset:0;
+  position:fixed;
+  top:0;left:0;right:0;bottom:0;
+  width:100vw;height:100vh;
   background:linear-gradient(160deg,#1A1410,#2D2015 50%,#1A1410);
-  display:flex;flex-direction:column;
-  align-items:center;justify-content:center;
+  display:-webkit-flex;display:flex;
+  -webkit-flex-direction:column;flex-direction:column;
+  -webkit-align-items:center;align-items:center;
+  -webkit-justify-content:center;justify-content:center;
   z-index:1000;cursor:pointer;
   transition:opacity .5s;
+  text-align:center;
+  box-sizing:border-box;
 }
 .idle-screen.hidden{opacity:0;pointer-events:none;}
 .idle-glow{width:200px;height:200px;background:radial-gradient(circle,rgba(201,168,76,0.2),transparent 70%);border-radius:50%;display:flex;align-items:center;justify-content:center;margin-bottom:32px;animation:pulse 3s ease-in-out infinite;}
@@ -264,6 +278,14 @@ body{
   .check-grid{grid-template-columns:1fr;}
   .kiosk-body{padding:16px 12px 32px;}
   .section{padding:20px 18px;}
+}
+/* ── TABLET (768×1024 portrait, 1024×768 landscape) ── */
+@media(min-width:600px) and (max-width:1200px){
+  .kiosk-inner{max-width:min(720px,90vw);}
+  .kiosk-body{padding:32px 32px 48px;}
+  .idle-glow{width:240px;height:240px;}
+  .idle-title{font-size:clamp(42px,7vw,62px);}
+  .idle-tap{font-size:15px;}
 }
 </style>
 <meta name="theme-color" content="#1A1410">
