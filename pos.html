@@ -1021,9 +1021,11 @@ html{height:-webkit-fill-available;}
 
       <!-- ATTENDANCE LOG -->
       <div class="page" id="page-attendance">
+        <!-- Prominent clock in/out button -->
+        <button id="attClockBtn" onclick="attClockToggle()" style="display:none;width:100%;padding:18px;border-radius:14px;border:none;font-size:18px;font-weight:700;font-family:'Jost',sans-serif;cursor:pointer;margin-bottom:16px;min-height:60px;letter-spacing:0.3px;transition:background .2s;color:#fff;">⏱ Clock In</button>
         <div class="sec-hdr">
           <h2 class="sec-title">Attendance Log</h2>
-          <div style="display:flex;gap:8px;">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
             <div style="display:flex;border:1px solid var(--border2);border-radius:9px;overflow:hidden;margin-right:8px;">
               <button id="attRangeDay" onclick="setAttRange('day')" style="flex:1;padding:6px 8px;font-size:11px;font-weight:600;border:none;background:var(--gold);color:#fff;cursor:pointer;font-family:'Jost',sans-serif;">Day</button>
               <button id="attRangeWeek" onclick="setAttRange('week')" style="flex:1;padding:6px 8px;font-size:11px;font-weight:600;border:none;background:var(--cream2);color:var(--ink2);cursor:pointer;font-family:'Jost',sans-serif;">Week</button>
@@ -3975,6 +3977,23 @@ function updateClockButtons(){
   const outBtn=document.getElementById('clockOutBtn');
   if(inBtn) inBtn.style.display=isClockedIn?'none':'flex';
   if(outBtn) outBtn.style.display=isClockedIn?'flex':'none';
+  // Update prominent attendance page button
+  const attBtn=document.getElementById('attClockBtn');
+  if(attBtn){
+    attBtn.style.display='block';
+    if(isClockedIn){
+      attBtn.textContent='🔴 Clock Out';
+      attBtn.style.background='#e05555';
+    } else {
+      attBtn.textContent='🟢 Clock In';
+      attBtn.style.background='#2ecc71';
+    }
+  }
+}
+function attClockToggle(){
+  const attBtn=document.getElementById('attClockBtn');
+  const isClockedOut=attBtn&&attBtn.textContent.includes('Clock In');
+  if(isClockedOut) doClockIn(); else doClockOut();
 }
 
 function doClockIn(){
@@ -4213,7 +4232,7 @@ function goPage(name){
   if(name==='bookings')renderBookings();
   if(name==='reports')renderReports();
   if(name==='products'){setProdView('service');}
-  if(name==='attendance'){document.getElementById('attFilterDate').value=td();renderAttendance();}
+  if(name==='attendance'){document.getElementById('attFilterDate').value=td();renderAttendance();updateClockButtons();}
   if(name==='payslip'){initPayPeriods();renderPayslip();}
   if(name==='clients'){renderClientsTable();}
   if(name==='users'){renderCashAdvanceAdmin();}
