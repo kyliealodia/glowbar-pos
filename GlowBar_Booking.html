@@ -323,8 +323,8 @@ function getActivePromo(tabId){
   const ymd=d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate();
   const major=new Set(['facial','glow_wax','diode','pico','exilis','glow_clear','tattoo']);
   const nailSpa=new Set(['nails','spa']);
-  if(ymd<20260609) return {label:'30% OFF Pre-Opening Special',pct:30};
-  if(ymd>=20260610&&ymd<=20260623){
+  if(ymd<=20260614) return {label:'30% OFF Grand Opening Extended Promo',pct:30};
+  if(ymd>=20260615&&ymd<=20260623){
     if(major.has(tabId)) return {label:'20% OFF Grand Opening',pct:20};
     if(ymd<=20260616&&nailSpa.has(tabId)) return {label:'20% OFF Grand Opening — Nails & Spa',pct:20};
   }
@@ -334,8 +334,8 @@ function getActivePromo(tabId){
 function getGlobalPromoBanner(){
   const d=new Date();
   const ymd=d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate();
-  if(ymd<20260609) return '🎉 Pre-Opening Special — 30% OFF all services! Book before June 9.';
-  if(ymd>=20260610&&ymd<=20260616) return '🎉 Grand Opening — 20% OFF all services!';
+  if(ymd<=20260614) return '🎉 Grand Opening Extended Promo! Get 30% OFF all services until June 14, 2026. Book now!';
+  if(ymd>=20260615&&ymd<=20260616) return '🎉 Grand Opening — 20% OFF all services!';
   if(ymd>=20260617&&ymd<=20260623) return '🎉 Grand Opening — 20% OFF facials, waxing, laser, Exilis, and more!';
   return null;
 }
