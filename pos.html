@@ -5845,6 +5845,11 @@ function sendPkgReminderMessenger(clientId,pkgKey){
   window.open('https://m.me/'+(c.messenger.replace('@','')),'_blank');
   showToast('Message copied — paste it in Messenger');
 }
+function copyPkgReminder(clientId,pkgKey){
+  const msg=_getPkgReminderMsg(clientId,pkgKey);
+  if(!msg)return;
+  navigator.clipboard.writeText(msg).then(()=>showToast('Reminder message copied to clipboard')).catch(()=>showToast('Copy failed — try selecting and copying manually','err'));
+}
 
 function sendClientSummary(id){
   const cl=S.clients.find(c=>c.id===id);
@@ -10010,9 +10015,10 @@ function viewClientProfile(id){
           <div style="color:var(--ink3);">Last Session</div><div style="font-weight:600;text-align:right;">${lastStr}</div>
           ${nextDate?`<div style="color:var(--ink3);">Next Suggested</div><div style="font-weight:600;text-align:right;color:var(--gold-dk);">📅 ${nextStr}</div>`:''}
         </div>
-        ${ps.remaining>0?`<div style="display:flex;gap:8px;">
+        ${ps.remaining>0?`<div style="display:flex;gap:8px;flex-wrap:wrap;">
           <button class="btn btn-outline btn-sm" style="flex:1;font-size:11px;" ontouchstart="event.preventDefault();sendPkgReminder('${c.id}','${key}')" onclick="sendPkgReminder('${c.id}','${key}')">📱 SMS Reminder</button>
           ${c.messenger?`<button class="btn btn-outline btn-sm" style="flex:1;font-size:11px;" ontouchstart="event.preventDefault();sendPkgReminderMessenger('${c.id}','${key}')" onclick="sendPkgReminderMessenger('${c.id}','${key}')">💬 Messenger</button>`:''}
+          <button class="btn btn-outline btn-sm" style="flex:1;font-size:11px;" ontouchstart="event.preventDefault();copyPkgReminder('${c.id}','${key}')" onclick="copyPkgReminder('${c.id}','${key}')">📋 Copy</button>
         </div>`:`<div style="font-size:11px;color:var(--danger);text-align:center;padding:4px 0;">📦 All sessions used — consider renewing</div>`}
       </div>`;
     }).join('');
