@@ -5818,10 +5818,8 @@ function _getPkgReminderMsg(clientId,pkgKey){
   const pkgId=parseInt(pkgKey.replace('pkg_',''));
   const pkg=S.packages.find(p=>p.id===pkgId);
   if(!pkg)return'';
-  const isLaser=/laser|pico|diode|carbon/i.test(pkg.name+' '+(pkg.desc||''));
-  const intervalDays=isLaser?28:30;
   const lastUsedDate=ps.lastUsed?new Date(ps.lastUsed):null;
-  const nextDate=lastUsedDate?new Date(lastUsedDate.getTime()+intervalDays*86400000):null;
+  const nextDate=lastUsedDate?new Date(lastUsedDate.getTime()+14*86400000):null;
   const nextStr=nextDate?nextDate.toLocaleDateString('en-PH',{weekday:'long',month:'long',day:'numeric',year:'numeric'}):'soon';
   const name=(c.name||c.firstName||'there').split(' ')[0];
   return `Hi ${name}! This is a reminder that you have ${ps.remaining} session${ps.remaining!==1?'s':''} remaining for your ${pkg.name} package. Your next recommended session is ${nextDate?'on '+nextStr:'coming up soon'}. Reply to book your appointment! — GlowBar Beauty Clinic`;
@@ -9986,11 +9984,9 @@ function viewClientProfile(id){
       const used=total-ps.remaining;
       const pct=Math.round((ps.remaining/total)*100);
       const col=ps.remaining===0?'var(--danger)':ps.remaining<=2?'var(--warn)':'var(--success)';
-      const isLaser=/laser|pico|diode|carbon/i.test(pkg.name+' '+(pkg.desc||''));
-      const intervalDays=isLaser?28:30;
       const lastUsedDate=ps.lastUsed?new Date(ps.lastUsed):null;
       const purchasedDate=ps.purchased?new Date(ps.purchased):null;
-      const nextDate=lastUsedDate?new Date(lastUsedDate.getTime()+intervalDays*86400000):null;
+      const nextDate=lastUsedDate?new Date(lastUsedDate.getTime()+14*86400000):null;
       const fmt=(d,opts)=>d?d.toLocaleDateString('en-PH',opts||{month:'short',day:'numeric',year:'numeric'}):'—';
       const lastStr=fmt(lastUsedDate)||'Not yet used';
       const purchasedStr=fmt(purchasedDate);
