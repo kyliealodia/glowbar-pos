@@ -4453,7 +4453,8 @@ function renderSvcs(){
     const sc=isService?'':(data.stock===0?'out':data.stock<=data.lowAt?'low':'');
     const sl=isService?'':(data.stock===0?'Out of stock':data.stock<=data.lowAt?`⚠ ${data.stock} ${data.unit}`:data.stock+' '+data.unit);
     const oos=!isService&&data.stock===0;
-    return `<div class="svc-card${oos?' oos':''}" onclick="addToCart('${data.id}')">
+    const clickFn=(data.sessions||0)>0?`checkClientPackage('${data.id}')`:`addToCart('${data.id}')`;
+    return `<div class="svc-card${oos?' oos':''}" onclick="${clickFn}">
       ${data.subcat?`<div class="sc-cat" style="color:var(--gold-dk);font-size:9px;">${data.subcat}</div>`:`<div class="sc-cat">${data.cat}</div>`}
       <div class="sc-nm">${data.name}</div>
       <div class="sc-pr">${fmtPrice(data.price)}</div>
@@ -4494,15 +4495,27 @@ function addToCart(id,skipAddons=false){
 }
 
 function checkClientPackage(id){
-  const pkg=S.packages.find(x=>String(x.id)===String(id));
+  // Resolve from S.packages first, fall back to S.products with sessions
+  let pkg=S.packages.find(x=>String(x.id)===String(id));
+  let fromProduct=false;
+  if(!pkg){
+    const prod=S.products.find(x=>String(x.id)===String(id)&&(x.sessions||0)>0);
+    if(prod){pkg={id:prod.id,name:prod.name,price:prod.price,sessions:prod.sessions};fromProduct=true;}
+  }
   if(!pkg)return;
   if(!selClient){showToast('Please select a client first','err');return;}
   const cl=S.clients.find(c=>c.id===selClient.id);
   const ps=cl?.packageSessions?.['pkg_'+pkg.id];
   if(ps&&ps.remaining>0){_openPkgSessionChoice(pkg,ps);return;}
-  const ex=cart.find(c=>c.type==='package'&&String(c.id)===String(id));
-  if(ex)ex.qty++;
-  else cart.push({type:'package',id:pkg.id,name:pkg.name,price:pkg.price,qty:1,unit:'package',addons:[]});
+  if(fromProduct){
+    const ex=cart.find(c=>c.type==='product'&&String(c.id)===String(id));
+    if(ex)ex.qty++;
+    else cart.push({type:'product',id:pkg.id,name:pkg.name,price:pkg.price,qty:1,unit:'sessions',addons:[]});
+  } else {
+    const ex=cart.find(c=>c.type==='package'&&String(c.id)===String(id));
+    if(ex)ex.qty++;
+    else cart.push({type:'package',id:pkg.id,name:pkg.name,price:pkg.price,qty:1,unit:'package',addons:[]});
+  }
   renderCart();
   showToast('Added ✓ — tap Order tab to checkout');
 }
