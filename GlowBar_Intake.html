@@ -565,21 +565,11 @@ function resetIdleTimer(){
   <div class="section" id="sec4">
     <div class="section-title">Care and Consent Agreement</div>
     <div class="section-sub">Please read the following carefully before signing.</div>
+    <div id="consentFormTitle" style="font-size:11px;font-weight:700;color:var(--gold-dk);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:12px;"></div>
 
-    <div class="consent-box" style="max-height:none;display:flex;flex-direction:column;gap:12px;font-size:13px;line-height:1.85;">
-      <p style="margin:0;"><strong>Informed Consent &amp; Risks.</strong> I understand that aesthetic treatments carry inherent risks, including but not limited to temporary redness, swelling, bruising, skin sensitivity, and in rare cases more serious adverse reactions. I have been given the opportunity to ask questions and all questions have been answered to my satisfaction. I understand that results vary per individual and are not guaranteed.</p>
-      <p style="margin:0;"><strong>Medical Disclosure.</strong> I confirm that all information I have provided in this form is truthful, accurate, and complete. I have disclosed all relevant medical history, current medications, supplements, and known allergies. I will inform Glow Bar staff of any changes to my health status on future visits.</p>
-      <p style="margin:0;"><strong>Limitation of Liability.</strong> I understand that Glow Bar Aesthetic Clinic and its staff are not liable for any adverse reactions, complications, or unsatisfactory results arising from undisclosed medical conditions, allergies, contraindications, or failure to follow post-treatment care instructions. I voluntarily consent to treatment and release Glow Bar Aesthetic Clinic, its owners, and staff from any related claims or liability.</p>
-      <p style="margin:0;"><strong>Age &amp; Authority.</strong> I confirm that I am at least 18 years old, or if a minor, that my parent or guardian has reviewed and signed this form on my behalf.</p>
-      <p style="margin:0;"><strong>Sanitation &amp; Safety.</strong> I understand that Glow Bar follows strict sanitation and safety protocols for all treatments and services.</p>
-      <p style="margin:0;"><strong>Photography.</strong> Any before/after photos taken during my visit are for clinical documentation purposes only and will not be shared publicly or used for marketing without my separate written consent.</p>
-      <p style="margin:0;"><strong>Data Privacy.</strong> I consent to the collection and use of my personal information in accordance with the Philippine Data Privacy Act. My information is kept confidential and will not be shared without my consent.</p>
-    </div>
+    <div class="consent-box" id="consentBox" style="max-height:none;display:flex;flex-direction:column;gap:12px;font-size:13px;line-height:1.85;"></div>
 
-    <label class="consent-check" onclick="toggleConsent(this,'c1',event)" id="cc1" style="margin-top:16px;border-color:rgba(201,168,76,0.4);">
-      <input type="checkbox" id="c1"><div class="cc-box">✓</div>
-      <div class="cc-text" style="font-weight:500;">I have read and understood all the information above and agree to the terms of this Care and Consent Agreement.</div>
-    </label>
+    <div id="consentChecks" style="margin-top:16px;"></div>
 
     <div class="fg" style="margin-top:20px;">
       <label class="fl">Client Signature *</label>
@@ -595,7 +585,7 @@ function resetIdleTimer(){
     </div>
 
     <div class="nav-row">
-      <button class="btn-back" ontouchstart="event.preventDefault();goSec(3)" onclick="goSec(3)">← Back</button>
+      <button class="btn-back" ontouchstart="event.preventDefault();goSec4Back()" onclick="goSec4Back()">← Back</button>
       <button class="btn-next" ontouchstart="event.preventDefault();submitForm()" onclick="submitForm()" id="submitBtn" disabled>✓ Submit Form</button>
     </div>
   </div>
@@ -620,16 +610,139 @@ try{
 }catch(e){db=null;}
 
 // ── CONSENT TEMPLATES ──
+const SERVICE_TO_WAIVER={
+  'Nail Services':'nail',
+  'Waxing':'waxing',
+  'Facial / Skin Treatment':'facial',
+  'Laser Treatment':'laser',
+  'Exilis / Body Contouring':'body',
+  'Tattoo / Wart Removal':'general'
+};
+
 const WAIVERS={
-  general:`GENERAL TREATMENT CONSENT & WAIVER\nGlow Bar Beauty Clinic\n\nBy completing and signing this form, I acknowledge that I have been informed about the nature of the aesthetic treatment(s) I am about to receive.\n\n1. INFORMED CONSENT\nThe procedure, its purpose, expected outcomes, and potential risks have been explained to me. I have been given the opportunity to ask questions.\n\n2. RISKS & BENEFITS\nAll aesthetic procedures carry inherent risks including temporary redness, swelling, bruising, and skin sensitivity. Results vary per individual and are not guaranteed.\n\n3. MEDICAL DISCLOSURE\nI confirm that I have accurately disclosed all relevant medical history, current medications, supplements, known allergies, and prior treatments.\n\n4. POST-TREATMENT CARE\nI agree to follow all aftercare instructions provided by the Glow Bar team.\n\n5. NO GUARANTEE OF RESULTS\nAesthetic results cannot be guaranteed. Individual responses vary and multiple sessions may be required.\n\n6. PHOTOGRAPHY\nAny before/after photos taken are for clinical documentation only and will not be shared publicly without my separate written consent.\n\n7. RIGHT TO REFUSE SERVICE\nGlow Bar reserves the right to decline or discontinue any treatment if a safety concern arises.\n\nI have read and understood this consent form in full and voluntarily consent to treatment.`,
-
-  laser:`LASER TREATMENT CONSENT & WAIVER\nGlow Bar Beauty Clinic\n\nThis waiver applies to: Laser Hair Removal, Pico Laser, Carbon Laser Facial, and all laser-based procedures.\n\n1. NATURE OF LASER TREATMENT\nLaser treatments use concentrated light energy to target specific skin structures. I have been informed of the procedure, device used, and expected number of sessions.\n\n2. RISKS & SIDE EFFECTS\nI am aware of potential risks including: temporary redness, swelling, and warmth; post-inflammatory hyperpigmentation (PIH) especially in darker skin tones; paradoxical hair growth (rare); blistering or pigment changes in rare cases; eye injury if protective eyewear is not worn.\n\n3. FITZPATRICK SKIN TYPE\nMy skin type has been assessed and laser settings adjusted accordingly. I agree to inform the technician of any recent sun exposure or tanning.\n\n4. CONTRAINDICATIONS\nI confirm I do NOT have active infections, recent sunburn, photosensitising medications, or pregnancy (for certain laser types) in the treatment area.\n\n5. SUN EXPOSURE\nI agree to avoid direct sun exposure for at least 2 weeks before and after treatment and will apply SPF 30+ daily.\n\nI voluntarily consent to laser treatment at Glow Bar.`,
-
-  injectables:`INJECTABLES CONSENT & WAIVER\nGlow Bar Beauty Clinic\n\nThis waiver applies to: Botulinum Toxin (Botox), Dermal Fillers, IV Drip, and all injectable procedures.\n\n1. BOTULINUM TOXIN (BOTOX)\nEffects appear within 3–7 days and last 3–6 months. Side effects may include temporary bruising, headache, and swelling. I must avoid rubbing the treated area for 24 hours.\n\n2. DERMAL FILLERS\nCommon side effects include bruising, swelling, and tenderness lasting 1–2 weeks. Rare but serious risks include vascular occlusion. I will seek immediate medical attention if I experience severe pain or skin color changes.\n\n3. IV DRIP TREATMENTS\nMild bruising at the IV site is common. I must disclose any known drug allergies before treatment.\n\n4. MEDICAL DISCLOSURE\nI have disclosed all known allergies, blood thinners, autoimmune conditions, and current or planned pregnancy.\n\nI voluntarily consent to injectable treatment at Glow Bar.`,
-
-  facial:`FACIAL TREATMENT CONSENT & WAIVER\nGlow Bar Beauty Clinic\n\nThis waiver applies to: HydraFacial, Chemical Peels, Microneedling, LED Therapy, and facial procedures.\n\n1. CHEMICAL PEELS\nMild to moderate peeling is expected for 3–7 days. I must avoid sun exposure, retinoids, and exfoliants for at least 1 week post-treatment.\n\n2. MICRONEEDLING\nTemporary redness and swelling are expected. I must not use active skincare ingredients (retinol, AHAs, vitamin C) for 48 hours post-treatment.\n\n3. HYDRAFACIAL\nTemporary redness or sensitivity may occur. I will inform my provider of any known product sensitivities.\n\n4. CONTRAINDICATIONS\nI confirm I do not have active skin infections, open wounds, or recent facial surgery in the treatment area. I have not used Accutane within the last 6 months.\n\nI voluntarily consent to facial treatment at Glow Bar.`,
-
-  body:`BODY CONTOURING CONSENT & WAIVER\nGlow Bar Beauty Clinic\n\nThis waiver applies to: RF Body Contouring, Exilis, Cavitation, and body contouring procedures.\n\n1. EXILIS RF TREATMENT\nI may feel a warm to hot sensation during treatment. I must communicate any discomfort immediately. Results develop gradually over 2–3 months as collagen remodels.\n\n2. RISKS\nPotential side effects include temporary redness, swelling, and warmth. Rare risk of burns if contraindications are not disclosed.\n\n3. CONTRAINDICATIONS\nI confirm I do NOT have metal implants, a pacemaker, active infections, pregnancy, or recent surgery in the treatment area.\n\n4. REALISTIC EXPECTATIONS\nBody contouring is not a weight loss solution. Results depend on lifestyle and adherence to the treatment plan.\n\n5. AFTERCARE\nI agree to drink at least 2 litres of water daily after each session.\n\nI voluntarily consent to body contouring treatment at Glow Bar.`
+  general:{
+    title:'General Service Consent & Waiver',
+    box:`<p style="margin:0;"><strong>Informed Consent &amp; Risks.</strong> I understand that aesthetic treatments carry inherent risks including temporary redness, swelling, bruising, and skin sensitivity. In rare cases, more serious adverse reactions may occur. Results vary per individual and are not guaranteed.</p>
+<p style="margin:0;"><strong>Medical Disclosure.</strong> I confirm that all information provided in this form is truthful and complete. I have disclosed all relevant medical history, current medications, supplements, and known allergies. I will inform Glow Bar staff of any changes to my health status on future visits.</p>
+<p style="margin:0;"><strong>Limitation of Liability.</strong> Glow Bar Aesthetic Clinic and its staff are not liable for adverse reactions arising from undisclosed medical conditions, allergies, contraindications, or failure to follow aftercare instructions. I voluntarily consent to treatment and release Glow Bar, its owners, and staff from any related claims.</p>
+<p style="margin:0;"><strong>Age &amp; Authority.</strong> I confirm I am at least 18 years old, or if a minor, that my parent or guardian has reviewed and signed this form on my behalf.</p>
+<p style="margin:0;"><strong>Photography.</strong> Any before/after photos are for clinical documentation only and will not be shared publicly without my separate written consent.</p>
+<p style="margin:0;"><strong>Data Privacy.</strong> I consent to the collection and use of my personal information in accordance with the Philippine Data Privacy Act.</p>`,
+    checks:['I have read and understood this Care and Consent Agreement and voluntarily consent to treatment at Glow Bar Aesthetic Clinic.']
+  },
+  nail:{
+    title:'Nail Services Consent',
+    box:`<p style="margin:0;"><strong>Service Description.</strong> Nail services at Glow Bar include manicure, pedicure, nail extensions, nail art, and nail spa treatments. Services involve trimming, filing, shaping, and applying nail products (polishes, gels, acrylics, or builder gel).</p>
+<p style="margin:0;"><strong>Risks &amp; Side Effects.</strong> Potential risks include temporary skin irritation, allergic reaction to nail products, nail damage or brittleness, cuticle injury, or infection if aftercare instructions are not followed. Please disclose any nail conditions or known product allergies before your service.</p>
+<p style="margin:0;"><strong>Contraindications.</strong> Nail services should be avoided if you have active skin infections, open wounds, nail infections (fungal or bacterial), or severe nail disease around the treatment area. Please inform your technician of any relevant health conditions.</p>
+<p style="margin:0;"><strong>Sanitation &amp; Safety.</strong> Glow Bar uses single-use files and buffers and fully sterilises all metal implements between clients. If you have any concerns about sanitation, please ask your technician before proceeding.</p>
+<p style="margin:0;"><strong>Aftercare.</strong> Moisturise cuticles regularly. Avoid prolonged water exposure for the first 24–48 hours after gel or acrylic application. Follow all product-specific care instructions provided by your technician.</p>
+<p style="margin:0;"><strong>Limitation of Liability.</strong> Glow Bar and its staff are not liable for adverse reactions arising from undisclosed conditions, allergies, or failure to follow aftercare instructions.</p>
+<p style="margin:0;"><strong>Data Privacy.</strong> I consent to the collection of my personal information in accordance with the Philippine Data Privacy Act.</p>`,
+    checks:['I have read and agree to the Nail Services Consent above. I have disclosed any relevant nail conditions, allergies, or product sensitivities to my technician.']
+  },
+  waxing:{
+    title:'Waxing Service Consent',
+    box:`<p style="margin:0;"><strong>Service Description.</strong> Waxing services at Glow Bar involve the removal of unwanted hair using warm or strip wax. Treatment areas may include the face, brows, lip, underarms, arms, legs, or bikini area.</p>
+<p style="margin:0;"><strong>Risks &amp; Side Effects.</strong> Common side effects include temporary redness, sensitivity, minor irritation, and follicular bumps lasting 24–48 hours. Some clients may experience ingrown hairs, folliculitis, or minor bruising. Rare risks include skin lifting or allergic reaction to wax ingredients.</p>
+<p style="margin:0;"><strong>Contraindications — Do NOT wax if you are currently using:</strong></p>
+<ul style="margin:4px 0 0 18px;line-height:2;">
+  <li>Retinol, tretinoin, or any topical retinoids in the treatment area</li>
+  <li>Accutane (isotretinoin) — wait at least 6 months after stopping</li>
+  <li>AHAs (glycolic, lactic acid) or BHAs (salicylic acid) in the treatment area</li>
+  <li>Blood-thinning medications (warfarin, aspirin, ibuprofen regularly)</li>
+  <li>Photosensitising antibiotics (doxycycline, tetracycline)</li>
+</ul>
+<p style="margin:0;"><strong>Do NOT wax</strong> over sunburned, windburned, inflamed, or broken skin. Inform your technician of any recent IPL or laser treatments in the area.</p>
+<p style="margin:0;"><strong>Skin Lifting Risk.</strong> Retinoids significantly thin the skin and increase the risk of skin lifting during waxing. Please disclose all current skincare products and medications, including topical prescriptions.</p>
+<p style="margin:0;"><strong>Aftercare.</strong> Avoid heat (saunas, hot showers, steam rooms, exercise) for 24 hours post-wax. Do not apply deodorant to freshly waxed underarms for 24 hours. Apply soothing lotion and SPF 30+ if sun exposure is unavoidable.</p>
+<p style="margin:0;"><strong>Data Privacy.</strong> I consent to the collection of my personal information in accordance with the Philippine Data Privacy Act.</p>`,
+    checks:[
+      'I confirm I am NOT currently using retinoids (retinol, tretinoin, Accutane) or chemical exfoliants (AHAs/BHAs) in the treatment area, and have not used Accutane within the past 6 months.',
+      'I have read and agree to the Waxing Service Consent above and will follow all aftercare instructions provided by my technician.'
+    ]
+  },
+  facial:{
+    title:'Facial Treatment Consent',
+    box:`<p style="margin:0;"><strong>Service Description.</strong> Facial treatments at Glow Bar include HydraFacial, chemical peels, microneedling, LED therapy, enzyme treatments, and other facial procedures designed to cleanse, exfoliate, and improve skin health and appearance.</p>
+<p style="margin:0;"><strong>Risks &amp; Side Effects.</strong> Common side effects include temporary redness, sensitivity, mild swelling, or tingling lasting a few hours to 2 days. Chemical peels may cause mild to moderate peeling or flaking for 3–7 days post-treatment. Microneedling may result in pinpoint bleeding, redness, and sensitivity for 24–72 hours.</p>
+<p style="margin:0;"><strong>Contraindications — Facial treatments are NOT recommended if you have:</strong></p>
+<ul style="margin:4px 0 0 18px;line-height:2;">
+  <li>Active acne cysts, pustules, or infected skin lesions</li>
+  <li>Open wounds or recent facial surgery (within 3 months)</li>
+  <li>Used Accutane (isotretinoin) within the past 6 months</li>
+  <li>Active cold sores or herpes simplex in the treatment area</li>
+  <li>Keloid or hypertrophic scarring history (for microneedling)</li>
+  <li>Pregnancy (some chemical agents are contraindicated)</li>
+</ul>
+<p style="margin:0;"><strong>Chemical Peel Aftercare.</strong> Avoid sun exposure, retinoids, AHAs, BHAs, and physical exfoliants for at least 7 days after a chemical peel. Apply SPF 30+ daily. Do not pick or peel flaking skin.</p>
+<p style="margin:0;"><strong>Microneedling Aftercare.</strong> Avoid vitamin C serums, retinol, AHAs, and BHAs for 48 hours post-treatment. Use only gentle, fragrance-free products. Apply SPF 30+ daily.</p>
+<p style="margin:0;"><strong>Limitation of Liability.</strong> Results vary and are not guaranteed. Glow Bar is not liable for adverse reactions due to undisclosed conditions or failure to follow pre- and post-treatment instructions.</p>
+<p style="margin:0;"><strong>Data Privacy.</strong> I consent to the collection of my personal information in accordance with the Philippine Data Privacy Act.</p>`,
+    checks:[
+      'I confirm I have not used Accutane (isotretinoin) within the past 6 months and have no active skin infections, open wounds, or cold sores in the treatment area.',
+      'I have read and agree to the Facial Treatment Consent above and will follow all pre- and post-treatment instructions provided by my technician.'
+    ]
+  },
+  laser:{
+    title:'Laser Treatment Consent',
+    box:`<p style="margin:0;"><strong>Service Description.</strong> This consent applies to: <strong>Diode Laser Hair Removal</strong>, <strong>Pico Laser</strong> (skin rejuvenation, pigmentation, tattoo removal), and <strong>Carbon Laser Facial</strong>. These treatments use concentrated light energy to target specific skin structures (hair follicles, pigment, or superficial skin cells).</p>
+<p style="margin:0;"><strong>Risks &amp; Side Effects.</strong> Potential side effects include:</p>
+<ul style="margin:4px 0 0 18px;line-height:2;">
+  <li>Temporary redness, warmth, and swelling in the treated area (usually resolves within hours)</li>
+  <li>Post-inflammatory hyperpigmentation (PIH) — more common in darker skin tones (Fitzpatrick Types IV–VI)</li>
+  <li>Temporary crusting or scabbing over treated pigmented lesions (Pico Laser)</li>
+  <li>Paradoxical hair growth (rare — hair stimulated rather than reduced)</li>
+  <li>Blistering or texture changes in rare cases</li>
+  <li>Eye injury if protective eyewear is not worn during treatment</li>
+</ul>
+<p style="margin:0;"><strong>Contraindications — Laser treatment is NOT suitable if you have:</strong></p>
+<ul style="margin:4px 0 0 18px;line-height:2;">
+  <li>Active skin infections, cold sores, or open wounds in the treatment area</li>
+  <li>Recent sunburn or active tan (within 2 weeks) in the treatment area</li>
+  <li>Photosensitising medications (some antibiotics: doxycycline, tetracycline; certain acne medications)</li>
+  <li>History of keloid or hypertrophic scarring</li>
+  <li>Pregnancy (certain laser types are contraindicated — advise your technician)</li>
+  <li>Epilepsy or seizure disorders triggered by flashing light</li>
+  <li>Gold thread implants or permanent makeup in or near the treatment area</li>
+  <li>Recent use of photosensitising topicals (retinoids, AHAs) in the treatment area</li>
+</ul>
+<p style="margin:0;"><strong>Sun Exposure Policy.</strong> Avoid direct sun exposure and tanning beds for a minimum of 2 weeks before AND after each session. Apply SPF 30+ sunscreen daily throughout the treatment course. Failure to follow sun guidelines significantly increases the risk of PIH and burns.</p>
+<p style="margin:0;"><strong>Fitzpatrick Skin Type.</strong> Skin type will be assessed before treatment and laser settings adjusted accordingly. Clients with darker skin tones (Types IV–VI) should be aware of a higher PIH risk and may require more conservative settings and longer intervals between sessions.</p>
+<p style="margin:0;"><strong>Multiple Sessions.</strong> Most laser treatments require multiple sessions for optimal results. Diode laser hair removal typically requires 6–10 sessions. Individual responses vary significantly.</p>
+<p style="margin:0;"><strong>Limitation of Liability.</strong> Glow Bar is not liable for adverse reactions due to undisclosed contraindications, recent sun exposure, or failure to follow pre- and post-treatment instructions.</p>
+<p style="margin:0;"><strong>Data Privacy.</strong> I consent to the collection of my personal information in accordance with the Philippine Data Privacy Act.</p>`,
+    checks:[
+      'I confirm I have NO active infections, open wounds, recent sunburn or tan (within 2 weeks), or photosensitising medications in the treatment area.',
+      'I agree to avoid direct sun exposure for at least 2 weeks before and after each laser session and will apply SPF 30+ sunscreen daily.',
+      'I have read and understand all contraindications and risks listed above and voluntarily consent to laser treatment at Glow Bar Aesthetic Clinic.'
+    ]
+  },
+  body:{
+    title:'RF / Body Contouring Consent',
+    box:`<p style="margin:0;"><strong>Service Description.</strong> This consent applies to: <strong>Exilis RF</strong> (radiofrequency skin tightening and fat reduction), <strong>Ultrasound Cavitation</strong>, and other non-invasive body contouring procedures. These treatments use energy-based devices to promote fat reduction, lymphatic drainage, and collagen remodelling.</p>
+<p style="margin:0;"><strong>Risks &amp; Side Effects.</strong> Common side effects include temporary redness, warmth, and mild swelling in the treated area, typically resolving within a few hours. The Exilis handpiece will feel warm to hot during treatment — you must communicate any pain or excessive heat immediately. Rare risks include superficial burns if contraindications are not disclosed or the treatment protocol is not followed correctly.</p>
+<p style="margin:0;"><strong>Contraindications — RF/Body Contouring is NOT suitable if you have:</strong></p>
+<ul style="margin:4px 0 0 18px;line-height:2;">
+  <li>Metal implants, plates, pins, rods, or prosthetics in or near the treatment area</li>
+  <li>A cardiac pacemaker, defibrillator (ICD), or any other implanted electronic device</li>
+  <li>Active skin infections, open wounds, or skin conditions in the treatment area</li>
+  <li>Pregnancy or actively nursing</li>
+  <li>Surgery in the treatment area within the past 6 months</li>
+  <li>Uncontrolled diabetes or impaired circulation</li>
+  <li>Active cancer or history of malignant tumours in the treatment area</li>
+  <li>Epilepsy or severe neurological disorders</li>
+</ul>
+<p style="margin:0;"><strong>Realistic Expectations.</strong> Body contouring is NOT a weight loss solution — it is a complement to a healthy lifestyle. Results develop gradually over 2–3 months as collagen remodels. Individual results depend on lifestyle, hydration, diet, and adherence to the treatment plan. A course of multiple sessions is typically required.</p>
+<p style="margin:0;"><strong>Aftercare.</strong> Drink at least 2 litres of water daily after each session to support lymphatic drainage and fat metabolism. Light exercise (walking, low-impact cardio) is encouraged within 24 hours. Avoid alcohol for 24 hours post-treatment.</p>
+<p style="margin:0;"><strong>Limitation of Liability.</strong> Glow Bar is not liable for adverse reactions due to undisclosed contraindications (particularly metal implants or pacemakers) or failure to follow aftercare instructions.</p>
+<p style="margin:0;"><strong>Data Privacy.</strong> I consent to the collection of my personal information in accordance with the Philippine Data Privacy Act.</p>`,
+    checks:[
+      'I confirm I have NO metal implants, pacemaker, implanted electronic devices, active infections, pregnancy, or surgery in or near the treatment area within the past 6 months.',
+      'I agree to drink at least 2 litres of water daily after each session and understand that results develop gradually over 2–3 months.',
+      'I have read and understand all contraindications and risks listed above and voluntarily consent to RF/body contouring treatment at Glow Bar Aesthetic Clinic.'
+    ]
+  }
 };
 
 let currentWaiver='general';
@@ -1005,7 +1118,10 @@ function goSec(n){
   document.getElementById('progressFill').style.width=(n/4*100)+'%';
   document.querySelector('.kiosk-body').scrollTop=0;
   if(n===1) clearStep1Error();
-  if(n===4){ initSig(); updateSubmitBtn(); }
+  if(n===4){ autoSelectWaiver(); initSig(); updateSubmitBtn(); }
+}
+function goSec4Back(){
+  goSec(_serviceSkipsHealthSteps()?1:3);
 }
 
 // ── TOGGLE CHECKS ──
@@ -1022,22 +1138,32 @@ function selectRating(btn,group){
 }
 
 // ── WAIVER ──
-function switchWaiver(btn,key){
-  document.querySelectorAll('.waiver-btn').forEach(b=>b.classList.remove('sel'));
-  btn.classList.add('sel');
-  currentWaiver=key;
-  document.getElementById('consentBox').textContent=WAIVERS[key]||WAIVERS.general;
+function autoSelectWaiver(){
+  const svc=document.getElementById('s1Service').value;
+  const key=SERVICE_TO_WAIVER[svc]||'general';
+  setWaiver(key);
 }
-
-// ── CONSENT CHECKS ──
-function toggleConsent(el,id,e){
+function setWaiver(key){
+  const w=WAIVERS[key]||WAIVERS.general;
+  currentWaiver=key;
+  document.getElementById('consentFormTitle').textContent=w.title;
+  document.getElementById('consentBox').innerHTML=w.box;
+  const container=document.getElementById('consentChecks');
+  container.innerHTML=w.checks.map((label,i)=>`
+    <label class="consent-check" onclick="toggleDynConsent(this,event)" style="${i===w.checks.length-1?'border-color:rgba(201,168,76,0.4);font-weight:500':''}">
+      <input type="checkbox" class="consent-chk"><div class="cc-box">✓</div>
+      <div class="cc-text">${label}</div>
+    </label>`).join('');
+}
+function toggleDynConsent(el,e){
   if(e) e.preventDefault();
   el.classList.toggle('checked');
-  document.getElementById(id).checked=el.classList.contains('checked');
+  el.querySelector('input').checked=el.classList.contains('checked');
   updateSubmitBtn();
 }
 function updateSubmitBtn(){
-  document.getElementById('submitBtn').disabled=!(document.getElementById('c1').checked&&sigHasMark);
+  const allChecked=[...document.querySelectorAll('#consentChecks .consent-chk')].every(cb=>cb.checked);
+  document.getElementById('submitBtn').disabled=!(allChecked&&sigHasMark);
 }
 
 // ── SIGNATURE ──
@@ -1212,17 +1338,17 @@ function resetForm(){
   document.querySelectorAll('.check-item.checked').forEach(el=>{el.classList.remove('checked');el.querySelector('input').checked=false;});
   document.querySelectorAll('.rating-btn.sel').forEach(b=>b.classList.remove('sel'));
   document.querySelectorAll('.consent-check.checked').forEach(el=>el.classList.remove('checked'));
-  ['c1','c2','c3'].forEach(id=>{const el=document.getElementById(id);if(el)el.checked=false;});
+  document.querySelectorAll('.consent-chk').forEach(cb=>cb.checked=false);
   clearSig();
   document.getElementById('successScreen').classList.remove('active');
-  switchWaiver(document.querySelector('.waiver-btn'),'general');
+  setWaiver('general');
   goSec(1);
   document.getElementById('submitBtn').disabled=true;
   document.getElementById('submitBtn').textContent='✓ Submit Form';
 }
 
-// Service dropdown is hardcoded in HTML — set initial waiver on load
-document.getElementById('consentBox').textContent=WAIVERS.general;
+// Set initial consent form on load
+setWaiver('general');
 </script>
 </body>
 </html>
