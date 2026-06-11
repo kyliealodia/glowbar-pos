@@ -4442,7 +4442,7 @@ function renderSvcs(){
   }
   g.innerHTML=items.map(({type,data})=>{
     if(type==='package'){
-      return `<div class="svc-card pkg" onclick="addToCart('${data.id}')">
+      return `<div class="svc-card pkg" onclick="checkClientPackage('${data.id}')">
         <div class="sc-cat" style="color:var(--gold-dk);">✨ Package</div>
         <div class="sc-nm">${data.name}</div>
         <div class="sc-pr">${fmtPrice(data.price)}</div>
@@ -4487,6 +4487,20 @@ function addToCart(id,skipAddons=false){
     if(ps&&ps.remaining>0){_openPkgSessionChoice(pkg,ps);return;}
   }
   const ex=cart.find(c=>c.type==='package'&&String(c.id)===sid);
+  if(ex)ex.qty++;
+  else cart.push({type:'package',id:pkg.id,name:pkg.name,price:pkg.price,qty:1,unit:'package',addons:[]});
+  renderCart();
+  showToast('Added ✓ — tap Order tab to checkout');
+}
+
+function checkClientPackage(id){
+  const pkg=S.packages.find(x=>String(x.id)===String(id));
+  if(!pkg)return;
+  if(!selClient){showToast('Please select a client first','err');return;}
+  const cl=S.clients.find(c=>c.id===selClient.id);
+  const ps=cl?.packageSessions?.['pkg_'+pkg.id];
+  if(ps&&ps.remaining>0){_openPkgSessionChoice(pkg,ps);return;}
+  const ex=cart.find(c=>c.type==='package'&&String(c.id)===String(id));
   if(ex)ex.qty++;
   else cart.push({type:'package',id:pkg.id,name:pkg.name,price:pkg.price,qty:1,unit:'package',addons:[]});
   renderCart();
