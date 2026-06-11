@@ -5171,6 +5171,25 @@ function confirmPay(){
         });
       }
     }
+    // Session-based product (sessions > 0 stored in S.products) — add to client package balance
+    if(ci.type==='product' && selClient){
+      const _sp=S.products.find(x=>x.id===ci.id);
+      if(_sp&&(_sp.sessions||0)>0){
+        const cl=S.clients.find(c=>c.id===selClient.id);
+        if(cl){
+          cl.packageSessions=cl.packageSessions||{};
+          const key='pkg_'+ci.id;
+          const totalSessions=((_sp.sessions||0)+(_sp.freeSessions||0))*ci.qty;
+          if(cl.packageSessions[key]){
+            cl.packageSessions[key].remaining=(cl.packageSessions[key].remaining||0)+totalSessions;
+            cl.packageSessions[key].total=(cl.packageSessions[key].total||0)+totalSessions;
+            cl.packageSessions[key].used=cl.packageSessions[key].used||0;
+          } else {
+            cl.packageSessions[key]={name:ci.name,total:totalSessions,remaining:totalSessions,used:0,purchased:now.toISOString(),lastUsed:null};
+          }
+        }
+      }
+    }
     // Package purchase — add all sessions, track total and purchase date
     if(ci.type==='package' && selClient){
       const cl=S.clients.find(c=>c.id===selClient.id);
@@ -5236,6 +5255,7 @@ function confirmPay(){
   const _rcptPkgPlan=_pendingInstallmentPlan;
   const _rcptClientSnap=selClient?S.clients.find(c=>c.id===selClient.id):null;
   sync('transactions'); sync('products'); if(selClient)sync('clients'); if(S.settings)sync('settings');
+  if(selClient){selClient=S.clients.find(c=>c.id===selClient.id)||selClient;}
   if(_pendingInstallmentPlan&&selClient){_createInstallmentRecord(selClient.id,_pendingInstallmentPlan,txid);_pendingInstallmentPlan=null;}
   if(internalInstInfo&&selClient){
     const cl=S.clients.find(c=>c.id===selClient.id);
