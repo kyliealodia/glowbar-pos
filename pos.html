@@ -3551,6 +3551,10 @@ window.addEventListener('DOMContentLoaded',()=>{
   const logoEl=document.getElementById('loginLogo'); if(logoEl)logoEl.src=LOGO;
   const sbLogoEl=document.getElementById('sbLogo'); if(sbLogoEl)sbLogoEl.src=LOGO;
 
+  // Show loading state immediately while Firebase fetches users
+  const staffGrid=document.getElementById('staffGrid');
+  if(staffGrid) staffGrid.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:20px 0;color:var(--ink3);font-size:12px;letter-spacing:0.5px;">Loading staff…</div>';
+
   if(useCloud){
     // Helper — Firebase stores arrays as objects with numeric keys, convert back
     function fbVal(val, defaultVal){
@@ -3585,10 +3589,13 @@ window.addEventListener('DOMContentLoaded',()=>{
           }
         }
         loaded++;
+        // Render login staff grid as soon as users arrive — don't wait for all keys
+        if(key==='users') renderStaff();
         if(loaded===onceKeys.length) afterLoad();
       }).catch((e)=>{
         console.warn('Failed to load',key,e);
         loaded++;
+        if(key==='users') renderStaff(); // still render (will use fallback if empty)
         if(loaded===onceKeys.length) afterLoad();
       });
     });
@@ -3624,13 +3631,16 @@ window.addEventListener('DOMContentLoaded',()=>{
       if(document.getElementById('page-dashboard')?.classList.contains('active')) renderCashDrawer();
     });
 
-    // Fallback — if Firebase takes more than 4s, load with whatever we have
+    // Fallback — if Firebase takes more than 5s, load with whatever we have
     setTimeout(()=>{
       if(loaded<onceKeys.length){
         console.warn('Firebase slow — loading with partial data');
+        // Ensure at least Kylie is always available to log in
+        if(!S.users.length) S.users=[{id:0,name:'Kylie',role:'owner',specialty:'Owner & Clinic Director',pin:'0000',color:'#B8935A',perms:ALL_PERMS,commission:0,requireSelfie:false,salary:0,sssVoluntary:false,philhealthVoluntary:false,pagibigVoluntary:false}];
+        renderStaff();
         afterLoad();
       }
-    }, 4000);
+    }, 5000);
 
   } else {
     afterLoad();
@@ -3930,9 +3940,11 @@ function applyRoleNav(){
 
 // ══ LOGIN ══
 function renderStaff(){
-  document.getElementById('staffGrid').innerHTML=S.users.map(u=>`
+  const KYLIE_FALLBACK={id:0,name:'Kylie',role:'owner',specialty:'Owner & Clinic Director',pin:'0000',color:'#B8935A',perms:ALL_PERMS,commission:0,requireSelfie:false,salary:0,sssVoluntary:false,philhealthVoluntary:false,pagibigVoluntary:false};
+  const users=S.users&&S.users.length?S.users:[KYLIE_FALLBACK];
+  document.getElementById('staffGrid').innerHTML=users.map(u=>`
     <div class="staff-btn" id="sbtn-${u.id}" onclick="pickLoginStaff(${u.id})">
-      <div class="staff-av" style="background:${u.color}">${initials(u.name)}</div>
+      <div class="staff-av" style="background:${u.color||'#B8935A'}">${initials(u.name)}</div>
       <div class="sn">${u.name}</div>
       ${u.role==='owner'?'<div style="font-size:9px;color:var(--gold-dk);letter-spacing:0.5px;">👑 Owner</div>':'<div style="font-size:9px;color:var(--ink4);">'+cap(u.role)+'</div>'}
     </div>`).join('');
