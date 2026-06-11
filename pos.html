@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -6941,7 +6941,7 @@ function renderClientsTable(){
       <td><div style="font-size:12px;">${esc(c.phone||'')}</div></td>
       <td><div style="font-size:12px;">${esc(c.todayService||'—')}</div></td>
       <td><div style="font-size:12px;">${addedFmt}</div></td>
-      <td><div style="display:flex;flex-direction:column;gap:4px;">${(()=>{const pkgEntries=c.packageSessions?Object.values(c.packageSessions).filter(ps=>ps.remaining>0):[];const pkgTotal=pkgEntries.reduce((s,ps)=>s+(ps.remaining||0),0);return(isKiosk?'<span class="pill pill-green" style="font-size:10px;">🖥 Intake</span>':'')+`<span class="pill ${c.vip?'pill-gold':'pill-gray'}">${c.vip?'VIP':'Regular'}</span>`+`<span class="pill ${c.intakeComplete?'pill-green':'pill-amber'}">${c.intakeComplete?'✓ Consent':'Consent needed'}</span>`+(pkgTotal>0?`<span class="pill pill-gold" style="font-size:10px;">📦 ${pkgTotal} session${pkgTotal!==1?'s':''}</span>`:'')})()</div></td>
+      <td><div style="display:flex;flex-direction:column;gap:4px;">${(()=>{const pkgEntries=c.packageSessions?Object.values(c.packageSessions).filter(ps=>ps.remaining>0):[];const pkgTotal=pkgEntries.reduce((s,ps)=>s+(ps.remaining||0),0);return(isKiosk?'<span class="pill pill-green" style="font-size:10px;">🖥 Intake</span>':'')+`<span class="pill ${c.vip?'pill-gold':'pill-gray'}">${c.vip?'VIP':'Regular'}</span>`+`<span class="pill ${c.intakeComplete?'pill-green':'pill-amber'}">${c.intakeComplete?'✓ Consent':'Consent needed'}</span>`+(pkgTotal>0?`<span class="pill pill-gold" style="font-size:10px;">📦 ${pkgTotal} session${pkgTotal!==1?'s':''}</span>`:'')})()}</div></td>
       <td><div style="display:flex;gap:5px;flex-wrap:wrap;">
         <button class="btn btn-gold btn-sm" onclick="viewClientProfile(${c.id})">👁 Profile</button>
         <button class="btn btn-outline btn-sm" onclick="editClient(${c.id})">Edit</button>
