@@ -4077,7 +4077,7 @@ function updateClockButtons(){
   if(!currentUser) return;
   const today=td();
   // Find if already clocked in today (no matching clock-out after)
-  const todayLogs=S.loginLogs.filter(l=>l.userId===currentUser.id&&l.time&&l.time.startsWith(today));
+  const todayLogs=S.loginLogs.filter(l=>l.userId===currentUser.id&&(l.time||l.date||'').startsWith(today));
   const lastLog=todayLogs[todayLogs.length-1];
   const isClockedIn=lastLog&&lastLog.action==='clockin';
   const inBtn=document.getElementById('clockInBtn');
@@ -4129,7 +4129,7 @@ function doClockOut(){
   _clockSnapTaken=false;
   // Calculate hours so far
   const today=td();
-  const todayLogs=S.loginLogs.filter(l=>l.userId===currentUser.id&&l.time&&l.time.startsWith(today));
+  const todayLogs=S.loginLogs.filter(l=>l.userId===currentUser.id&&(l.time||l.date||'').startsWith(today));
   const clockinLog=todayLogs.filter(l=>l.action==='clockin').pop();
   let hoursWorked='';
   if(clockinLog){
@@ -4244,7 +4244,7 @@ function confirmClock(){
   } else {
     // Calculate total hours
     const today=td();
-    const todayLogs=S.loginLogs.filter(l=>l.userId===currentUser.id&&l.time&&l.time.startsWith(today));
+    const todayLogs=S.loginLogs.filter(l=>l.userId===currentUser.id&&(l.time||l.date||'').startsWith(today));
     const clockinLog=todayLogs.filter(l=>l.action==='clockin').pop();
     if(clockinLog){
       const ms=new Date(logEntry.time)-new Date(clockinLog.time);
@@ -8997,9 +8997,9 @@ function renderAttendance(){
   // Only show clock-in and clock-out records (not device login/logout)
   let logs = S.loginLogs.filter(l=>l.action==='clockin'||l.action==='clockout');
   logs = [...logs].reverse();
-  if(attRange==='day'&&filterDate) logs=logs.filter(l=>l.time.startsWith(filterDate));
+  if(attRange==='day'&&filterDate) logs=logs.filter(l=>(l.time||l.date||'').startsWith(filterDate));
 else if(attRange==='week'&&filterDate){const from=new Date(filterDate);const to=new Date(from);to.setDate(from.getDate()+6);logs=logs.filter(l=>{const d=l.time.slice(0,10);return d>=filterDate&&d<=to.toISOString().slice(0,10);});}
-else if(attRange==='month'&&filterDate) logs=logs.filter(l=>l.time.startsWith(filterDate.slice(0,7)));
+else if(attRange==='month'&&filterDate) logs=logs.filter(l=>(l.time||l.date||'').startsWith(filterDate.slice(0,7)));
   const tbody = document.getElementById('attendanceBody');
   const emptyEl = document.getElementById('attendanceEmpty');
   if(!tbody) return;
@@ -9016,7 +9016,7 @@ else if(attRange==='month'&&filterDate) logs=logs.filter(l=>l.time.startsWith(fi
     if(!isClockin){
       // Find matching clock-in for this user on same day
       const dayStr = log.time.split('T')[0];
-      const allLogs = S.loginLogs.filter(l=>l.userId===log.userId&&l.action==='clockin'&&l.time.startsWith(dayStr));
+      const allLogs = S.loginLogs.filter(l=>l.userId===log.userId&&l.action==='clockin'&&(l.time||l.date||'').startsWith(dayStr));
       const prevClockin = allLogs[allLogs.length-1];
       if(prevClockin){
         const ms=new Date(log.time)-new Date(prevClockin.time);
@@ -9311,7 +9311,7 @@ function getDaysPresent(userId, period){
   const logs=S.loginLogs.filter(l=>
     (l.userId===userId||l.user===u?.name)
     &&(l.action==='clockin'||l.action==='in')
-    &&l.time?.startsWith(period)
+    &&(l.time||l.date||'').startsWith(period)
   );
   return new Set(logs.map(l=>l.time.split('T')[0])).size;
 }
@@ -9349,7 +9349,7 @@ function renderPayrollSummary(staffList, txns, period){
 
     // Attendance-aware basic pay
     const workingDays=getWorkingDays(py,pm);
-    const inLogs=S.loginLogs.filter(l=>(l.userId===u.id||l.user===u.name)&&(l.action==='clockin'||l.action==='in')&&l.time?.startsWith(period));
+    const inLogs=S.loginLogs.filter(l=>(l.userId===u.id||l.user===u.name)&&(l.action==='clockin'||l.action==='in')&&(l.time||l.date||'').startsWith(period));
     const daysPresent=new Set(inLogs.map(l=>l.time.split('T')[0])).size;
     const leaveDays=(S.leaveRequests||[]).filter(l=>l.userId===u.id&&l.status==='approved'&&l.from?.startsWith(period)).reduce((s,l)=>s+(l.days||1),0);
     const today=new Date(); today.setHours(23,59,59,0);
@@ -9520,14 +9520,14 @@ function renderPayslip(){
     // Attendance from clock logs
     const clockLogs=S.loginLogs.filter(l=>{
       const matchUser=l.userId===u.id||l.user===u.name;
-      return matchUser&&(l.action==='clockin'||l.action==='clockout'||l.action==='in'||l.action==='out')&&l.time?.startsWith(period);
+      return matchUser&&(l.action==='clockin'||l.action==='clockout'||l.action==='in'||l.action==='out')&&(l.time||l.date||'').startsWith(period);
     });
     let totalMins=0;
     const inLogs=clockLogs.filter(l=>l.action==='clockin'||l.action==='in');
     const outLogs=clockLogs.filter(l=>l.action==='clockout'||l.action==='out');
     outLogs.forEach(lo=>{
       const dayStr=lo.time.split('T')[0];
-      const prevIn=inLogs.filter(l=>l.time.startsWith(dayStr)).pop();
+      const prevIn=inLogs.filter(l=>(l.time||l.date||'').startsWith(dayStr)).pop();
       if(prevIn) totalMins+=Math.round((new Date(lo.time)-new Date(prevIn.time))/60000);
     });
     const hrs=Math.floor(totalMins/60), mins=totalMins%60;
