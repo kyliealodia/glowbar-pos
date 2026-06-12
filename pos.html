@@ -4077,7 +4077,7 @@ function updateClockButtons(){
   if(!currentUser) return;
   const today=td();
   // Find if already clocked in today (no matching clock-out after)
-  const todayLogs=S.loginLogs.filter(l=>l.userId===currentUser.id&&l.time.startsWith(today));
+  const todayLogs=S.loginLogs.filter(l=>l.userId===currentUser.id&&l.time&&l.time.startsWith(today));
   const lastLog=todayLogs[todayLogs.length-1];
   const isClockedIn=lastLog&&lastLog.action==='clockin';
   const inBtn=document.getElementById('clockInBtn');
@@ -4129,7 +4129,7 @@ function doClockOut(){
   _clockSnapTaken=false;
   // Calculate hours so far
   const today=td();
-  const todayLogs=S.loginLogs.filter(l=>l.userId===currentUser.id&&l.time.startsWith(today));
+  const todayLogs=S.loginLogs.filter(l=>l.userId===currentUser.id&&l.time&&l.time.startsWith(today));
   const clockinLog=todayLogs.filter(l=>l.action==='clockin').pop();
   let hoursWorked='';
   if(clockinLog){
@@ -4244,7 +4244,7 @@ function confirmClock(){
   } else {
     // Calculate total hours
     const today=td();
-    const todayLogs=S.loginLogs.filter(l=>l.userId===currentUser.id&&l.time.startsWith(today));
+    const todayLogs=S.loginLogs.filter(l=>l.userId===currentUser.id&&l.time&&l.time.startsWith(today));
     const clockinLog=todayLogs.filter(l=>l.action==='clockin').pop();
     if(clockinLog){
       const ms=new Date(logEntry.time)-new Date(clockinLog.time);
