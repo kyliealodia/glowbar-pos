@@ -5740,28 +5740,42 @@ function sendReceiptEmail(r){
   if(typeof emailjs==='undefined') return;
   const RECEIPT_BASE='https://kyliealodia.github.io/glowbar-pos/GlowBar_Receipt.html';
   const receiptLink=RECEIPT_BASE+'?id='+r.id;
-  const _fp=n=>'₱'+(n||0).toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2});
-  const _fd=d=>{try{return new Date(d).toLocaleDateString('en-PH',{weekday:'long',year:'numeric',month:'long',day:'numeric'});}catch(e){return d;}};
+  // _fp returns a plain number string — the EmailJS template already adds the ₱ prefix.
+  // Passing ₱ here too would produce ₱₱ in the email.
+  const _fp=n=>(n||0).toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const _fd=d=>{try{return new Date(d).toLocaleDateString('en-PH',{year:'numeric',month:'long',day:'numeric'});}catch(e){return String(d);}};
   const methodLabel=(r.method||'cash').replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
-  const hasFee=r.payFee>0;
-  const svcList=(r.services||[]).map(s=>s.name+(s.qty>1?' ×'+s.qty:'')).join(', ');
+  const hasFee=(r.payFee||0)>0;
+  // Exclude ₱0 session-use items from the services display
+  const svcList=(r.services||[])
+    .filter(s=>!(s.type==='session_use'&&(s.price||0)===0))
+    .map(s=>s.name+(s.qty>1?' ×'+s.qty:''))
+    .join(', ')||'—';
   const pkgItem=r.packageInfo&&r.packageInfo.length?r.packageInfo[0]:null;
+  const sessTotal=pkgItem?((pkgItem.sessionsUsed||0)+(pkgItem.sessionsRemaining||0)):0;
+  // Receipt date: fall back to current date if createdAt is missing
+  const receiptDate=_fd(r.createdAt||new Date().toISOString());
+  // Remaining balance: show 0.00 when fully paid so template never shows bare ₱
+  const remBalStr=(r.remainingBalance>0)?_fp(r.remainingBalance):'0.00';
   const params={
     client_name: r.clientName||'Valued Client',
     email: r.clientEmail,
-    receipt_number: r.id,
-    receipt_date: _fd(r.createdAt),
+    receipt_number: r.id||'',
+    receipt_date: receiptDate,
     services: svcList,
     staff_name: r.staff||'—',
     payment_method: methodLabel+(r.feeTerm?' ('+r.feeTerm+' months)':''),
-    original_amount: hasFee?_fp(r.originalAmount):_fp(r.totalCharged),
-    fee_applied: hasFee?_fp(r.payFee):'None',
+    original_amount: _fp(hasFee?(r.originalAmount||r.totalCharged):r.totalCharged),
+    fee_applied: hasFee?_fp(r.payFee):'0.00',
     total_charged: _fp(r.totalCharged),
-    amount_paid_today: _fp(r.totalCharged),
-    remaining_balance: (r.remainingBalance>0)?_fp(r.remainingBalance):'',
+    amount_paid_today: _fp(r.totalCharged||0),
+    remaining_balance: remBalStr,
+    // Only populate package fields when this transaction has a package
     package_name: pkgItem?pkgItem.packageName:'',
     sessions_used: pkgItem?String(pkgItem.sessionsUsed):'',
+    sessions_total: pkgItem?String(sessTotal):'',
     sessions_remaining: pkgItem?String(pkgItem.sessionsRemaining):'',
+    has_package: pkgItem?'yes':'',
     next_payment_date: r.nextPaymentDate?_fd(r.nextPaymentDate+'T12:00'):'',
     receipt_link: receiptLink
   };
