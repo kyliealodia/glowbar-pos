@@ -1041,6 +1041,7 @@ html{height:-webkit-fill-available;}
               <button id="attRangeMonth" onclick="setAttRange('month')" style="flex:1;padding:6px 8px;font-size:11px;font-weight:600;border:none;background:var(--cream2);color:var(--ink2);cursor:pointer;font-family:'Jost',sans-serif;">Month</button>
               <button id="attRangeAll" onclick="setAttRange('all')" style="flex:1;padding:6px 8px;font-size:11px;font-weight:600;border:none;background:var(--cream2);color:var(--ink2);cursor:pointer;font-family:'Jost',sans-serif;">All</button>
             </div>
+            <select class="form-select" id="attFilterStaff" style="width:140px;font-size:12px;" onchange="renderAttendance()"><option value="">All Staff</option></select>
             <input type="date" class="form-input" id="attFilterDate" style="width:160px;font-size:12px;" onchange="renderAttendance()">
             <button class="btn btn-outline btn-sm" onclick="exportAttendance()">⬇ Export CSV</button>
             <button class="btn btn-outline btn-sm" onclick="addAttLog()">+ Add Record</button>
@@ -1048,7 +1049,7 @@ html{height:-webkit-fill-available;}
         </div>
         <div class="card" style="overflow:hidden;">
           <table class="inv-table" style="width:100%;">
-            <thead><tr><th>Selfie</th><th>Staff</th><th>Role</th><th>Action</th><th>Date</th><th>Time</th><th>Duration</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Selfie</th><th>Staff</th><th>Date</th><th>Clock In</th><th>Clock Out</th><th>Hours</th><th>Actions</th></tr></thead>
             <tbody id="attendanceBody"></tbody>
           </table>
           <div id="attendanceEmpty" style="padding:40px;text-align:center;color:var(--ink3);font-size:13px;display:none;">No login records yet.</div>
@@ -8993,50 +8994,89 @@ function setAttRange(range){
 
 // ══ ATTENDANCE LOG ══
 function renderAttendance(){
-  const filterDate = document.getElementById('attFilterDate')?.value || '';
-  // Only show clock-in and clock-out records (not device login/logout)
-  let logs = S.loginLogs.filter(l=>l.action==='clockin'||l.action==='clockout');
-  logs = [...logs].reverse();
-  if(attRange==='day'&&filterDate) logs=logs.filter(l=>(l.time||l.date||'').startsWith(filterDate));
-else if(attRange==='week'&&filterDate){const from=new Date(filterDate);const to=new Date(from);to.setDate(from.getDate()+6);logs=logs.filter(l=>{const d=l.time.slice(0,10);return d>=filterDate&&d<=to.toISOString().slice(0,10);});}
-else if(attRange==='month'&&filterDate) logs=logs.filter(l=>(l.time||l.date||'').startsWith(filterDate.slice(0,7)));
-  const tbody = document.getElementById('attendanceBody');
-  const emptyEl = document.getElementById('attendanceEmpty');
-  if(!tbody) return;
-  if(!logs.length){ tbody.innerHTML=''; if(emptyEl)emptyEl.style.display='block'; return; }
-  if(emptyEl) emptyEl.style.display='none';
-  tbody.innerHTML = logs.map(log => {
-    const d = new Date(log.time);
-    const dateStr = d.toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'numeric'});
-    const timeStr = d.toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'});
-    const isClockin = log.action==='clockin';
-    const actionColor = isClockin?'var(--success)':'var(--danger)';
-    const actionLabel = isClockin?'🟢 Clock In':'🔴 Clock Out';
-    let duration = '—';
-    if(!isClockin){
-      // Find matching clock-in for this user on same day
-      const dayStr = log.time.split('T')[0];
-      const allLogs = S.loginLogs.filter(l=>l.userId===log.userId&&l.action==='clockin'&&(l.time||l.date||'').startsWith(dayStr));
-      const prevClockin = allLogs[allLogs.length-1];
-      if(prevClockin){
-        const ms=new Date(log.time)-new Date(prevClockin.time);
-        const h=Math.floor(ms/3600000), m=Math.floor((ms%3600000)/60000);
-        duration=h>0?`${h}h ${m}m`:`${m}m`;
-      }
+  const filterDate = document.getElementById('attFilterDate')?.value||'';
+  const filterStaff = document.getElementById('attFilterStaff')?.value||'';
+
+  // Populate staff filter dropdown from known users
+  const staffSel=document.getElementById('attFilterStaff');
+  if(staffSel){
+    const names=[...new Set(S.loginLogs.map(l=>l.name||l.user||'').filter(Boolean))].sort();
+    const cur=staffSel.value;
+    staffSel.innerHTML='<option value="">All Staff</option>'+names.map(n=>`<option value="${n}"${n===cur?' selected':''}>${n}</option>`).join('');
+  }
+
+  // Normalise both log formats into unified shift records
+  // New format: {date, in, out, name/user, userId, ...}
+  // Old format: separate {action:'clockin'|'clockout', time: ISO, name, userId, ...}
+  const records=[];
+
+  // ── New format ──
+  S.loginLogs.filter(l=>l.date||(l.in&&!l.action)).forEach(l=>{
+    const date=l.date||(l.in?l.in.slice(0,10):'');
+    if(!date)return;
+    records.push({id:l.id,userId:l.userId,name:l.name||l.user||'Unknown',role:l.role||'',date,inTime:l.in||null,outTime:l.out||null,selfie:l.selfie||null});
+  });
+
+  // ── Old format ── pair clockin / clockout by userId+date
+  const oldPairs={};
+  S.loginLogs.filter(l=>l.time&&(l.action==='clockin'||l.action==='clockout'||l.action==='in'||l.action==='out')).forEach(l=>{
+    const date=(l.time||'').slice(0,10);
+    if(!date)return;
+    const key=(l.userId||l.name||'')+'_'+date;
+    if(!oldPairs[key]) oldPairs[key]={id:l.id,userId:l.userId,name:l.name||l.user||'Unknown',role:l.role||'',date,inTime:null,outTime:null,selfie:null};
+    const isin=l.action==='clockin'||l.action==='in';
+    if(isin&&!oldPairs[key].inTime){oldPairs[key].inTime=l.time;if(l.selfie)oldPairs[key].selfie=l.selfie;}
+    if(!isin) oldPairs[key].outTime=l.time;
+  });
+  Object.values(oldPairs).forEach(r=>records.push(r));
+
+  // Sort newest first
+  records.sort((a,b)=>b.date.localeCompare(a.date));
+
+  // ── Date range filter ──
+  let filtered=records;
+  if(attRange==='day'&&filterDate) filtered=filtered.filter(r=>r.date===filterDate);
+  else if(attRange==='week'&&filterDate){
+    const to=new Date(filterDate);to.setDate(to.getDate()+6);
+    const toStr=to.toISOString().slice(0,10);
+    filtered=filtered.filter(r=>r.date>=filterDate&&r.date<=toStr);
+  } else if(attRange==='month'&&filterDate) filtered=filtered.filter(r=>r.date.startsWith(filterDate.slice(0,7)));
+
+  // ── Staff filter ──
+  if(filterStaff) filtered=filtered.filter(r=>r.name===filterStaff);
+
+  const tbody=document.getElementById('attendanceBody');
+  const emptyEl=document.getElementById('attendanceEmpty');
+  if(!tbody)return;
+  if(!filtered.length){tbody.innerHTML='';if(emptyEl)emptyEl.style.display='block';return;}
+  if(emptyEl)emptyEl.style.display='none';
+
+  const fmtT=iso=>{
+    if(!iso)return'—';
+    return new Date(iso).toLocaleTimeString('en-PH',{hour:'numeric',minute:'2-digit',hour12:true});
+  };
+
+  tbody.innerHTML=filtered.map(r=>{
+    const dateStr=r.date?new Date(r.date+'T12:00').toLocaleDateString('en-PH',{weekday:'short',month:'short',day:'numeric',year:'numeric'}):'—';
+    const inStr=fmtT(r.inTime);
+    const outStr=fmtT(r.outTime);
+    let hours='—';
+    if(r.inTime&&r.outTime){
+      const ms=new Date(r.outTime)-new Date(r.inTime);
+      if(ms>0){const h=Math.floor(ms/3600000),m=Math.floor((ms%3600000)/60000);hours=h>0?`${h}h ${m}m`:`${m}m`;}
     }
-    const selfieHtml = log.selfie
-      ? `<img src="${log.selfie}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;border:2px solid var(--gold);cursor:pointer;" onclick="viewSelfie('${log.selfie}','${log.name} — ${isClockin?'Clock In':'Clock Out'} ${timeStr}')" title="Click to enlarge">`
-      : `<div style="width:40px;height:40px;border-radius:50%;background:var(--cream2);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--ink3);">👤</div>`;
-    const u=S.users.find(x=>x.id===log.userId);
+    const u=S.users.find(x=>x.id===r.userId);
+    const selfieHtml=r.selfie
+      ?`<img src="${r.selfie}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;border:2px solid var(--gold);cursor:pointer;" onclick="viewSelfie('${r.selfie}','${esc(r.name)}')" title="Click to enlarge">`
+      :`<div style="width:40px;height:40px;border-radius:50%;background:var(--cream2);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--ink3);">👤</div>`;
     return `<tr>
       <td>${selfieHtml}</td>
-      <td><div style="display:flex;align-items:center;gap:7px;"><div style="width:26px;height:26px;border-radius:50%;background:${u?.color||'#999'};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;color:#fff;">${initials(log.name||'?')}</div><span style="font-size:13px;font-weight:500;">${log.name||'Unknown'}</span></div></td>
-      <td><span class="pill pill-gray" style="font-size:10px;">${cap(log.role||'—')}</span></td>
-      <td style="color:${actionColor};font-size:12px;font-weight:500;">${actionLabel}</td>
+      <td><div style="display:flex;align-items:center;gap:7px;"><div style="width:26px;height:26px;border-radius:50%;background:${u?.color||'#999'};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;color:#fff;">${initials(r.name||'?')}</div><span style="font-size:13px;font-weight:500;">${esc(r.name)}</span></div></td>
       <td style="font-size:12px;color:var(--ink2);">${dateStr}</td>
-      <td style="font-size:13px;font-weight:500;">${timeStr}${isClockin&&log.lateStatus?`<br><span style="font-size:10px;font-weight:600;color:${log.lateStatus==='late'?'var(--danger)':'var(--success)'};">${log.lateStatus==='late'?'⚠ Late':'✓ On Time'}</span>`:''}</td>
-      <td style="font-size:12px;color:var(--ink3);">${duration}</td>
-<td><button onclick="event.stopPropagation();editAttLog('${log.id}')" style="font-size:11px;padding:3px 8px;border:1px solid var(--border);border-radius:6px;background:var(--cream);cursor:pointer;margin-right:4px;">✏ Edit</button><button onclick="event.stopPropagation();deleteAttLog('${log.id}')" style="font-size:11px;padding:3px 8px;border:1px solid var(--danger);border-radius:6px;background:var(--cream);color:var(--danger);cursor:pointer;">🗑 Delete</button></td>
+      <td style="font-size:13px;font-weight:500;color:var(--success);">${inStr}</td>
+      <td style="font-size:13px;font-weight:500;color:var(--danger);">${outStr}</td>
+      <td style="font-size:12px;font-weight:600;color:var(--ink);">${hours}</td>
+      <td><button onclick="event.stopPropagation();deleteAttLog('${r.id}')" style="font-size:11px;padding:3px 8px;border:1px solid var(--danger);border-radius:6px;background:var(--cream);color:var(--danger);cursor:pointer;">🗑 Delete</button></td>
     </tr>`;
   }).join('');
 }
