@@ -9346,14 +9346,48 @@ showToast(u.name+'\'s compensation saved','ok');
 }
 
 // ── Payroll helpers ──
+
+// Normalises both log formats for a user in a given YYYY-MM period.
+// Returns { presentDays, totalMins, hasClockData }
+function _getAttendanceStats(userId, userName, period){
+  const presentDates=new Set();
+  let totalMins=0;
+
+  // New format: {date, in, out}
+  S.loginLogs.filter(l=>{
+    const matchUser=l.userId===userId||(l.name||l.user||'')===userName;
+    const date=l.date||(l.in?String(l.in).slice(0,10):'');
+    return matchUser&&date&&date.startsWith(period)&&(l.date||l.in)&&!l.action;
+  }).forEach(l=>{
+    const date=l.date||(l.in?String(l.in).slice(0,10):'');
+    if(date) presentDates.add(date);
+    if(l.in&&l.out){
+      const ms=new Date(l.out)-new Date(l.in);
+      if(ms>0) totalMins+=Math.round(ms/60000);
+    }
+  });
+
+  // Old format: separate clockin / clockout entries with 'time' field
+  const oldLogs=S.loginLogs.filter(l=>{
+    const matchUser=l.userId===userId||(l.name||l.user||'')===userName;
+    const t=String(l.time||'');
+    return matchUser&&t&&t.startsWith(period)&&(l.action==='clockin'||l.action==='clockout'||l.action==='in'||l.action==='out');
+  });
+  const oldIn=oldLogs.filter(l=>l.action==='clockin'||l.action==='in');
+  const oldOut=oldLogs.filter(l=>l.action==='clockout'||l.action==='out');
+  oldIn.forEach(l=>presentDates.add(String(l.time).slice(0,10)));
+  oldOut.forEach(lo=>{
+    const dayStr=String(lo.time).slice(0,10);
+    const prevIn=oldIn.filter(l=>String(l.time).slice(0,10)===dayStr).pop();
+    if(prevIn){const ms=new Date(lo.time)-new Date(prevIn.time);if(ms>0)totalMins+=Math.round(ms/60000);}
+  });
+
+  return {presentDays:presentDates.size,totalMins,hasClockData:presentDates.size>0};
+}
+
 function getDaysPresent(userId, period){
   const u=S.users.find(x=>x.id===userId);
-  const logs=S.loginLogs.filter(l=>
-    (l.userId===userId||l.user===u?.name)
-    &&(l.action==='clockin'||l.action==='in')
-    &&(l.time||l.date||'').startsWith(period)
-  );
-  return new Set(logs.map(l=>l.time.split('T')[0])).size;
+  return _getAttendanceStats(userId,u?.name||'',period).presentDays;
 }
 function getWorkingDays(yr, mo, from, to){
   const monthStart=new Date(yr,mo-1,1);
@@ -9389,14 +9423,12 @@ function renderPayrollSummary(staffList, txns, period){
 
     // Attendance-aware basic pay
     const workingDays=getWorkingDays(py,pm);
-    const inLogs=S.loginLogs.filter(l=>(l.userId===u.id||l.user===u.name)&&(l.action==='clockin'||l.action==='in')&&(l.time||l.date||'').startsWith(period));
-    const daysPresent=new Set(inLogs.map(l=>l.time.split('T')[0])).size;
+    const {presentDays:daysPresent,hasClockData}=_getAttendanceStats(u.id,u.name,period);
     const leaveDays=(S.leaveRequests||[]).filter(l=>l.userId===u.id&&l.status==='approved'&&l.from?.startsWith(period)).reduce((s,l)=>s+(l.days||1),0);
     const today=new Date(); today.setHours(23,59,59,0);
 const monthEndS=new Date(py,pm,0);
 const effectiveEndS=today<monthEndS?today:monthEndS;
 const elapsedWorkingDays=getWorkingDays(py,pm,null,effectiveEndS);
-const hasClockData=inLogs.length>0;
 const daysAbsent=hasClockData?Math.max(0,elapsedWorkingDays-daysPresent-leaveDays):0;
     const dailyRate=workingDays>0?salary/workingDays:0;
     const earnedBasic=salary-Math.round(dailyRate*daysAbsent);
@@ -9557,23 +9589,9 @@ function renderPayslip(){
     }
     const sessions=myTxns.reduce((s,t)=>s+(t.items?.length||0),0);
 
-    // Attendance from clock logs
-    const clockLogs=S.loginLogs.filter(l=>{
-      const matchUser=l.userId===u.id||l.user===u.name;
-      return matchUser&&(l.action==='clockin'||l.action==='clockout'||l.action==='in'||l.action==='out')&&(l.time||l.date||'').startsWith(period);
-    });
-    let totalMins=0;
-    const inLogs=clockLogs.filter(l=>l.action==='clockin'||l.action==='in');
-    const outLogs=clockLogs.filter(l=>l.action==='clockout'||l.action==='out');
-    outLogs.forEach(lo=>{
-      const dayStr=lo.time.split('T')[0];
-      const prevIn=inLogs.filter(l=>(l.time||l.date||'').startsWith(dayStr)).pop();
-      if(prevIn) totalMins+=Math.round((new Date(lo.time)-new Date(prevIn.time))/60000);
-    });
+    // Attendance from clock logs (both formats)
+    const {presentDays:daysPresent,totalMins,hasClockData}=_getAttendanceStats(u.id,u.name,period);
     const hrs=Math.floor(totalMins/60), mins=totalMins%60;
-
-    // Days present & absent
-    const daysPresent=new Set(inLogs.map(l=>l.time.split('T')[0])).size;
     const workingDays=getWorkingDays(py,pm);
 
     // Check approved leaves this month (don't count as absent)
@@ -9590,7 +9608,6 @@ function renderPayslip(){
 const monthEnd=new Date(py,pm,0);
 const effectiveEnd=today<monthEnd?today:monthEnd;
 const elapsedWorkingDays=getWorkingDays(py,pm,null,effectiveEnd);
-const hasClockData=inLogs.length>0;
 const daysAbsent=hasClockData?Math.max(0,elapsedWorkingDays-daysPresent-leaveDays):0;
 const salary=u.salary||0;
 const dailyRate=workingDays>0?salary/workingDays:0;
