@@ -369,14 +369,12 @@ function resetIdleTimer(){
     <div class="kst-line"></div>
     <div class="kst" id="kst2"><div class="kst-dot">2</div><div class="kst-lbl">Skin & Health</div></div>
     <div class="kst-line"></div>
-    <div class="kst" id="kst3"><div class="kst-dot">3</div><div class="kst-lbl">Lifestyle</div></div>
-    <div class="kst-line"></div>
-    <div class="kst" id="kst4"><div class="kst-dot">4</div><div class="kst-lbl">Consent</div></div>
+    <div class="kst" id="kst3"><div class="kst-dot">3</div><div class="kst-lbl">Consent</div></div>
   </div>
 </div>
 
 <!-- PROGRESS -->
-<div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:25%"></div></div>
+<div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:33%"></div></div>
 
 <!-- BODY -->
 <div class="kiosk-body">
@@ -511,58 +509,12 @@ function resetIdleTimer(){
 
     <div class="nav-row">
       <button class="btn-back" ontouchstart="event.preventDefault();goSec(1)" onclick="goSec(1)">← Back</button>
-      <button class="btn-next" ontouchstart="event.preventDefault();runAnalysis();goSec(3)" onclick="runAnalysis();goSec(3)">Next — Lifestyle →</button>
+      <button class="btn-next" ontouchstart="event.preventDefault();runAnalysis();goSec(3)" onclick="runAnalysis();goSec(3)">Next — Consent & Sign →</button>
     </div>
   </div>
 
-  <!-- STEP 3 — LIFESTYLE -->
+  <!-- STEP 3 — CONSENT -->
   <div class="section" id="sec3">
-    <div class="section-title">Lifestyle & Preferences</div>
-    <div class="section-sub">Help us understand your routine so we can give you the best results.</div>
-
-    <div class="fg">
-      <label class="fl">How would you rate your current skincare routine?</label>
-      <div class="rating-row">
-        <button class="rating-btn" onclick="selectRating(this,'skincare')">😴 None</button>
-        <button class="rating-btn" onclick="selectRating(this,'skincare')">🌱 Basic</button>
-        <button class="rating-btn" onclick="selectRating(this,'skincare')">✨ Regular</button>
-        <button class="rating-btn" onclick="selectRating(this,'skincare')">💎 Advanced</button>
-      </div>
-    </div>
-
-    <div class="fg">
-      <label class="fl">Sun exposure level</label>
-      <div class="rating-row">
-        <button class="rating-btn" onclick="selectRating(this,'sun')">🏠 Mostly indoors</button>
-        <button class="rating-btn" onclick="selectRating(this,'sun')">🚶 Moderate</button>
-        <button class="rating-btn" onclick="selectRating(this,'sun')">☀️ High exposure</button>
-      </div>
-    </div>
-
-    <div class="fg">
-      <label class="fl">Do you currently use any of the following?</label>
-      <div class="check-grid">
-        <label class="check-item" onclick="toggleCheck(this,event)"><input type="checkbox" value="Retinol / Retinoids"><div class="check-box">✓</div>Retinol / Retinoids</label>
-        <label class="check-item" onclick="toggleCheck(this,event)"><input type="checkbox" value="AHA / BHA exfoliants"><div class="check-box">✓</div>AHA / BHA exfoliants</label>
-        <label class="check-item" onclick="toggleCheck(this,event)"><input type="checkbox" value="Vitamin C serum"><div class="check-box">✓</div>Vitamin C serum</label>
-        <label class="check-item" onclick="toggleCheck(this,event)"><input type="checkbox" value="Sunscreen daily"><div class="check-box">✓</div>Sunscreen daily</label>
-        <label class="check-item" onclick="toggleCheck(this,event)"><input type="checkbox" value="Prescription skincare"><div class="check-box">✓</div>Prescription skincare</label>
-        <label class="check-item" onclick="toggleCheck(this,event)"><input type="checkbox" value="None of the above"><div class="check-box">✓</div>None of the above</label>
-      </div>
-    </div>
-
-    <div class="fg"><label class="fl">What are your main beauty goals? <span style="color:var(--ink4);font-weight:400;text-transform:none;">(in your own words)</span></label>
-      <textarea class="ft" id="s3Goals" placeholder="e.g. I want clearer skin, reduce dark spots, lose inches on my waist, look more refreshed…" style="min-height:80px;"></textarea>
-    </div>
-
-    <div class="nav-row">
-      <button class="btn-back" ontouchstart="event.preventDefault();goSec(2)" onclick="goSec(2)">← Back</button>
-      <button class="btn-next" ontouchstart="event.preventDefault();goSec(4)" onclick="goSec(4)">Next — Consent & Sign →</button>
-    </div>
-  </div>
-
-  <!-- STEP 4 — CONSENT -->
-  <div class="section" id="sec4">
     <div class="section-title">Care and Consent Agreement</div>
     <div class="section-sub">Please read the following carefully before signing.</div>
     <div id="consentFormTitle" style="font-size:11px;font-weight:700;color:var(--gold-dk);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:12px;"></div>
@@ -585,7 +537,7 @@ function resetIdleTimer(){
     </div>
 
     <div class="nav-row">
-      <button class="btn-back" ontouchstart="event.preventDefault();goSec4Back()" onclick="goSec4Back()">← Back</button>
+      <button class="btn-back" ontouchstart="event.preventDefault();goSec(_serviceSkipsHealthSteps()?1:2)" onclick="goSec(_serviceSkipsHealthSteps()?1:2)">← Back</button>
       <button class="btn-next" ontouchstart="event.preventDefault();submitForm()" onclick="submitForm()" id="submitBtn" disabled>✓ Submit Form</button>
     </div>
   </div>
@@ -1093,7 +1045,7 @@ function goSecFromStep1(){
   if(!bd){showStep1Error('⚠️ Please enter your Birthday.');document.getElementById('s1Bday').focus();return;}
   if(!ph){showStep1Error('⚠️ Please enter your Phone Number.');document.getElementById('s1Phone').focus();return;}
   if(!svc){showStep1Error('⚠️ Please select the service you are here for today.');document.getElementById('s1Service').focus();return;}
-  goSec(_serviceSkipsHealthSteps()?4:2);
+  goSec(_serviceSkipsHealthSteps()?3:2);
 }
 function goSec(n){
   // Validate step 1
@@ -1107,7 +1059,7 @@ function goSec(n){
       goSec(1); return;
     }
   }
-  [1,2,3,4].forEach(i=>{
+  [1,2,3].forEach(i=>{
     document.getElementById('sec'+i).classList.remove('active');
     const kst=document.getElementById('kst'+i);
     kst.classList.remove('active','done');
@@ -1115,13 +1067,10 @@ function goSec(n){
     else if(i===n) kst.classList.add('active');
   });
   document.getElementById('sec'+n).classList.add('active');
-  document.getElementById('progressFill').style.width=(n/4*100)+'%';
+  document.getElementById('progressFill').style.width=(n/3*100)+'%';
   document.querySelector('.kiosk-body').scrollTop=0;
   if(n===1) clearStep1Error();
-  if(n===4){ autoSelectWaiver(); initSig(); updateSubmitBtn(); }
-}
-function goSec4Back(){
-  goSec(_serviceSkipsHealthSteps()?1:3);
+  if(n===3){ autoSelectWaiver(); initSig(); updateSubmitBtn(); }
 }
 
 // ── TOGGLE CHECKS ──
@@ -1212,9 +1161,6 @@ async function submitForm(){
   const sig=sigCanvas.toDataURL('image/jpeg',0.5);
   const concerns=[...document.querySelectorAll('#skinConcerns .check-item.checked')].map(el=>el.querySelector('input').value);
   const medConds=[...document.querySelectorAll('#sec2 .check-item.checked')].map(el=>el.querySelector('input').value).filter(v=>!concerns.includes(v));
-  const currentProducts=[...document.querySelectorAll('#sec3 .check-item.checked')].map(el=>el.querySelector('input').value);
-  const skincareRating=document.querySelector('.rating-row:first-of-type .rating-btn.sel')?.textContent||'';
-  const sunExposure=document.querySelector('.rating-row:nth-of-type(2) .rating-btn.sel')?.textContent||'';
   const consentChecks=[...document.querySelectorAll('#consentChecks .consent-check')].map(el=>({label:el.textContent.replace('✓','').trim(),checked:el.classList.contains('checked')}));
 
   const ref='CL'+Date.now().toString().slice(-8);
@@ -1243,11 +1189,6 @@ async function submitForm(){
     medications:document.getElementById('s2Meds').value.trim(),
     medConditions:medConds,
     prevTreatments:document.getElementById('s2PrevTx').value.trim(),
-    // Lifestyle
-    skincareRoutine:skincareRating,
-    sunExposure,
-    currentProducts,
-    goals:document.getElementById('s3Goals').value.trim(),
     todayService:document.getElementById('s1Service').value,
     // Consent — stored in the same structure as the main POS app
     consentSigned:true,
@@ -1317,7 +1258,7 @@ async function submitForm(){
 }
 
 function showSuccess(ref, name){
-  [1,2,3,4].forEach(i=>{
+  [1,2,3].forEach(i=>{
     const s=document.getElementById('kst'+i);
     s.classList.remove('active');s.classList.add('done');
     document.getElementById('sec'+i).classList.remove('active');
@@ -1334,10 +1275,9 @@ function showSuccess(ref, name){
 
 function resetForm(){
   // Reset all fields
-  ['s1FirstName','s1LastName','s1Phone','s1Email','s1Address','s1Messenger','s1Emergency','s2Allergies','s2Meds','s2PrevTx','s3Goals'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['s1FirstName','s1LastName','s1Phone','s1Email','s1Address','s1Messenger','s1Emergency','s2Allergies','s2Meds','s2PrevTx'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   ['s1Bday','s1Gender','s1Source','s1Service','s2SkinType','s2Fitz'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.querySelectorAll('.check-item.checked').forEach(el=>{el.classList.remove('checked');el.querySelector('input').checked=false;});
-  document.querySelectorAll('.rating-btn.sel').forEach(b=>b.classList.remove('sel'));
   document.querySelectorAll('.consent-check.checked').forEach(el=>el.classList.remove('checked'));
   document.querySelectorAll('.consent-chk').forEach(cb=>cb.checked=false);
   clearSig();
