@@ -12138,6 +12138,17 @@ const CONSENT_KEYS={
   picoLaser:'Pico Laser Consent',
   nailServices:'Nail Services Consent',
 };
+const INTAKE_CONSENT_LABELS={
+  nail:'Nail Services Consent',
+  waxing:'Waxing Service Consent',
+  facial:'Facial Treatment Consent',
+  laser:'Laser Treatment Consent',
+  rf:'RF / Body Contouring Consent',
+  general:'General Service Consent',
+};
+function getConsentLabel(key,consent){
+  return CONSENT_KEYS[key]||INTAKE_CONSENT_LABELS[key]||consent?.title||key;
+}
 
 function getConsentKeyForProduct(p){
   const cat=(p.cat||'').toLowerCase(), sub=(p.subcat||'').toLowerCase();
@@ -12173,7 +12184,7 @@ function _showConsentPrompt(unsigned, client, callback){
   document.getElementById('consentRequiredList').innerHTML=unsigned.map(k=>`
     <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--cream2);border-radius:8px;border:1px solid var(--border2);">
       <span style="font-size:14px;">📋</span>
-      <span style="font-size:12px;font-weight:500;color:var(--ink2);">${CONSENT_KEYS[k]}</span>
+      <span style="font-size:12px;font-weight:500;color:var(--ink2);">${getConsentLabel(k,client?.consents?.[k])}</span>
     </div>`).join('');
   _cfQueue=[...unsigned];
   _cfQueueClient=client;
@@ -12200,7 +12211,7 @@ function openConsentForm(clientId, formKey, onSigned){
   const client=S.clients.find(c=>c.id===clientId);
   if(!client)return;
   _cfClientId=clientId;_cfFormKey=formKey;_cfOnSigned=onSigned||null;
-  document.getElementById('cfModalTitle').textContent=CONSENT_KEYS[formKey];
+  document.getElementById('cfModalTitle').textContent=getConsentLabel(formKey,client.consents?.[formKey]);
   document.getElementById('cfModalSubtitle').textContent='Client: '+client.name;
   document.getElementById('consentFormBody').innerHTML=_buildConsentForm(client,formKey);
   openM('consentFormModal');
@@ -12234,7 +12245,7 @@ function saveConsentForm(){
   if(_cfFormKey==='general') client.intakeComplete=true;
   sync('clients');
   closeM('consentFormModal');
-  showToast('✅ '+CONSENT_KEYS[_cfFormKey]+' signed','ok');
+  showToast('✅ '+getConsentLabel(_cfFormKey,data)+' signed','ok');
   renderClientConsents(_cfClientId);
   const cb=_cfOnSigned;_cfClientId=null;_cfFormKey=null;_cfOnSigned=null;
   if(cb)cb();
@@ -12245,7 +12256,7 @@ function viewSignedConsent(clientId,formKey){
   const client=S.clients.find(c=>c.id===clientId);
   const consent=client?.consents?.[formKey];
   if(!consent?.signed){showToast('This form has not been signed yet','err');return;}
-  document.getElementById('vcModalTitle').textContent=CONSENT_KEYS[formKey];
+  document.getElementById('vcModalTitle').textContent=getConsentLabel(formKey,consent);
   document.getElementById('vcSignedInfo').textContent='Signed: '+fmtDate(consent.date)+' · '+client.name;
   document.getElementById('viewConsentBody').innerHTML=_buildSignedView(client,formKey,consent);
   openM('viewConsentModal');
@@ -12256,8 +12267,7 @@ function renderClientConsents(clientId){
   const client=S.clients.find(c=>c.id===clientId);
   const grid=document.getElementById('cpConsentsGrid');
   if(!grid||!client)return;
-  grid.innerHTML=Object.entries(CONSENT_KEYS).map(([key,label])=>{
-    const c=client.consents?.[key];
+  function consentCard(key,label,c){
     const signed=c?.signed;
     return `<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:${signed?'#F1F8E9':'var(--cream2)'};border:1px solid ${signed?'#C8E6C9':'var(--border2)'};border-radius:10px;gap:8px;">
       <div style="min-width:0;">
@@ -12269,7 +12279,11 @@ function renderClientConsents(clientId){
         :`<button style="font-size:10px;padding:3px 10px;border:1px solid var(--gold);border-radius:6px;background:var(--cream);color:var(--gold-dk);cursor:pointer;white-space:nowrap;" onclick="openConsentForm(${clientId},'${key}')">Sign</button>`
       }
     </div>`;
-  }).join('');
+  }
+  const posCards=Object.entries(CONSENT_KEYS).map(([key,label])=>consentCard(key,label,client.consents?.[key]));
+  const intakeKeys=Object.keys(client.consents||{}).filter(k=>!CONSENT_KEYS[k]&&client.consents[k]?.signed&&INTAKE_CONSENT_LABELS[k]);
+  const intakeCards=intakeKeys.map(k=>consentCard(k,getConsentLabel(k,client.consents[k]),client.consents[k]));
+  grid.innerHTML=[...posCards,...intakeCards].join('');
 }
 
 // ── Signature pad ──
@@ -12490,11 +12504,15 @@ function _buildSignedView(client, formKey, consent){
     const val=Array.isArray(v)?(v.length?v.join(', '):'None'):(v===true?'Yes':v===false?'No':v||'—');
     return `<tr><td style="font-size:11px;font-weight:600;color:var(--ink3);padding:5px 12px 5px 0;vertical-align:top;white-space:nowrap;">${label}</td><td style="font-size:12px;color:var(--ink2);padding:5px 0;">${val}</td></tr>`;
   }).join('');
+  const checksHtml=consent.checks?.length
+    ?`<div style="margin-bottom:20px;"><div style="font-size:11px;font-weight:600;color:var(--ink3);margin-bottom:8px;">Agreed to:</div>${consent.checks.map(ch=>`<div style="display:flex;align-items:flex-start;gap:8px;font-size:12px;color:var(--ink2);margin-bottom:6px;"><span style="color:${ch.checked?'#388E3C':'var(--ink4)'};flex-shrink:0;">${ch.checked?'☑':'☐'}</span><span>${ch.label}</span></div>`).join('')}</div>`
+    :'';
   return `<div style="background:var(--cream2);border-radius:10px;padding:12px 16px;margin-bottom:18px;font-size:12px;color:var(--ink2);">
-    <strong>${CONSENT_KEYS[formKey]}</strong><br>
+    <strong>${getConsentLabel(formKey,consent)}</strong><br>
     Client: ${client.name} &nbsp;·&nbsp; Signed: ${fmtDate(consent.date)}
   </div>
   ${rows?`<table style="width:100%;border-collapse:collapse;margin-bottom:20px;">${rows}</table>`:''}
+  ${checksHtml}
   <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border2);">
     <div style="font-size:11px;font-weight:600;color:var(--ink3);margin-bottom:8px;">Signature:</div>
     ${sigHtml}

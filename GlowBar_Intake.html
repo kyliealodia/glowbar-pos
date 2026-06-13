@@ -1215,6 +1215,7 @@ async function submitForm(){
   const currentProducts=[...document.querySelectorAll('#sec3 .check-item.checked')].map(el=>el.querySelector('input').value);
   const skincareRating=document.querySelector('.rating-row:first-of-type .rating-btn.sel')?.textContent||'';
   const sunExposure=document.querySelector('.rating-row:nth-of-type(2) .rating-btn.sel')?.textContent||'';
+  const consentChecks=[...document.querySelectorAll('#consentChecks .consent-check')].map(el=>({label:el.textContent.replace('✓','').trim(),checked:el.classList.contains('checked')}));
 
   const ref='CL'+Date.now().toString().slice(-8);
   const data={
@@ -1251,7 +1252,7 @@ async function submitForm(){
     // Consent — stored in the same structure as the main POS app
     consentSigned:true,
     signature:sig,
-    consents:{general:{signed:true,date:new Date().toISOString().split('T')[0],signedAt:new Date().toISOString(),signature:sig,data:{fullName:document.getElementById('s1FirstName').value.trim()+' '+document.getElementById('s1LastName').value.trim(),dob:document.getElementById('s1Bday').value,contact:document.getElementById('s1Phone').value.trim(),allergies:document.getElementById('s2Allergies').value.trim(),medications:document.getElementById('s2Meds').value.trim(),medConditions:medConds.join(', ')}}},
+    consents:{[currentWaiver]:{signed:true,date:new Date().toISOString().split('T')[0],signedAt:new Date().toISOString(),signature:sig,title:WAIVERS[currentWaiver]?.title||'General Service Consent',checks:consentChecks,data:{fullName:document.getElementById('s1FirstName').value.trim()+' '+document.getElementById('s1LastName').value.trim(),dob:document.getElementById('s1Bday').value,contact:document.getElementById('s1Phone').value.trim(),allergies:document.getElementById('s2Allergies').value.trim(),medications:document.getElementById('s2Meds').value.trim(),medConditions:medConds.join(', ')}}},
     intakeComplete:true,
     skinAnalysis:window._skinAnalysis||null,
     visits:0,
