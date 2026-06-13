@@ -5346,7 +5346,7 @@ function confirmPay(){
       staff:(selStaff||currentUser)?.name,method,sub,disc,tip,vat,vatOn:vatOn||false,
       originalAmount:payFeeAmt>0?originalAmount:null,
       payFee:payFeeAmt||null,feePct:payFeePct||null,feeTerm:payFeeTerm||null,
-      depositApplied:dep||null,totalCharged:finalTotal,
+      depositApplied:dep||null,totalCharged:finalTotal,amountPaid:finalTotal,
       remainingBalance:_rcptRemBal,nextPaymentDate:_rcptNextDue,
       packageInfo:_rcptPkgInfo||null,
       installmentInfo:instMeta||null,internalInstallment:internalInstInfo||null,
@@ -5741,43 +5741,47 @@ function sendReceiptEmail(r){
   const RECEIPT_BASE='https://kyliealodia.github.io/glowbar-pos/GlowBar_Receipt.html';
   const receiptLink=RECEIPT_BASE+'?id='+r.id;
   // _fp returns a plain number string — the EmailJS template already adds the ₱ prefix.
-  // Passing ₱ here too would produce ₱₱ in the email.
   const _fp=n=>(n||0).toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2});
-  const _fd=d=>{try{return new Date(d).toLocaleDateString('en-PH',{year:'numeric',month:'long',day:'numeric'});}catch(e){return String(d);}};
+  // Locale-independent date formatter — avoids browser-dependent toLocaleDateString output.
+  const _MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const _fd=d=>{try{const dt=new Date(d);if(isNaN(dt.getTime()))return String(d);return _MONTHS[dt.getMonth()]+' '+dt.getDate()+', '+dt.getFullYear();}catch(e){return String(d);}};
   const methodLabel=(r.method||'cash').replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
   const hasFee=(r.payFee||0)>0;
-  // Exclude ₱0 session-use items from the services display
+  // Include all named items — session_use items are real services (pre-paid package sessions)
   const svcList=(r.services||[])
-    .filter(s=>!(s.type==='session_use'&&(s.price||0)===0))
+    .filter(s=>s.name)
     .map(s=>s.name+(s.qty>1?' ×'+s.qty:''))
     .join(', ')||'—';
-  const pkgItem=r.packageInfo&&r.packageInfo.length?r.packageInfo[0]:null;
+  // Require packageName to be set so empty/partial packageInfo entries are ignored
+  const pkgItem=(r.packageInfo&&Array.isArray(r.packageInfo)&&r.packageInfo.length>0&&r.packageInfo[0]?.packageName)?r.packageInfo[0]:null;
   const sessTotal=pkgItem?((pkgItem.sessionsUsed||0)+(pkgItem.sessionsRemaining||0)):0;
-  // Receipt date: fall back to current date if createdAt is missing
   const receiptDate=_fd(r.createdAt||new Date().toISOString());
-  // Remaining balance: show 0.00 when fully paid so template never shows bare ₱
   const remBalStr=(r.remainingBalance>0)?_fp(r.remainingBalance):'0.00';
   const params={
     client_name: r.clientName||'Valued Client',
     email: r.clientEmail,
     receipt_number: r.id||'',
     receipt_date: receiptDate,
+    date: receiptDate,
     services: svcList,
+    service_availed: svcList,
     staff_name: r.staff||'—',
     payment_method: methodLabel+(r.feeTerm?' ('+r.feeTerm+' months)':''),
     original_amount: _fp(hasFee?(r.originalAmount||r.totalCharged):r.totalCharged),
     fee_applied: hasFee?_fp(r.payFee):'0.00',
     total_charged: _fp(r.totalCharged),
-    amount_paid_today: _fp(r.totalCharged||0),
+    amount_paid_today: _fp(r.amountPaid||r.totalCharged||0),
     remaining_balance: remBalStr,
-    // Only populate package fields when this transaction has a package
-    package_name: pkgItem?pkgItem.packageName:'',
-    sessions_used: pkgItem?String(pkgItem.sessionsUsed):'',
-    sessions_total: pkgItem?String(sessTotal):'',
-    sessions_remaining: pkgItem?String(pkgItem.sessionsRemaining):'',
-    has_package: pkgItem?'yes':'',
     next_payment_date: r.nextPaymentDate?_fd(r.nextPaymentDate+'T12:00'):'',
-    receipt_link: receiptLink
+    receipt_link: receiptLink,
+    // Package fields only sent when this transaction contains a package purchase
+    ...(pkgItem?{
+      has_package:'yes',
+      package_name:pkgItem.packageName,
+      sessions_used:String(pkgItem.sessionsUsed||0),
+      sessions_total:String(sessTotal),
+      sessions_remaining:String(pkgItem.sessionsRemaining||0)
+    }:{})
   };
   emailjs.send('service_guqj3f9','template_6im3p4m',params,'Q6-l0KLPhVy0Y-UMa')
     .then(()=>showToast('Receipt emailed to '+r.clientEmail,'ok'))
