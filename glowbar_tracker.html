@@ -2095,17 +2095,19 @@ function saveData(){
   }catch(e){}
 }
 const fmt=n=>'₱'+Math.round(n).toLocaleString();
-function getS(c,i){return state[c+'_'+i]||{notes:'',paidBy:''}}
-function setS(c,i,f,v){const k=c+'_'+i;if(!state[k])state[k]={notes:'',paidBy:''};state[k][f]=v;refreshCat(c);refreshSummary();}
+function getS(c,i){return state[c+'_'+i]||{notes:'',paidBy:'',dp:0}}
+function setS(c,i,f,v){const k=c+'_'+i;if(!state[k])state[k]={notes:'',paidBy:'',dp:0};state[k][f]=v;refreshCat(c);refreshSummary();}
 function totals(cat){
-  let totalPlanned=0,paidCount=0,totalCount=cat.items.length;
+  let totalPlanned=0,totalDp=0,paidCount=0,totalCount=cat.items.length;
   cat.items.forEach((item,i)=>{
     const s=getS(cat.id,i);
-    totalPlanned+=item.p||0;
-    const pb=s.paidBy||'';
-    if(pb==='kylie'||pb==='mcjames'||pb==='shopee1'||pb==='shopee3')paidCount++;
+    const p=item.p||0;
+    const dp=s.dp||0;
+    totalPlanned+=p;
+    totalDp+=dp;
+    if(dp>=p&&p>0)paidCount++;
   });
-  return{totalPlanned,paidCount,totalCount};
+  return{totalPlanned,totalDp,totalBalance:totalPlanned-totalDp,paidCount,totalCount};
 }
 
 function setSplStatus(catId,i,status){setS(catId,i,'paidBy',status);}
@@ -2115,63 +2117,66 @@ function renderExpensesSplSummary(){
 }
 
 function refreshSummary(){
-  let mcjamesUsed=0,kylieUsed=0,notYetPaid=0,splAmt=0,grandTotal=0;
+  let mcjamesDp=0,kylieDp=0,shopDp=0,grandTotal=0,totalDpAll=0,notYetPaid=0;
   CATS.forEach(cat=>{
     cat.items.forEach((item,i)=>{
       const p=item.p||0; if(!p)return;
-      const pb=(getS(cat.id,i).paidBy)||'';
+      const s=getS(cat.id,i);
+      const pb=s.paidBy||'';
+      const dp=s.dp||0;
       grandTotal+=p;
-      if(pb==='mcjames')mcjamesUsed+=p;
-      else if(pb==='kylie')kylieUsed+=p;
-      else if(pb==='shopee1'||pb==='shopee3')splAmt+=p;
-      else notYetPaid+=p;
+      totalDpAll+=dp;
+      if(pb==='mcjames')mcjamesDp+=dp;
+      else if(pb==='kylie')kylieDp+=dp;
+      else if(pb==='shopee1'||pb==='shopee3')shopDp+=dp;
+      if(!dp)notYetPaid+=p;
     });
   });
   renderExpensesSplSummary();
-  const paidTotal=mcjamesUsed+kylieUsed;
+  const paidTotal=kylieDp+mcjamesDp;
   const contingency=TOTAL_FUNDS-grandTotal;
-  const availableCash=TOTAL_FUNDS-paidTotal;
-  const mcjamesRemaining=MCJAMES_FUND-mcjamesUsed;
-  const kylieRemaining=KYLIE_FUND-kylieUsed;
+  const availableCash=TOTAL_FUNDS-totalDpAll;
+  const mcjamesRemaining=MCJAMES_FUND-mcjamesDp;
+  const kylieRemaining=KYLIE_FUND-kylieDp;
   document.getElementById('summary-grid').innerHTML=`
     <div class="metric" style="border:0.5px solid #b8d4c8">
       <div class="metric-label" style="color:var(--gold-d)">Kuya Mcjames Fund</div>
       <div class="metric-value gd">${fmt(MCJAMES_FUND)}</div>
-      <div style="font-size:10px;color:var(--muted);margin-top:3px">Items paid by Kuya: <strong>${fmt(mcjamesUsed)}</strong></div>
+      <div style="font-size:10px;color:var(--muted);margin-top:3px">Paid by Kuya: <strong>${fmt(mcjamesDp)}</strong></div>
       <div style="font-size:11px;font-weight:600;color:${mcjamesRemaining<0?'var(--red)':mcjamesRemaining<10000?'var(--warn)':'var(--green)'}">Remaining: ${fmt(Math.abs(mcjamesRemaining))}${mcjamesRemaining<0?' over':''}</div>
     </div>
     <div class="metric" style="border:0.5px solid #c8b8d4">
       <div class="metric-label" style="color:var(--gold-d)">Kylie Fund</div>
       <div class="metric-value gd">${fmt(KYLIE_FUND)}</div>
-      <div style="font-size:10px;color:var(--muted);margin-top:3px">Items paid by Kylie: <strong>${fmt(kylieUsed)}</strong></div>
+      <div style="font-size:10px;color:var(--muted);margin-top:3px">Paid by Kylie: <strong>${fmt(kylieDp)}</strong></div>
       <div style="font-size:11px;font-weight:600;color:${kylieRemaining<0?'var(--red)':kylieRemaining<50000?'var(--warn)':'var(--green)'}">Remaining: ${fmt(Math.abs(kylieRemaining))}${kylieRemaining<0?' over':''}</div>
     </div>
     <div class="metric" style="border:0.5px solid var(--gold-l);background:var(--cream2)">
       <div class="metric-label" style="color:var(--gold-d)">Available Cash</div>
       <div class="metric-value ${availableCash<0?'r':availableCash<50000?'a':'g'}">${fmt(Math.abs(availableCash))}${availableCash<0?' over':''}</div>
-      <div style="font-size:10px;color:var(--muted);margin-top:2px">₱500K − paid (Kylie + Kuya)</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:2px">₱500K − total downpayments</div>
     </div>
-    ${splAmt>0?`<div class="metric" style="border:0.5px solid #f0a500">
+    ${shopDp>0?`<div class="metric" style="border:0.5px solid #f0a500">
       <div class="metric-label" style="color:#c96b00">🛒 Shopee Pay Later</div>
-      <div class="metric-value" style="color:#c96b00">${fmt(splAmt)}</div>
-      <div style="font-size:10px;color:var(--muted);margin-top:3px">Total planned on Shopee</div>
+      <div class="metric-value" style="color:#c96b00">${fmt(shopDp)}</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:3px">Total paid via Shopee</div>
     </div>`:''}
     <div class="metric">
       <div class="metric-label">Not Yet Paid</div>
       <div class="metric-value a">${fmt(notYetPaid)}</div>
-      <div style="font-size:10px;color:var(--muted);margin-top:3px">Unassigned or pending items</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:3px">Planned with no downpayment</div>
     </div>
     <div class="metric" style="border:0.5px solid ${contingency<0?'var(--red)':contingency<50000?'#f0c060':'#badbcc'};background:${contingency<0?'#fff5f5':contingency<50000?'#fffbec':'#f0fff4'}">
       <div class="metric-label" style="color:${contingency<0?'var(--red)':contingency<50000?'var(--warn)':'#0f5132'}">Contingency Fund</div>
       <div class="metric-value" style="color:${contingency<0?'var(--red)':contingency<50000?'var(--warn)':'#0f5132'}">${contingency<0?'−':''}${fmt(Math.abs(contingency))}</div>
       <div style="font-size:10px;color:var(--muted);margin-top:3px">₱500K − all planned amounts</div>
     </div>`;
-  const pct=Math.min(100,Math.round(paidTotal/TOTAL_FUNDS*100));
+  const pct=Math.min(100,Math.round(totalDpAll/TOTAL_FUNDS*100));
   const bar=document.getElementById('budget-bar');
   bar.style.width=pct+'%';bar.style.background=pct>100?'var(--red)':pct>85?'#E4A834':'linear-gradient(90deg,var(--gold-l),var(--gold))';
   document.getElementById('bar-mid').textContent=pct+'% of ₱500K used';
   const al=document.getElementById('alert-el');
-  if(availableCash<0){al.className='alert show';al.textContent=`⚠ Paid expenses (${fmt(paidTotal)}) exceed combined funds of ₱500,000 by ${fmt(-availableCash)}.`;}
+  if(availableCash<0){al.className='alert show';al.textContent=`⚠ Total downpayments (${fmt(totalDpAll)}) exceed combined funds of ₱500,000 by ${fmt(-availableCash)}.`;}
   else if(availableCash<50000){al.className='alert show';al.textContent=`Less than ${fmt(availableCash)} available — review before next purchase.`;}
   else al.className='alert';
 }
@@ -2182,10 +2187,10 @@ function refreshCat(id){
   const pct=t.totalCount>0?Math.min(100,Math.round(t.paidCount/t.totalCount*100)):0;
   const hdr=document.getElementById('hdr-'+id);if(!hdr)return;
   const pl=hdr.querySelector('.cat-planned');if(pl)pl.textContent=fmt(t.totalPlanned)+' planned';
-  const pt=hdr.querySelector('.cat-prog-txt');if(pt)pt.textContent=t.paidCount+'/'+t.totalCount+' items paid';
+  const pt=hdr.querySelector('.cat-prog-txt');if(pt)pt.textContent='Paid: '+fmt(t.totalDp)+' | Remaining: '+fmt(t.totalBalance);
   const pb=hdr.querySelector('.cat-prog-bar');if(pb){pb.style.width=pct+'%';pb.className='pfill ok cat-prog-bar'+(pct===100?' done':'');}
   const foot=document.getElementById('foot-'+id);if(!foot)return;
-  foot.innerHTML=`<td style="text-align:left;font-weight:700">Total</td><td style="font-weight:700">${fmt(t.totalPlanned)}</td><td colspan="3"></td>`;
+  foot.innerHTML=`<td style="text-align:left;font-weight:700">Total</td><td style="font-weight:700">${fmt(t.totalPlanned)}</td><td></td><td style="font-weight:700">${fmt(t.totalDp)}</td><td style="font-weight:700">${fmt(t.totalBalance)}</td><td colspan="2"></td>`;
 }
 
 function toggleCat(id){
@@ -2198,11 +2203,12 @@ function rowHtml(cat,item,i){
   const s=getS(cat.id,i);
   const nm=item.name.replace(/"/g,'&quot;');
   const pb=s.paidBy||'';
-  const paidLabel=pb==='kylie'?'✓ Paid — Kylie':pb==='mcjames'?'✓ Paid — Kuya Mcjames':pb==='shopee1'?'🛒 Shopee Pay Later — 1 month':pb==='shopee3'?'🛒 Shopee Pay Later — 3 months':'';
+  const dp=s.dp||0;
+  const bal=Math.max(0,(item.p||0)-dp);
   const rowBg=pb==='kylie'?'background:#f0fff4':pb==='mcjames'?'background:#f0f4ff':pb==='shopee1'||pb==='shopee3'?'background:#fff8ed':'';
   return `<tr style="${rowBg}">
     <td><input class="ni" type="text" value="${nm}" oninput="updN('${cat.id}',${i},this.value)"></td>
-    <td><input class="ii" type="number" placeholder="0" value="${item.p||''}" oninput="updP('${cat.id}',${i},this.value)" style="width:90px"></td>
+    <td><input class="ii" type="number" placeholder="0" value="${item.p||''}" oninput="updP('${cat.id}',${i},this.value)" style="width:80px"></td>
     <td style="text-align:left;min-width:160px">
       <select style="border:0.5px solid var(--border);border-radius:7px;padding:4px 6px;font-size:11px;background:#fff;color:var(--text);font-family:inherit;width:100%;max-width:200px" onchange="setSplStatus('${cat.id}',${i},this.value)">
         <option value=""${pb===''?' selected':''}>— not assigned —</option>
@@ -2213,6 +2219,8 @@ function rowHtml(cat,item,i){
         <option value="pending"${pb==='pending'?' selected':''}>○ Not yet paid</option>
       </select>
     </td>
+    <td><input class="ii" type="number" placeholder="0" value="${dp||''}" oninput="updDp('${cat.id}',${i},this.value)" style="width:80px"></td>
+    <td style="text-align:right;font-size:12px;font-weight:600;color:${bal>0?'var(--red)':'var(--green)'};padding-right:8px">${bal>0?fmt(bal):'✓ Paid'}</td>
     <td><input class="nti" type="text" placeholder="notes" value="${s.notes||''}" oninput="setS('${cat.id}',${i},'notes',this.value)"></td>
     <td><button class="del-row" onclick="delRow('${cat.id}',${i})" title="Remove">✕</button></td>
   </tr>`;
@@ -2253,6 +2261,21 @@ function delCat(id){
 
 function updN(c,i,v){const cat=CATS.find(x=>x.id===c);if(cat&&cat.items[i])cat.items[i].name=v;refreshCat(c);refreshSummary();}
 function updP(c,i,v){const cat=CATS.find(x=>x.id===c);if(cat&&cat.items[i])cat.items[i].p=parseFloat(v)||0;refreshCat(c);refreshSummary();}
+function updDp(c,i,v){
+  const k=c+'_'+i;if(!state[k])state[k]={notes:'',paidBy:'',dp:0};
+  state[k].dp=parseFloat(v)||0;
+  // Update balance cell immediately without full rebuild
+  const rows=document.querySelectorAll(`#body-${c} tbody tr`);
+  const row=rows[i];if(row){
+    const cat=CATS.find(x=>x.id===c);
+    const p=cat?.items[i]?.p||0;
+    const dp=state[k].dp;
+    const bal=Math.max(0,p-dp);
+    const balCell=row.cells[4];
+    if(balCell){balCell.textContent=bal>0?fmt(bal):'✓ Paid';balCell.style.color=bal>0?'var(--red)':'var(--green)';}
+  }
+  refreshCat(c);refreshSummary();
+}
 
 function buildCats(){
   const con=document.getElementById('cats-container');con.innerHTML='';
@@ -2276,7 +2299,7 @@ function buildCats(){
       </div>
       <div class="cat-body${isOpen?' open':''}" id="body-${cat.id}">
         <table class="tbl">
-          <thead><tr><th style="text-align:left">Item</th><th>Planned (₱)</th><th style="text-align:left">Paid by</th><th>Notes</th><th></th></tr></thead>
+          <thead><tr><th style="text-align:left">Item</th><th>Planned (₱)</th><th style="text-align:left">Paid by</th><th>Downpayment (₱)</th><th>Balance</th><th>Notes</th><th></th></tr></thead>
           <tbody>${cat.items.map((item,i)=>rowHtml(cat,item,i)).join('')}</tbody>
           <tfoot><tr id="foot-${cat.id}"></tr></tfoot>
         </table>
