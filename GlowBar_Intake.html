@@ -515,31 +515,55 @@ function resetIdleTimer(){
 
   <!-- STEP 3 — CONSENT -->
   <div class="section" id="sec3">
-    <div class="section-title">Care and Consent Agreement</div>
-    <div class="section-sub">Please read the following carefully before signing.</div>
-    <div id="consentFormTitle" style="font-size:11px;font-weight:700;color:var(--gold-dk);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:12px;"></div>
 
-    <div class="consent-box" id="consentBox" style="max-height:none;display:flex;flex-direction:column;gap:12px;font-size:13px;line-height:1.85;"></div>
-
-    <div id="consentChecks" style="margin-top:16px;"></div>
-
-    <div class="fg" style="margin-top:20px;">
-      <label class="fl">Client Signature *</label>
-      <div class="sig-wrap">
-        <canvas id="sigCanvas" height="160"></canvas>
-        <button class="sig-clear" onclick="clearSig()">Clear</button>
-        <div class="sig-hint" id="sigHint">✍️ Sign here with your finger or stylus</div>
+    <!-- Phase 1: General Consent -->
+    <div id="cp1">
+      <div class="section-title">Care &amp; Consent Agreement</div>
+      <div class="section-sub">Please read all terms carefully before proceeding.</div>
+      <div id="gc-title" style="font-size:11px;font-weight:700;color:var(--gold-dk);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:10px;"></div>
+      <div class="consent-box" id="gc-body"></div>
+      <div id="gc-checks" style="margin-top:4px;"></div>
+      <div class="nav-row">
+        <button class="btn-back" ontouchstart="event.preventDefault();goSec(_serviceSkipsHealthSteps()?1:2)" onclick="goSec(_serviceSkipsHealthSteps()?1:2)">← Back</button>
+        <button class="btn-next" ontouchstart="event.preventDefault();agreePhase1()" onclick="agreePhase1()" id="cp1Btn">Agree &amp; Continue →</button>
       </div>
     </div>
 
-    <div style="background:var(--gold-lt);border:1px solid rgba(201,168,76,0.3);border-radius:10px;padding:14px 16px;font-size:12px;color:var(--ink2);line-height:1.7;margin-top:4px;">
-      📋 By submitting this form, you confirm that you have read and agreed to all terms above. Your information will be stored securely and used only for clinical and appointment purposes.
+    <!-- Phase 2: Service-specific Consent -->
+    <div id="cp2" style="display:none;">
+      <div class="section-title">Service Consent</div>
+      <div class="section-sub">Your service requires an additional consent form.</div>
+      <div id="sc-title" style="font-size:11px;font-weight:700;color:var(--gold-dk);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:10px;"></div>
+      <div class="consent-box" id="sc-body"></div>
+      <div id="sc-checks" style="margin-top:4px;"></div>
+      <div class="nav-row">
+        <button class="btn-back" ontouchstart="event.preventDefault();showConsentPhase(1)" onclick="showConsentPhase(1)">← Back</button>
+        <button class="btn-next" ontouchstart="event.preventDefault();agreePhase2()" onclick="agreePhase2()">Agree &amp; Continue →</button>
+      </div>
     </div>
 
-    <div class="nav-row">
-      <button class="btn-back" ontouchstart="event.preventDefault();goSec(_serviceSkipsHealthSteps()?1:2)" onclick="goSec(_serviceSkipsHealthSteps()?1:2)">← Back</button>
-      <button class="btn-next" ontouchstart="event.preventDefault();submitForm()" onclick="submitForm()" id="submitBtn" disabled>✓ Submit Form</button>
+    <!-- Phase 3: Signature -->
+    <div id="cp3" style="display:none;">
+      <div class="section-title">Sign Your Consent</div>
+      <div class="section-sub">Your signature confirms you have read and agreed to all forms below.</div>
+      <div id="formsSignedList" style="background:var(--cream2);border:1px solid var(--cream3);border-radius:10px;padding:12px 14px;margin-bottom:16px;display:flex;flex-direction:column;gap:8px;font-size:13px;color:var(--ink2);"></div>
+      <div class="fg">
+        <label class="fl">Client Signature *</label>
+        <div class="sig-wrap">
+          <canvas id="sigCanvas" height="160"></canvas>
+          <button class="sig-clear" onclick="clearSig()">Clear</button>
+          <div class="sig-hint" id="sigHint">✍️ Sign here with your finger or stylus</div>
+        </div>
+      </div>
+      <div style="background:var(--gold-lt);border:1px solid rgba(201,168,76,0.3);border-radius:10px;padding:14px 16px;font-size:12px;color:var(--ink2);line-height:1.7;margin-top:4px;">
+        📋 By submitting this form, you confirm that you have read and agreed to all terms above. Your information will be stored securely and used only for clinical and appointment purposes.
+      </div>
+      <div class="nav-row">
+        <button class="btn-back" ontouchstart="event.preventDefault();sigBack()" onclick="sigBack()">← Back</button>
+        <button class="btn-next" ontouchstart="event.preventDefault();submitForm()" onclick="submitForm()" id="submitBtn" disabled>✓ Submit Form</button>
+      </div>
     </div>
+
   </div>
 
 </div>
@@ -563,12 +587,10 @@ try{
 
 // ── CONSENT TEMPLATES ──
 const SERVICE_TO_WAIVER={
-  'Nail Services':'nail',
   'Waxing':'waxing',
   'Facial / Skin Treatment':'facial',
   'Laser Treatment':'laser',
-  'Exilis / Body Contouring':'body',
-  'Tattoo / Wart Removal':'general'
+  'Exilis / Body Contouring':'rf'
 };
 
 const WAIVERS={
@@ -670,7 +692,7 @@ const WAIVERS={
       'I have read and understand all contraindications and risks listed above and voluntarily consent to laser treatment at Glow Bar Aesthetic Clinic.'
     ]
   },
-  body:{
+  rf:{
     title:'RF / Body Contouring Consent',
     box:`<p style="margin:0;"><strong>Service Description.</strong> This consent applies to: <strong>Exilis RF</strong> (radiofrequency skin tightening and fat reduction), <strong>Ultrasound Cavitation</strong>, and other non-invasive body contouring procedures. These treatments use energy-based devices to promote fat reduction, lymphatic drainage, and collagen remodelling.</p>
 <p style="margin:0;"><strong>Risks &amp; Side Effects.</strong> Common side effects include temporary redness, warmth, and mild swelling in the treated area, typically resolving within a few hours. The Exilis handpiece will feel warm to hot during treatment — you must communicate any pain or excessive heat immediately. Rare risks include superficial burns if contraindications are not disclosed or the treatment protocol is not followed correctly.</p>
@@ -697,7 +719,9 @@ const WAIVERS={
   }
 };
 
-let currentWaiver='general';
+let currentWaiver=null;
+let _consentPhaseCount=1;
+let sigInitialized=false;
 let sigCtx=null,sigDrawing=false,sigHasMark=false;
 // idleTimer / IDLE_MS / wakeUp / resetIdleTimer defined in <head>
 
@@ -1070,7 +1094,7 @@ function goSec(n){
   document.getElementById('progressFill').style.width=(n/3*100)+'%';
   document.querySelector('.kiosk-body').scrollTop=0;
   if(n===1) clearStep1Error();
-  if(n===3){ autoSelectWaiver(); initSig(); updateSubmitBtn(); }
+  if(n===3){ autoSelectWaiver(); }
 }
 
 // ── TOGGLE CHECKS ──
@@ -1086,33 +1110,70 @@ function selectRating(btn,group){
   btn.classList.add('sel');
 }
 
-// ── WAIVER ──
+// ── TOAST ──
+function showToast(msg){
+  let t=document.getElementById('kioskToast');
+  if(!t){t=document.createElement('div');t.id='kioskToast';t.style.cssText='position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#2C2318;color:#fff;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:500;z-index:9999;pointer-events:none;opacity:0;transition:opacity .25s;max-width:320px;text-align:center;';document.body.appendChild(t);}
+  t.textContent=msg;t.style.opacity='1';
+  clearTimeout(t._tm);t._tm=setTimeout(()=>{t.style.opacity='0';},2800);
+}
+
+// ── CONSENT PHASES ──
 function autoSelectWaiver(){
   const svc=document.getElementById('s1Service').value;
-  const key=SERVICE_TO_WAIVER[svc]||'general';
-  setWaiver(key);
+  const svcKey=SERVICE_TO_WAIVER[svc]||null;
+  currentWaiver=svcKey;
+  _consentPhaseCount=svcKey?2:1;
+  populateConsentCard('gc',WAIVERS.general);
+  document.getElementById('cp1Btn').textContent=svcKey?'Agree & Continue →':'Agree & Sign →';
+  if(svcKey&&WAIVERS[svcKey]) populateConsentCard('sc',WAIVERS[svcKey]);
+  showConsentPhase(1);
 }
-function setWaiver(key){
-  const w=WAIVERS[key]||WAIVERS.general;
-  currentWaiver=key;
-  document.getElementById('consentFormTitle').textContent=w.title;
-  document.getElementById('consentBox').innerHTML=w.box;
-  const container=document.getElementById('consentChecks');
-  container.innerHTML=w.checks.map((label,i)=>`
-    <label class="consent-check" onclick="toggleDynConsent(this,event)" style="${i===w.checks.length-1?'border-color:rgba(201,168,76,0.4);font-weight:500':''}">
+function populateConsentCard(prefix,waiver){
+  document.getElementById(prefix+'-title').textContent=waiver.title;
+  document.getElementById(prefix+'-body').innerHTML=waiver.box;
+  document.getElementById(prefix+'-checks').innerHTML=waiver.checks.map(label=>`
+    <label class="consent-check" onclick="toggleConsentCheck(this,event)">
       <input type="checkbox" class="consent-chk"><div class="cc-box">✓</div>
       <div class="cc-text">${label}</div>
     </label>`).join('');
 }
-function toggleDynConsent(el,e){
+function showConsentPhase(n){
+  document.getElementById('cp1').style.display=n===1?'':'none';
+  document.getElementById('cp2').style.display=n===2?'':'none';
+  document.getElementById('cp3').style.display=n===3?'':'none';
+  document.querySelector('.kiosk-body').scrollTop=0;
+}
+function toggleConsentCheck(el,e){
   if(e) e.preventDefault();
   el.classList.toggle('checked');
   el.querySelector('input').checked=el.classList.contains('checked');
+}
+function agreePhase1(){
+  const allChecked=[...document.querySelectorAll('#gc-checks .consent-chk')].every(cb=>cb.checked);
+  if(!allChecked){showToast('Please agree to all items above to continue','err');return;}
+  if(_consentPhaseCount>=2){showConsentPhase(2);}else{goToSignaturePhase();}
+}
+function agreePhase2(){
+  const allChecked=[...document.querySelectorAll('#sc-checks .consent-chk')].every(cb=>cb.checked);
+  if(!allChecked){showToast('Please agree to all items above to continue','err');return;}
+  goToSignaturePhase();
+}
+function goToSignaturePhase(){
+  const forms=[WAIVERS.general.title];
+  if(currentWaiver&&WAIVERS[currentWaiver]) forms.push(WAIVERS[currentWaiver].title);
+  document.getElementById('formsSignedList').innerHTML=
+    `<div style="font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px;">Forms you are signing today:</div>`+
+    forms.map(f=>`<div style="display:flex;align-items:center;gap:8px;"><span style="color:var(--gold);">📋</span><span>${f}</span></div>`).join('');
+  showConsentPhase(3);
+  if(!sigInitialized){initSig();sigInitialized=true;}
   updateSubmitBtn();
 }
+function sigBack(){
+  showConsentPhase(_consentPhaseCount);
+}
 function updateSubmitBtn(){
-  const allChecked=[...document.querySelectorAll('#consentChecks .consent-chk')].every(cb=>cb.checked);
-  document.getElementById('submitBtn').disabled=!(allChecked&&sigHasMark);
+  document.getElementById('submitBtn').disabled=!sigHasMark;
 }
 
 // ── SIGNATURE ──
@@ -1161,7 +1222,15 @@ async function submitForm(){
   const sig=sigCanvas.toDataURL('image/jpeg',0.5);
   const concerns=[...document.querySelectorAll('#skinConcerns .check-item.checked')].map(el=>el.querySelector('input').value);
   const medConds=[...document.querySelectorAll('#sec2 .check-item.checked')].map(el=>el.querySelector('input').value).filter(v=>!concerns.includes(v));
-  const consentChecks=[...document.querySelectorAll('#consentChecks .consent-check')].map(el=>({label:el.textContent.replace('✓','').trim(),checked:el.classList.contains('checked')}));
+  const _today=new Date().toISOString().split('T')[0];
+  const _signedAt=new Date().toISOString();
+  const _cdata={fullName:document.getElementById('s1FirstName').value.trim()+' '+document.getElementById('s1LastName').value.trim(),dob:document.getElementById('s1Bday').value,contact:document.getElementById('s1Phone').value.trim(),allergies:document.getElementById('s2Allergies').value.trim(),medications:document.getElementById('s2Meds').value.trim(),medConditions:medConds.join(', ')};
+  const generalChecks=[...document.querySelectorAll('#gc-checks .consent-chk')].map(el=>({label:el.closest('.consent-check')?.querySelector('.cc-text')?.textContent||'',checked:el.checked}));
+  const consents={general:{signed:true,date:_today,signedAt:_signedAt,signature:sig,title:WAIVERS.general.title,checks:generalChecks,data:_cdata}};
+  if(currentWaiver&&WAIVERS[currentWaiver]){
+    const svcChecks=[...document.querySelectorAll('#sc-checks .consent-chk')].map(el=>({label:el.closest('.consent-check')?.querySelector('.cc-text')?.textContent||'',checked:el.checked}));
+    consents[currentWaiver]={signed:true,date:_today,signedAt:_signedAt,signature:sig,title:WAIVERS[currentWaiver].title,checks:svcChecks,data:_cdata};
+  }
 
   const ref='CL'+Date.now().toString().slice(-8);
   const data={
@@ -1190,10 +1259,9 @@ async function submitForm(){
     medConditions:medConds,
     prevTreatments:document.getElementById('s2PrevTx').value.trim(),
     todayService:document.getElementById('s1Service').value,
-    // Consent — stored in the same structure as the main POS app
     consentSigned:true,
     signature:sig,
-    consents:{[currentWaiver]:{signed:true,date:new Date().toISOString().split('T')[0],signedAt:new Date().toISOString(),signature:sig,title:WAIVERS[currentWaiver]?.title||'General Service Consent',checks:consentChecks,data:{fullName:document.getElementById('s1FirstName').value.trim()+' '+document.getElementById('s1LastName').value.trim(),dob:document.getElementById('s1Bday').value,contact:document.getElementById('s1Phone').value.trim(),allergies:document.getElementById('s2Allergies').value.trim(),medications:document.getElementById('s2Meds').value.trim(),medConditions:medConds.join(', ')}}},
+    consents,
     intakeComplete:true,
     skinAnalysis:window._skinAnalysis||null,
     visits:0,
@@ -1281,15 +1349,14 @@ function resetForm(){
   document.querySelectorAll('.consent-check.checked').forEach(el=>el.classList.remove('checked'));
   document.querySelectorAll('.consent-chk').forEach(cb=>cb.checked=false);
   clearSig();
+  sigInitialized=false;
+  currentWaiver=null;
   document.getElementById('successScreen').classList.remove('active');
-  setWaiver('general');
   goSec(1);
   document.getElementById('submitBtn').disabled=true;
   document.getElementById('submitBtn').textContent='✓ Submit Form';
 }
 
-// Set initial consent form on load
-setWaiver('general');
 </script>
 </body>
 </html>
