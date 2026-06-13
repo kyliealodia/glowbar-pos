@@ -5740,9 +5740,9 @@ function sendReceiptEmail(r){
   if(typeof emailjs==='undefined') return;
   const RECEIPT_BASE='https://kyliealodia.github.io/glowbar-pos/GlowBar_Receipt.html';
   const receiptLink=RECEIPT_BASE+'?id='+r.id;
-  // _fp returns a plain number string — the EmailJS template already adds the ₱ prefix.
-  const _fp=n=>(n||0).toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2});
-  // Locale-independent date formatter — avoids browser-dependent toLocaleDateString output.
+  // _fp formats as ₱1,234.00 — include ₱ here; template should NOT add another ₱
+  const _fp=n=>'₱'+(n||0).toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2});
+  // Locale-independent date formatter — avoids browser-dependent toLocaleDateString output
   const _MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
   const _fd=d=>{try{const dt=new Date(d);if(isNaN(dt.getTime()))return String(d);return _MONTHS[dt.getMonth()]+' '+dt.getDate()+', '+dt.getFullYear();}catch(e){return String(d);}};
   const methodLabel=(r.method||'cash').replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
@@ -5756,33 +5756,40 @@ function sendReceiptEmail(r){
   const pkgItem=(r.packageInfo&&Array.isArray(r.packageInfo)&&r.packageInfo.length>0&&r.packageInfo[0]?.packageName)?r.packageInfo[0]:null;
   const sessTotal=pkgItem?((pkgItem.sessionsUsed||0)+(pkgItem.sessionsRemaining||0)):0;
   const receiptDate=_fd(r.createdAt||new Date().toISOString());
-  const remBalStr=(r.remainingBalance>0)?_fp(r.remainingBalance):'0.00';
+  const amtPaid=_fp(r.amountPaid||r.totalCharged||0);
+  const remBal=(r.remainingBalance>0)?_fp(r.remainingBalance):'₱0.00';
   const params={
+    // Identity
     client_name: r.clientName||'Valued Client',
     email: r.clientEmail,
     receipt_number: r.id||'',
+    // Date — sent as both variable names in case template uses either
     receipt_date: receiptDate,
     date: receiptDate,
+    // Services — sent as both variable names in case template uses either
     services: svcList,
     service_availed: svcList,
+    // Staff & payment
     staff_name: r.staff||'—',
     payment_method: methodLabel+(r.feeTerm?' ('+r.feeTerm+' months)':''),
+    // Amounts — include ₱ in value; template must NOT add another ₱
     original_amount: _fp(hasFee?(r.originalAmount||r.totalCharged):r.totalCharged),
-    fee_applied: hasFee?_fp(r.payFee):'0.00',
+    fee_applied: hasFee?_fp(r.payFee):'₱0.00',
     total_charged: _fp(r.totalCharged),
-    amount_paid_today: _fp(r.amountPaid||r.totalCharged||0),
-    remaining_balance: remBalStr,
+    // Amount paid today — sent as both variable names
+    amount_paid_today: amtPaid,
+    amount_paid: amtPaid,
+    remaining_balance: remBal,
     next_payment_date: r.nextPaymentDate?_fd(r.nextPaymentDate+'T12:00'):'',
     receipt_link: receiptLink,
-    // Package fields only sent when this transaction contains a package purchase
-    ...(pkgItem?{
-      has_package:'yes',
-      package_name:pkgItem.packageName,
-      sessions_used:String(pkgItem.sessionsUsed||0),
-      sessions_total:String(sessTotal),
-      sessions_remaining:String(pkgItem.sessionsRemaining||0)
-    }:{})
+    // Package section: empty strings when no package so template section stays hidden
+    has_package: pkgItem?'yes':'',
+    package_name: pkgItem?pkgItem.packageName:'',
+    sessions_used: pkgItem?String(pkgItem.sessionsUsed||0):'',
+    sessions_total: pkgItem?String(sessTotal):'',
+    sessions_remaining: pkgItem?String(pkgItem.sessionsRemaining||0):''
   };
+  console.log('sendReceiptEmail params:', params);
   emailjs.send('service_guqj3f9','template_6im3p4m',params,'Q6-l0KLPhVy0Y-UMa')
     .then(()=>showToast('Receipt emailed to '+r.clientEmail,'ok'))
     .catch(e=>console.warn('Receipt email error:',e));
