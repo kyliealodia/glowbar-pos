@@ -9153,6 +9153,19 @@ function exportAttendance(){
 }
 
 // ══ PAYROLL & COMMISSION ══
+// Convert any ISO/UTC timestamp to a Date object whose .getFullYear/.getMonth/.getDate reflect Philippine time (UTC+8)
+function toPHDate(isoString){
+  if(!isoString) return new Date(NaN);
+  try{return new Date(new Date(String(isoString)).toLocaleString('en-US',{timeZone:'Asia/Manila'}));}
+  catch(e){return new Date(NaN);}
+}
+// Return YYYY-MM-DD string in Philippine local time
+function toPHDateStr(isoString){
+  const d=toPHDate(isoString);
+  if(isNaN(d.getTime())) return '';
+  return d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0')+'-'+d.getDate().toString().padStart(2,'0');
+}
+
 function initPayPeriods(){
   const sel=document.getElementById('payPeriodMonth');if(!sel)return;
   sel.innerHTML='';
@@ -9377,12 +9390,13 @@ function _getAttendanceStats(userId, userName, period){
   let totalMins=0;
 
   // New format: {date, in, out}
+  // l.date is already a PH date string (YYYY-MM-DD); l.in may be an ISO/UTC string — convert to PH
   S.loginLogs.filter(l=>{
     const matchUser=l.userId===userId||(l.name||l.user||'')===userName;
-    const date=l.date||(l.in?String(l.in).slice(0,10):'');
+    const date=l.date||(l.in?toPHDateStr(l.in):'');
     return matchUser&&date&&date.startsWith(period)&&(l.date||l.in)&&!l.action;
   }).forEach(l=>{
-    const date=l.date||(l.in?String(l.in).slice(0,10):'');
+    const date=l.date||(l.in?toPHDateStr(l.in):'');
     if(date) presentDates.add(date);
     if(l.in&&l.out){
       const ms=new Date(l.out)-new Date(l.in);
@@ -9390,18 +9404,18 @@ function _getAttendanceStats(userId, userName, period){
     }
   });
 
-  // Old format: separate clockin / clockout entries with 'time' field
+  // Old format: separate clockin / clockout entries with 'time' field (ISO/UTC) — convert to PH date
   const oldLogs=S.loginLogs.filter(l=>{
     const matchUser=l.userId===userId||(l.name||l.user||'')===userName;
-    const t=String(l.time||'');
-    return matchUser&&t&&t.startsWith(period)&&(l.action==='clockin'||l.action==='clockout'||l.action==='in'||l.action==='out');
+    const phDate=l.time?toPHDateStr(String(l.time)):'';
+    return matchUser&&phDate&&phDate.startsWith(period)&&(l.action==='clockin'||l.action==='clockout'||l.action==='in'||l.action==='out');
   });
   const oldIn=oldLogs.filter(l=>l.action==='clockin'||l.action==='in');
   const oldOut=oldLogs.filter(l=>l.action==='clockout'||l.action==='out');
-  oldIn.forEach(l=>presentDates.add(String(l.time).slice(0,10)));
+  oldIn.forEach(l=>presentDates.add(toPHDateStr(String(l.time))));
   oldOut.forEach(lo=>{
-    const dayStr=String(lo.time).slice(0,10);
-    const prevIn=oldIn.filter(l=>String(l.time).slice(0,10)===dayStr).pop();
+    const dayStr=toPHDateStr(String(lo.time));
+    const prevIn=oldIn.filter(l=>toPHDateStr(String(l.time))===dayStr).pop();
     if(prevIn){const ms=new Date(lo.time)-new Date(prevIn.time);if(ms>0)totalMins+=Math.round(ms/60000);}
   });
 
@@ -9579,7 +9593,7 @@ function renderPayslip(){
   const [py,pm]=period.split('-').map(Number);
   if(!py||!pm) return;
   const txns=S.transactions.filter(t=>{
-    const d=new Date(t.time);
+    const d=toPHDate(t.time);
     return d.getFullYear()===py && d.getMonth()+1===pm;
   });
   const g=document.getElementById('payslipGrid');if(!g)return;
@@ -9719,7 +9733,7 @@ function printPayslips(){
 function exportPayslip(){
   const period=document.getElementById('payPeriodMonth')?.value||td().slice(0,7);
   const [py,pm]=period.split('-').map(Number);
-  const txns=S.transactions.filter(t=>{const d=new Date(t.time);return d.getFullYear()===py&&d.getMonth()+1===pm;});
+  const txns=S.transactions.filter(t=>{const d=toPHDate(t.time);return d.getFullYear()===py&&d.getMonth()+1===pm;});
   let csv='Staff,Role,Basic Salary,Commission %,Sales Handled,Commission Earned,Allowances,SSS,PhilHealth,PagIBIG,Tax,Other Deductions,Total Deductions,Net Pay\n';
   S.users.filter(u=>u.role!=='owner').forEach(u=>{
     const myTxns=txns.filter(t=>t.staff===u.name);
