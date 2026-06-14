@@ -1471,12 +1471,12 @@ body{font-family:system-ui,sans-serif;background:var(--cream);color:var(--text);
 
 <div id="tab-expenses" class="section active">
   <div id="alert-el" class="alert"></div>
-  <div id="expenses-spl-summary" style="display:none;margin-bottom:1rem"></div>
   <div class="summary" id="summary-grid"></div>
   <div class="bar-wrap">
     <div class="bar-bg"><div class="bar-fill" id="budget-bar" style="width:0%"></div></div>
     <div class="bar-lbl"><span>₱0</span><span id="bar-mid"></span><span>₱500,000 total funds</span></div>
   </div>
+  <div id="expenses-spl-summary" style="display:none;margin-top:1rem;margin-bottom:0.5rem"></div>
   <div id="cats-container"></div>
   <div class="add-cat-wrap">
     <button class="add-cat-btn" onclick="toggleNCF()">＋ Add new category</button>
@@ -2123,40 +2123,41 @@ function renderExpensesSplSummary(){
   const thisMonthKey=thisYear+'-'+String(thisMo).padStart(2,'0');
   const nextMo=thisMo===12?1:thisMo+1,nextYr=thisMo===12?thisYear+1:thisYear;
   const nextMonthKey=nextYr+'-'+String(nextMo).padStart(2,'0');
+  const moNames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
+  // Collect SPL items
   const splItems=[];
   CATS.forEach(cat=>{
     cat.items.forEach((item,i)=>{
       const s=getS(cat.id,i);const pb=s.paidBy||'';
       if(pb!=='shopee1'&&pb!=='shopee3')return;
       const dp=s.dp||0;if(!dp)return;
-      splItems.push({name:item.name,catName:cat.name,dp,pb,purchaseDate:s.purchaseDate||''});
+      const purchaseMonth=(s.purchaseDate||'').slice(0,7); // normalise to YYYY-MM
+      splItems.push({name:item.name,catName:cat.name,dp,pb,purchaseMonth});
     });
   });
   if(!splItems.length){el.style.display='none';return;}
   el.style.display='block';
 
-  const schedule={};
-  splItems.forEach(item=>{
-    const{name,catName,dp,pb,purchaseDate}=item;
-    if(!purchaseDate){
-      if(!schedule['unknown'])schedule['unknown']=[];
-      schedule['unknown'].push({name,catName,amount:dp,pb,installment:'full',noDate:true,isOverdue:false});
+  // Build monthly payment schedule
+  const schedule={}; // 'YYYY-MM' -> [{name,catName,amount,pb,installment,isOverdue}]
+  splItems.forEach(({name,catName,dp,pb,purchaseMonth})=>{
+    if(!purchaseMonth){
+      if(!schedule.unknown)schedule.unknown=[];
+      schedule.unknown.push({name,catName,amount:dp,pb,installment:'full',isOverdue:false});
       return;
     }
-    const pd=new Date(purchaseDate+'T12:00');
+    const[pdYr,pdMo]=purchaseMonth.split('-').map(Number);
     if(pb==='shopee1'){
-      let yr=pd.getFullYear(),mo=pd.getMonth()+2;
-      if(mo>12){mo=1;yr++;}
+      let yr=pdYr,mo=pdMo+1;if(mo>12){mo=1;yr++;}
       const key=yr+'-'+String(mo).padStart(2,'0');
       if(!schedule[key])schedule[key]=[];
       const isOverdue=(yr<thisYear)||(yr===thisYear&&mo<thisMo);
       schedule[key].push({name,catName,amount:dp,pb,installment:'Full',isOverdue});
     }else{
-      const instAmt=dp/3;
+      const instAmt=Math.round(dp/3);
       for(let m=1;m<=3;m++){
-        let yr=pd.getFullYear(),mo=pd.getMonth()+1+m;
-        while(mo>12){mo-=12;yr++;}
+        let yr=pdYr,mo=pdMo+m;while(mo>12){mo-=12;yr++;}
         const key=yr+'-'+String(mo).padStart(2,'0');
         if(!schedule[key])schedule[key]=[];
         const isOverdue=(yr<thisYear)||(yr===thisYear&&mo<thisMo);
@@ -2166,58 +2167,116 @@ function renderExpensesSplSummary(){
   });
 
   const keys=Object.keys(schedule).filter(k=>k!=='unknown').sort();
-  if(schedule['unknown'])keys.push('unknown');
+  if(schedule.unknown)keys.push('unknown');
 
+  // Aggregate totals
   const totalSpl=splItems.reduce((s,it)=>s+it.dp,0);
   const overdueTotal=Object.values(schedule).flat().filter(p=>p.isOverdue).reduce((s,p)=>s+p.amount,0);
   const thisMonthTotal=(schedule[thisMonthKey]||[]).reduce((s,p)=>s+p.amount,0);
   const nextMonthTotal=(schedule[nextMonthKey]||[]).reduce((s,p)=>s+p.amount,0);
 
-  let html=`<div style="background:linear-gradient(135deg,#fff8ed,#fffbf5);border:1.5px solid #f0a500;border-radius:14px;padding:16px">
-    <div style="font-size:13px;font-weight:700;color:#c96b00;margin-bottom:12px">💳 Shopee Pay Later — Payment Schedule</div>
-    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
-      <div style="background:#fff3cd;border:0.5px solid #f0c060;border-radius:8px;padding:8px 14px;min-width:110px">
-        <div style="font-size:10px;color:#856404;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Total SPL</div>
-        <div style="font-size:16px;font-weight:700;color:#664d03">${fmt(totalSpl)}</div>
+  // Per-item due dates helper
+  function itemDues(it){
+    if(!it.purchaseMonth)return[];
+    const[pdYr,pdMo]=it.purchaseMonth.split('-').map(Number);
+    if(it.pb==='shopee1'){
+      let yr=pdYr,mo=pdMo+1;if(mo>12){mo=1;yr++;}
+      const od=(yr<thisYear)||(yr===thisYear&&mo<thisMo);
+      return[{label:moNames[mo-1]+' '+yr,amount:it.dp,isOverdue:od}];
+    }
+    const inst=Math.round(it.dp/3);
+    return[1,2,3].map(m=>{
+      let yr=pdYr,mo=pdMo+m;while(mo>12){mo-=12;yr++;}
+      const od=(yr<thisYear)||(yr===thisYear&&mo<thisMo);
+      return{label:moNames[mo-1]+' '+yr,amount:inst,isOverdue:od,n:m};
+    });
+  }
+
+  // ── Build HTML ──
+  let html=`<div style="background:linear-gradient(135deg,#fff8ed,#fffbf5);border:1.5px solid #f0a500;border-radius:14px;padding:16px 18px">
+    <div style="font-size:14px;font-weight:700;color:#c96b00;margin-bottom:12px">💳 Shopee Pay Later</div>
+
+    <!-- Totals row -->
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
+      <div style="background:#fff3cd;border:0.5px solid #f0c060;border-radius:9px;padding:9px 14px;min-width:110px">
+        <div style="font-size:10px;color:#856404;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Total SPL Debt</div>
+        <div style="font-size:18px;font-weight:700;color:#664d03">${fmt(totalSpl)}</div>
       </div>
-      ${overdueTotal>0?`<div style="background:#fff5f5;border:1px solid var(--red);border-radius:8px;padding:8px 14px;min-width:110px">
-        <div style="font-size:10px;color:var(--red);font-weight:600;text-transform:uppercase;letter-spacing:0.5px">⚠ Overdue</div>
-        <div style="font-size:16px;font-weight:700;color:var(--red)">${fmt(overdueTotal)}</div>
-      </div>`:''}
-      ${thisMonthTotal>0?`<div style="background:#fff8ed;border:0.5px solid #f0a500;border-radius:8px;padding:8px 14px;min-width:110px">
-        <div style="font-size:10px;color:#c96b00;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Due This Month</div>
-        <div style="font-size:16px;font-weight:700;color:#c96b00">${fmt(thisMonthTotal)}</div>
-      </div>`:''}
-      ${nextMonthTotal>0?`<div style="background:#fafaf8;border:0.5px solid #e0d0b0;border-radius:8px;padding:8px 14px;min-width:110px">
+      <div style="background:${thisMonthTotal>0?'#fff8ed':'#fafaf8'};border:0.5px solid ${thisMonthTotal>0?'#f0a500':'#e0e0e0'};border-radius:9px;padding:9px 14px;min-width:110px">
+        <div style="font-size:10px;color:${thisMonthTotal>0?'#c96b00':'#aaa'};font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Due This Month</div>
+        <div style="font-size:18px;font-weight:700;color:${thisMonthTotal>0?'#c96b00':'#ccc'}">${fmt(thisMonthTotal)}</div>
+      </div>
+      <div style="background:#fafaf8;border:0.5px solid #e0d0b0;border-radius:9px;padding:9px 14px;min-width:110px">
         <div style="font-size:10px;color:#8a7a50;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Due Next Month</div>
-        <div style="font-size:16px;font-weight:700;color:#8a7a50">${fmt(nextMonthTotal)}</div>
+        <div style="font-size:18px;font-weight:700;color:#8a7a50">${fmt(nextMonthTotal)}</div>
+      </div>
+      ${overdueTotal>0?`<div style="background:#fff5f5;border:1px solid var(--red);border-radius:9px;padding:9px 14px;min-width:110px">
+        <div style="font-size:10px;color:var(--red);font-weight:600;text-transform:uppercase;letter-spacing:0.5px">⚠ Overdue</div>
+        <div style="font-size:18px;font-weight:700;color:var(--red)">${fmt(overdueTotal)}</div>
       </div>`:''}
-    </div>`;
+    </div>
+
+    <!-- Per-item list -->
+    <div style="font-size:10px;font-weight:700;color:#c96b00;text-transform:uppercase;letter-spacing:0.7px;margin-bottom:7px">Items</div>
+    <div style="display:flex;flex-direction:column;gap:7px;margin-bottom:16px">`;
+
+  splItems.forEach(item=>{
+    const dues=itemDues(item);
+    const anyOD=dues.some(d=>d.isOverdue);
+    const purchasedLabel=item.purchaseMonth
+      ?new Date(item.purchaseMonth+'-15').toLocaleString('en-US',{month:'long',year:'numeric'})
+      :'—';
+    const monthlyAmt=item.pb==='shopee1'?item.dp:Math.round(item.dp/3);
+    html+=`<div style="background:#fff;border:1px solid ${anyOD?'var(--red)':'#f0d080'};border-radius:9px;padding:10px 12px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;font-weight:600;color:${anyOD?'var(--red)':'var(--text)'};">${anyOD?'⚠ ':''}${item.name} <span style="font-size:10px;font-weight:400;color:var(--muted)">(${item.catName})</span></div>
+          <div style="font-size:10px;color:#8a6020;margin-top:1px">Purchased: ${purchasedLabel} · ${item.pb==='shopee1'?'1-month plan':'3-month plan'}</div>
+        </div>
+        <div style="text-align:right;white-space:nowrap">
+          <div style="font-size:13px;font-weight:700;color:#c96b00">${fmt(item.dp)}</div>
+          <div style="font-size:10px;color:#8a6020">${item.pb==='shopee1'?'lump sum':fmt(monthlyAmt)+'/mo × 3'}</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:7px">`;
+    if(!dues.length){
+      html+=`<span style="font-size:11px;color:#aaa;background:#f5f5f5;border-radius:5px;padding:2px 8px">Set purchase month to see due dates</span>`;
+    }else{
+      dues.forEach((d,idx)=>{
+        const tag=item.pb==='shopee3'?` [${idx+1}/3]`:'';
+        html+=`<span style="background:${d.isOverdue?'#fff0f0':'#fff3cd'};border:0.5px solid ${d.isOverdue?'#e57373':'#f0c060'};border-radius:5px;padding:2px 9px;font-size:11px;color:${d.isOverdue?'var(--red)':'#664d03'};font-weight:600">${d.isOverdue?'⚠ ':''}${d.label}${tag}: ${fmt(d.amount)}</span>`;
+      });
+    }
+    html+=`</div></div>`;
+  });
+  html+=`</div>
+
+    <!-- Monthly payment schedule -->
+    <div style="font-size:10px;font-weight:700;color:#c96b00;text-transform:uppercase;letter-spacing:0.7px;margin-bottom:7px">Payment Schedule</div>`;
 
   keys.forEach(key=>{
     const payments=schedule[key];
     const monthTotal=payments.reduce((s,p)=>s+p.amount,0);
-    const anyOverdue=payments.some(p=>p.isOverdue);
-    const isThisMonth=key===thisMonthKey,isNextMonth=key===nextMonthKey;
+    const anyOD=payments.some(p=>p.isOverdue);
+    const isThis=key===thisMonthKey,isNext=key===nextMonthKey;
     let monthLabel;
-    if(key==='unknown'){monthLabel='📅 Purchase date not set';}
+    if(key==='unknown'){monthLabel='Purchase month not set';}
     else{
       const[yr,mo]=key.split('-');
-      const d=new Date(parseInt(yr),parseInt(mo)-1,1);
-      monthLabel='📅 '+d.toLocaleString('en-US',{month:'long',year:'numeric'});
-      if(isThisMonth)monthLabel+=' <span style="background:#f0a500;color:#fff;border-radius:4px;padding:0 5px;font-size:10px">THIS MONTH</span>';
-      else if(isNextMonth)monthLabel+=' <span style="background:#badbcc;color:#0f5132;border-radius:4px;padding:0 5px;font-size:10px">NEXT</span>';
+      monthLabel=new Date(parseInt(yr),parseInt(mo)-1,1).toLocaleString('en-US',{month:'long',year:'numeric'});
+      if(isThis)monthLabel+=' <span style="background:#f0a500;color:#fff;border-radius:4px;padding:0 5px;font-size:10px;vertical-align:middle">THIS MONTH</span>';
+      else if(isNext)monthLabel+=' <span style="background:#badbcc;color:#0f5132;border-radius:4px;padding:0 5px;font-size:10px;vertical-align:middle">NEXT</span>';
     }
-    const bc=anyOverdue?'var(--red)':isThisMonth?'#f0a500':'#e0d0b0';
-    const bg=anyOverdue?'#fff5f5':isThisMonth?'#fffbf0':'#fafaf8';
+    const bc=anyOD?'var(--red)':isThis?'#f0a500':'#e0d0b0';
+    const bg=anyOD?'#fff5f5':isThis?'#fffbf0':'#fafaf8';
     html+=`<div style="border:1px solid ${bc};border-radius:10px;padding:10px 12px;margin-bottom:6px;background:${bg}">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-        <div style="font-size:12px;font-weight:700;color:${anyOverdue?'var(--red)':isThisMonth?'#c96b00':'var(--text)'}">${monthLabel}${anyOverdue?' ⚠ OVERDUE':''}</div>
-        <div style="font-size:13px;font-weight:700;color:${anyOverdue?'var(--red)':'#c96b00'}">${fmt(monthTotal)}</div>
+        <div style="font-size:12px;font-weight:700;color:${anyOD?'var(--red)':isThis?'#c96b00':'var(--text)'}">${monthLabel}${anyOD?' ⚠ OVERDUE':''}</div>
+        <div style="font-size:13px;font-weight:700;color:${anyOD?'var(--red)':'#c96b00'}">${fmt(monthTotal)}</div>
       </div>`;
     payments.forEach(p=>{
-      html+=`<div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:${p.isOverdue?'var(--red)':'var(--text)'};padding:3px 6px;background:rgba(0,0,0,0.03);border-radius:5px;margin-bottom:2px">
-        <span>${p.isOverdue?'⚠ ':''}${p.name} <span style="color:var(--muted);font-size:10px">(${p.catName})</span> <span style="color:#c96b00;font-size:10px;margin-left:4px">[${p.pb==='shopee1'?'1mo':'3mo'} — ${p.installment}]</span></span>
+      html+=`<div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;padding:3px 6px;background:rgba(0,0,0,0.03);border-radius:5px;margin-bottom:2px;color:${p.isOverdue?'var(--red)':'var(--text)'}">
+        <span>${p.isOverdue?'⚠ ':''}${p.name} <span style="color:var(--muted)">(${p.catName})</span> <span style="color:#c96b00;margin-left:4px;font-size:10px">[${p.pb==='shopee1'?'1mo':'3mo'} — ${p.installment}]</span></span>
         <span style="font-weight:600;white-space:nowrap;margin-left:8px">${fmt(p.amount)}</span>
       </div>`;
     });
@@ -2329,7 +2388,7 @@ function rowHtml(cat,item,i){
         <option value="shopee3"${pb==='shopee3'?' selected':''}>🛒 Shopee Pay Later — 3 months</option>
         <option value="pending"${pb==='pending'?' selected':''}>○ Not yet paid</option>
       </select>
-      ${(pb==='shopee1'||pb==='shopee3')?`<div style="margin-top:4px"><input type="date" value="${s.purchaseDate||''}" style="border:0.5px solid #f0a500;border-radius:6px;padding:3px 5px;font-size:11px;width:100%;max-width:200px;background:#fffbf0" onchange="setS('${cat.id}',${i},'purchaseDate',this.value)" title="Purchase date (for payment schedule)"></div>`:''}
+      ${(pb==='shopee1'||pb==='shopee3')?`<div style="margin-top:5px;display:flex;align-items:center;gap:5px"><span style="font-size:10px;color:#c96b00;white-space:nowrap">📅 Purchase month:</span><input type="month" value="${(s.purchaseDate||'').slice(0,7)}" style="border:0.5px solid #f0a500;border-radius:6px;padding:3px 5px;font-size:11px;flex:1;max-width:150px;background:#fffbf0" onchange="setS('${cat.id}',${i},'purchaseDate',this.value)" title="Month purchased (used to calculate payment due dates)"></div>`:''}
 
     </td>
     <td><input class="ii" type="number" placeholder="0" value="${dp||''}" oninput="updDp('${cat.id}',${i},this.value)" style="width:80px"></td>
