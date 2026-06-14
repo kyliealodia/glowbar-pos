@@ -1486,7 +1486,8 @@ function renderCutoff(){
   const today=new Date();today.setHours(23,59,59,0);
   const staffStart=userRecord.startDate?new Date(userRecord.startDate):new Date(getOpeningDate());
   const dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  const shiftDays=userRecord.shiftDays||['Tue','Wed','Thu','Fri','Sat','Sun'];
+  const _coRestDays=userRecord.restDays||[1];
+  const shiftDays=dayNames.filter((_,i)=>!_coRestDays.includes(i));
   const coStartDate=new Date(yr,mo-1,coStart);
   const coEndDate=new Date(yr,mo-1,coEnd,23,59,59);
   const rangeStart=staffStart>coStartDate?staffStart:coStartDate;
@@ -1730,7 +1731,12 @@ function renderPayslip(){
 const dailyRate=userRecord.dailyRate||0;
 const today=new Date(); today.setHours(23,59,59,0);
 const staffStart=userRecord.startDate?new Date(userRecord.startDate):new Date(getOpeningDate());
-const workingDays=getWorkingDaysSP(yr,mo,staffStart,today,userRecord.shiftDays)||1;
+// Derive shiftDays from restDays (set in POS compensation modal); fall back to stored shiftDays or default (Mon off)
+const _dayNamesAll=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const _restDays=userRecord.restDays||[1];
+const _shiftDays=_dayNamesAll.filter((_,i)=>!_restDays.includes(i));
+const workingDays=getWorkingDaysSP(yr,mo,staffStart,today,_shiftDays)||1;
+const _schedLabel=_shiftDays.join(', ')||'No days';
 
   // Days present from clock-in logs — handle both log formats, use PH dates
   const presentDatesM=new Set();
@@ -1850,7 +1856,7 @@ const paidDays=daysPresent+leaveDays;
 
         <!-- Attendance bar -->
         <div style="padding:10px 24px;background:#fff;border-bottom:1px solid #E8DFD0;display:flex;gap:20px;flex-wrap:wrap;align-items:center;">
-          <div style="font-size:12px;"><span style="color:#8C7B65;">Working Days (Mon–Sat): </span><strong>${workingDays}</strong></div>
+          <div style="font-size:12px;"><span style="color:#8C7B65;">Working Days (${_schedLabel}): </span><strong>${workingDays}</strong></div>
           <div style="font-size:12px;"><span style="color:#8C7B65;">Days Present: </span><strong style="color:#4A8C5C;">${daysPresent}</strong></div>
           ${leaveDays>0?`<div style="font-size:12px;"><span style="color:#8C7B65;">On Leave: </span><strong style="color:#4A7CB8;">${leaveDays} day${leaveDays!==1?'s':''}</strong></div>`:''}
           ${daysAbsent>0?`<div style="font-size:12px;"><span style="color:#8C7B65;">Absent: </span><strong style="color:#C44A4A;">${daysAbsent} day${daysAbsent!==1?'s':''}</strong></div>`:''}
@@ -2535,7 +2541,8 @@ function renderAdminPayroll(){
 
     // Working days in cut-off
     const staffStart=u.startDate?new Date(u.startDate):new Date(getOpeningDate());
-    const shiftDays=u.shiftDays||['Tue','Wed','Thu','Fri','Sat','Sun'];
+    const _sumRestDays=u.restDays||[1];
+    const shiftDays=dayNames.filter((_,i)=>!_sumRestDays.includes(i));
     const coStartDate=new Date(yr,mo-1,coStart);
     const coEndDate=new Date(yr,mo-1,coEnd,23,59,59);
     const rangeStart=staffStart>coStartDate?staffStart:coStartDate;

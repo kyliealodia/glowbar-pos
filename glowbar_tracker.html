@@ -2095,8 +2095,8 @@ function saveData(){
   }catch(e){}
 }
 const fmt=n=>'₱'+Math.round(n).toLocaleString();
-function getS(c,i){return state[c+'_'+i]||{notes:'',paidBy:'',dp:0}}
-function setS(c,i,f,v){const k=c+'_'+i;if(!state[k])state[k]={notes:'',paidBy:'',dp:0};state[k][f]=v;refreshCat(c);refreshSummary();}
+function getS(c,i){return state[c+'_'+i]||{notes:'',paidBy:'',dp:0,purchaseDate:''}}
+function setS(c,i,f,v){const k=c+'_'+i;if(!state[k])state[k]={notes:'',paidBy:'',dp:0,purchaseDate:''};state[k][f]=v;refreshCat(c);refreshSummary();}
 function totals(cat){
   let totalPlanned=0,totalDp=0,paidCount=0,totalCount=cat.items.length;
   cat.items.forEach((item,i)=>{
@@ -2110,10 +2110,121 @@ function totals(cat){
   return{totalPlanned,totalDp,totalBalance:totalPlanned-totalDp,paidCount,totalCount};
 }
 
-function setSplStatus(catId,i,status){setS(catId,i,'paidBy',status);}
+function setSplStatus(catId,i,status){
+  const k=catId+'_'+i;if(!state[k])state[k]={notes:'',paidBy:'',dp:0,purchaseDate:''};
+  state[k].paidBy=status;
+  rebuildBody(catId);refreshSummary();
+}
 
 function renderExpensesSplSummary(){
-  const el=document.getElementById('expenses-spl-summary');if(el)el.style.display='none';
+  const el=document.getElementById('expenses-spl-summary');if(!el)return;
+  const today=new Date();
+  const thisYear=today.getFullYear(),thisMo=today.getMonth()+1;
+  const thisMonthKey=thisYear+'-'+String(thisMo).padStart(2,'0');
+  const nextMo=thisMo===12?1:thisMo+1,nextYr=thisMo===12?thisYear+1:thisYear;
+  const nextMonthKey=nextYr+'-'+String(nextMo).padStart(2,'0');
+
+  const splItems=[];
+  CATS.forEach(cat=>{
+    cat.items.forEach((item,i)=>{
+      const s=getS(cat.id,i);const pb=s.paidBy||'';
+      if(pb!=='shopee1'&&pb!=='shopee3')return;
+      const dp=s.dp||0;if(!dp)return;
+      splItems.push({name:item.name,catName:cat.name,dp,pb,purchaseDate:s.purchaseDate||''});
+    });
+  });
+  if(!splItems.length){el.style.display='none';return;}
+  el.style.display='block';
+
+  const schedule={};
+  splItems.forEach(item=>{
+    const{name,catName,dp,pb,purchaseDate}=item;
+    if(!purchaseDate){
+      if(!schedule['unknown'])schedule['unknown']=[];
+      schedule['unknown'].push({name,catName,amount:dp,pb,installment:'full',noDate:true,isOverdue:false});
+      return;
+    }
+    const pd=new Date(purchaseDate+'T12:00');
+    if(pb==='shopee1'){
+      let yr=pd.getFullYear(),mo=pd.getMonth()+2;
+      if(mo>12){mo=1;yr++;}
+      const key=yr+'-'+String(mo).padStart(2,'0');
+      if(!schedule[key])schedule[key]=[];
+      const isOverdue=(yr<thisYear)||(yr===thisYear&&mo<thisMo);
+      schedule[key].push({name,catName,amount:dp,pb,installment:'Full',isOverdue});
+    }else{
+      const instAmt=dp/3;
+      for(let m=1;m<=3;m++){
+        let yr=pd.getFullYear(),mo=pd.getMonth()+1+m;
+        while(mo>12){mo-=12;yr++;}
+        const key=yr+'-'+String(mo).padStart(2,'0');
+        if(!schedule[key])schedule[key]=[];
+        const isOverdue=(yr<thisYear)||(yr===thisYear&&mo<thisMo);
+        schedule[key].push({name,catName,amount:instAmt,pb,installment:`${m}/3`,isOverdue});
+      }
+    }
+  });
+
+  const keys=Object.keys(schedule).filter(k=>k!=='unknown').sort();
+  if(schedule['unknown'])keys.push('unknown');
+
+  const totalSpl=splItems.reduce((s,it)=>s+it.dp,0);
+  const overdueTotal=Object.values(schedule).flat().filter(p=>p.isOverdue).reduce((s,p)=>s+p.amount,0);
+  const thisMonthTotal=(schedule[thisMonthKey]||[]).reduce((s,p)=>s+p.amount,0);
+  const nextMonthTotal=(schedule[nextMonthKey]||[]).reduce((s,p)=>s+p.amount,0);
+
+  let html=`<div style="background:linear-gradient(135deg,#fff8ed,#fffbf5);border:1.5px solid #f0a500;border-radius:14px;padding:16px">
+    <div style="font-size:13px;font-weight:700;color:#c96b00;margin-bottom:12px">💳 Shopee Pay Later — Payment Schedule</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+      <div style="background:#fff3cd;border:0.5px solid #f0c060;border-radius:8px;padding:8px 14px;min-width:110px">
+        <div style="font-size:10px;color:#856404;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Total SPL</div>
+        <div style="font-size:16px;font-weight:700;color:#664d03">${fmt(totalSpl)}</div>
+      </div>
+      ${overdueTotal>0?`<div style="background:#fff5f5;border:1px solid var(--red);border-radius:8px;padding:8px 14px;min-width:110px">
+        <div style="font-size:10px;color:var(--red);font-weight:600;text-transform:uppercase;letter-spacing:0.5px">⚠ Overdue</div>
+        <div style="font-size:16px;font-weight:700;color:var(--red)">${fmt(overdueTotal)}</div>
+      </div>`:''}
+      ${thisMonthTotal>0?`<div style="background:#fff8ed;border:0.5px solid #f0a500;border-radius:8px;padding:8px 14px;min-width:110px">
+        <div style="font-size:10px;color:#c96b00;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Due This Month</div>
+        <div style="font-size:16px;font-weight:700;color:#c96b00">${fmt(thisMonthTotal)}</div>
+      </div>`:''}
+      ${nextMonthTotal>0?`<div style="background:#fafaf8;border:0.5px solid #e0d0b0;border-radius:8px;padding:8px 14px;min-width:110px">
+        <div style="font-size:10px;color:#8a7a50;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Due Next Month</div>
+        <div style="font-size:16px;font-weight:700;color:#8a7a50">${fmt(nextMonthTotal)}</div>
+      </div>`:''}
+    </div>`;
+
+  keys.forEach(key=>{
+    const payments=schedule[key];
+    const monthTotal=payments.reduce((s,p)=>s+p.amount,0);
+    const anyOverdue=payments.some(p=>p.isOverdue);
+    const isThisMonth=key===thisMonthKey,isNextMonth=key===nextMonthKey;
+    let monthLabel;
+    if(key==='unknown'){monthLabel='📅 Purchase date not set';}
+    else{
+      const[yr,mo]=key.split('-');
+      const d=new Date(parseInt(yr),parseInt(mo)-1,1);
+      monthLabel='📅 '+d.toLocaleString('en-US',{month:'long',year:'numeric'});
+      if(isThisMonth)monthLabel+=' <span style="background:#f0a500;color:#fff;border-radius:4px;padding:0 5px;font-size:10px">THIS MONTH</span>';
+      else if(isNextMonth)monthLabel+=' <span style="background:#badbcc;color:#0f5132;border-radius:4px;padding:0 5px;font-size:10px">NEXT</span>';
+    }
+    const bc=anyOverdue?'var(--red)':isThisMonth?'#f0a500':'#e0d0b0';
+    const bg=anyOverdue?'#fff5f5':isThisMonth?'#fffbf0':'#fafaf8';
+    html+=`<div style="border:1px solid ${bc};border-radius:10px;padding:10px 12px;margin-bottom:6px;background:${bg}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <div style="font-size:12px;font-weight:700;color:${anyOverdue?'var(--red)':isThisMonth?'#c96b00':'var(--text)'}">${monthLabel}${anyOverdue?' ⚠ OVERDUE':''}</div>
+        <div style="font-size:13px;font-weight:700;color:${anyOverdue?'var(--red)':'#c96b00'}">${fmt(monthTotal)}</div>
+      </div>`;
+    payments.forEach(p=>{
+      html+=`<div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:${p.isOverdue?'var(--red)':'var(--text)'};padding:3px 6px;background:rgba(0,0,0,0.03);border-radius:5px;margin-bottom:2px">
+        <span>${p.isOverdue?'⚠ ':''}${p.name} <span style="color:var(--muted);font-size:10px">(${p.catName})</span> <span style="color:#c96b00;font-size:10px;margin-left:4px">[${p.pb==='shopee1'?'1mo':'3mo'} — ${p.installment}]</span></span>
+        <span style="font-weight:600;white-space:nowrap;margin-left:8px">${fmt(p.amount)}</span>
+      </div>`;
+    });
+    html+=`</div>`;
+  });
+  html+=`</div>`;
+  el.innerHTML=html;
 }
 
 function refreshSummary(){
@@ -2218,6 +2329,8 @@ function rowHtml(cat,item,i){
         <option value="shopee3"${pb==='shopee3'?' selected':''}>🛒 Shopee Pay Later — 3 months</option>
         <option value="pending"${pb==='pending'?' selected':''}>○ Not yet paid</option>
       </select>
+      ${(pb==='shopee1'||pb==='shopee3')?`<div style="margin-top:4px"><input type="date" value="${s.purchaseDate||''}" style="border:0.5px solid #f0a500;border-radius:6px;padding:3px 5px;font-size:11px;width:100%;max-width:200px;background:#fffbf0" onchange="setS('${cat.id}',${i},'purchaseDate',this.value)" title="Purchase date (for payment schedule)"></div>`:''}
+
     </td>
     <td><input class="ii" type="number" placeholder="0" value="${dp||''}" oninput="updDp('${cat.id}',${i},this.value)" style="width:80px"></td>
     <td style="text-align:right;font-size:12px;font-weight:600;color:${bal>0?'var(--red)':'var(--green)'};padding-right:8px">${bal>0?fmt(bal):'✓ Paid'}</td>
@@ -2262,7 +2375,7 @@ function delCat(id){
 function updN(c,i,v){const cat=CATS.find(x=>x.id===c);if(cat&&cat.items[i])cat.items[i].name=v;refreshCat(c);refreshSummary();}
 function updP(c,i,v){const cat=CATS.find(x=>x.id===c);if(cat&&cat.items[i])cat.items[i].p=parseFloat(v)||0;refreshCat(c);refreshSummary();}
 function updDp(c,i,v){
-  const k=c+'_'+i;if(!state[k])state[k]={notes:'',paidBy:'',dp:0};
+  const k=c+'_'+i;if(!state[k])state[k]={notes:'',paidBy:'',dp:0,purchaseDate:''};
   state[k].dp=parseFloat(v)||0;
   // Update balance cell immediately without full rebuild
   const rows=document.querySelectorAll(`#body-${c} tbody tr`);
