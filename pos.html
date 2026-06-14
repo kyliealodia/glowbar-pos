@@ -2685,6 +2685,11 @@ html{height:-webkit-fill-available;}
         <div class="form-group"><label class="form-label">Monthly Basic Salary (₱)</label><input class="form-input" type="number" id="scSalary" placeholder="0" min="0"></div>
         <div class="form-group"><label class="form-label">Commission Rate (%)</label><input class="form-input" type="number" id="scCommission" placeholder="0" min="0" max="100"></div>
       </div>
+      <div style="font-size:11px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px;">Schedule Type</div>
+      <div style="background:var(--cream2);border-radius:10px;padding:12px 14px;">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;"><input type="checkbox" id="scOnCall" style="accent-color:var(--gold);width:15px;height:15px;"> On-Call / Flexible Schedule — no absent day deductions</label>
+        <div style="font-size:11px;color:var(--ink3);margin-top:5px;margin-left:23px;">Enable for staff paid per visit rather than fixed monthly schedule.</div>
+      </div>
       <div style="font-size:11px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px;">Government Deductions</div>
       <div style="display:flex;flex-direction:column;gap:8px;background:var(--cream2);border-radius:10px;padding:12px 14px;">
         <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;"><input type="checkbox" id="scSSS" style="accent-color:var(--gold);width:15px;height:15px;"> SSS (Social Security System) — employee share auto-computed</label>
@@ -9303,6 +9308,7 @@ function openStaffComp(uid){
   document.getElementById('staffCompTitle').textContent='Compensation — '+u.name;
   document.getElementById('scSalary').value=u.salary||0;
   document.getElementById('scCommission').value=u.commission||0;
+  document.getElementById('scOnCall').checked=u.onCall===true;
   document.getElementById('scSSS').checked=u.sssVoluntary!==false;
   document.getElementById('scPhilHealth').checked=u.philhealthVoluntary!==false;
   document.getElementById('scPagibig').checked=u.pagibigVoluntary!==false;
@@ -9359,6 +9365,7 @@ function saveStaffComp(){
   const u=S.users.find(x=>x.id===editCompUserId);if(!u)return;
 const salary=parseFloat(document.getElementById('scSalary').value)||0;
 const commission=parseFloat(document.getElementById('scCommission').value)||0;
+const onCall=document.getElementById('scOnCall').checked;
 const sssVoluntary=document.getElementById('scSSS').checked;
 const philhealthVoluntary=document.getElementById('scPhilHealth').checked;
 const pagibigVoluntary=document.getElementById('scPagibig').checked;
@@ -9376,7 +9383,7 @@ cats.forEach(cat=>{
   if(el&&el.value.trim()!=='') categoryCommissions[cat]=parseFloat(el.value)||0;
 });
 const i=S.users.findIndex(x=>x.id===editCompUserId);
-if(i>=0) S.users[i]={...S.users[i],salary,commission,sssVoluntary,philhealthVoluntary,pagibigVoluntary,withholdingTax,otherDeductions,allowances,dailyRate,categoryCommissions};
+if(i>=0) S.users[i]={...S.users[i],salary,commission,onCall,sssVoluntary,philhealthVoluntary,pagibigVoluntary,withholdingTax,otherDeductions,allowances,dailyRate,categoryCommissions};
 closeM('staffCompModal');sync('users');renderPayslip();
 showToast(u.name+'\'s compensation saved','ok');
 }
@@ -9465,8 +9472,11 @@ function renderPayrollSummary(staffList, txns, period){
     const today=new Date(); today.setHours(23,59,59,0);
 const monthEndS=new Date(py,pm,0);
 const effectiveEndS=today<monthEndS?today:monthEndS;
-const elapsedWorkingDays=getWorkingDays(py,pm,null,effectiveEndS);
-const daysAbsent=hasClockData?Math.max(0,elapsedWorkingDays-daysPresent-leaveDays):0;
+const _startDateS=u.startDate?new Date(u.startDate+'T12:00'):null;
+const _monthStartS=new Date(py,pm-1,1);
+const effectiveFromS=(_startDateS&&_startDateS>_monthStartS)?_startDateS:null;
+const elapsedWorkingDays=getWorkingDays(py,pm,effectiveFromS,effectiveEndS);
+const daysAbsent=(!u.onCall&&hasClockData)?Math.max(0,elapsedWorkingDays-daysPresent-leaveDays):0;
     const dailyRate=workingDays>0?salary/workingDays:0;
     const earnedBasic=salary-Math.round(dailyRate*daysAbsent);
     const grossPay=Math.max(0,earnedBasic)+commAmt;
@@ -9644,8 +9654,13 @@ function renderPayslip(){
     const today=new Date(); today.setHours(23,59,59,0);
 const monthEnd=new Date(py,pm,0);
 const effectiveEnd=today<monthEnd?today:monthEnd;
-const elapsedWorkingDays=getWorkingDays(py,pm,null,effectiveEnd);
-const daysAbsent=hasClockData?Math.max(0,elapsedWorkingDays-daysPresent-leaveDays):0;
+// Only count working days from the staff member's start date (if they started mid-month)
+const _startDate=u.startDate?new Date(u.startDate+'T12:00'):null;
+const _monthStart=new Date(py,pm-1,1);
+const effectiveFrom=(_startDate&&_startDate>_monthStart)?_startDate:null;
+const elapsedWorkingDays=getWorkingDays(py,pm,effectiveFrom,effectiveEnd);
+// On-call staff: no absent deductions — only track actual days worked
+const daysAbsent=(!u.onCall&&hasClockData)?Math.max(0,elapsedWorkingDays-daysPresent-leaveDays):0;
 const salary=u.salary||0;
 const dailyRate=workingDays>0?salary/workingDays:0;
     const absenceDeduction=Math.round(dailyRate*daysAbsent);
@@ -9675,10 +9690,10 @@ const dailyRate=workingDays>0?salary/workingDays:0;
         </div>
         <!-- Attendance summary strip -->
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;padding:8px 10px;background:var(--cream2);border-radius:8px;font-size:11px;">
-          <span>📅 Working days: <strong>${workingDays}</strong></span>
+          ${u.onCall?`<span style="background:#e0f0ff;color:#1a5fa8;border-radius:5px;padding:1px 7px;font-weight:600;">📋 On-Call</span>`:`<span>📅 Working days: <strong>${elapsedWorkingDays}</strong>${effectiveFrom?` <span style="color:var(--ink3);">(from ${u.startDate})</span>`:''}</span>`}
           <span style="color:var(--success);">✓ Present: <strong>${daysPresent}</strong></span>
           ${leaveDays>0?`<span style="color:var(--info);">🌿 On leave: <strong>${leaveDays}</strong></span>`:''}
-          ${daysAbsent>0?`<span style="color:var(--danger);">✗ Absent: <strong>${daysAbsent}</strong></span>`:''}
+          ${!u.onCall&&daysAbsent>0?`<span style="color:var(--danger);">✗ Absent: <strong>${daysAbsent}</strong></span>`:''}
           <span style="color:var(--ink3);">Daily rate: <strong>${fp2(dailyRate)}</strong></span>
         </div>
       </div>
