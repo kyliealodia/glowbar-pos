@@ -1067,15 +1067,6 @@ html{height:-webkit-fill-available;}
           <div id="payrollSummaryContent"></div>
         </div>
 
-        <!-- Staff Compensation Settings -->
-        <div class="card" style="margin-bottom:16px;padding:18px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
-            <div style="font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:500;">Staff Compensation Settings</div>
-            <div style="font-size:11px;color:var(--ink3);">Based on Philippine labor & government rates</div>
-          </div>
-          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;" id="commissionRatesGrid"></div>
-        </div>
-
         <!-- Payslips -->
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;" id="payslipGrid"></div>
       </div>
@@ -9350,32 +9341,6 @@ function rejectCashAdvance(id){
   showToast('Cash advance rejected','ok');
 }
 
-function renderCommissionRates(){
-  const g=document.getElementById('commissionRatesGrid');if(!g)return;
-  g.innerHTML=S.users.map(u=>{
-    const salary=u.salary||0;
-    return `<div style="background:var(--cream2);border:1px solid var(--border2);border-radius:12px;padding:14px 16px;">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-        <div style="width:36px;height:36px;border-radius:50%;background:${u.color};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:#fff;flex-shrink:0;">${initials(u.name)}</div>
-        <div><div style="font-size:14px;font-weight:600;">${u.name}</div><div style="font-size:10px;color:var(--ink3);">${u.specialty||cap(u.role)}</div></div>
-      </div>
-      <div style="display:flex;gap:8px;margin-bottom:8px;">
-        <div style="flex:1;background:#fff;border-radius:8px;padding:8px 10px;border:1px solid var(--border2);">
-          <div style="font-size:9px;color:var(--ink4);text-transform:uppercase;letter-spacing:0.8px;">Basic Salary</div>
-          <div style="font-size:15px;font-weight:600;color:var(--ink);">₱${(salary).toLocaleString('en-PH')}</div>
-        </div>
-        <div style="flex:1;background:#fff;border-radius:8px;padding:8px 10px;border:1px solid var(--border2);">
-          <div style="font-size:9px;color:var(--ink4);text-transform:uppercase;letter-spacing:0.8px;">Commission</div>
-          <div style="font-size:15px;font-weight:600;color:var(--gold-dk);">${u.commission||0}%</div>
-        </div>
-      </div>
-      <div style="font-size:11px;color:var(--ink3);margin-bottom:8px;">
-        ${u.sssVoluntary!==false?'✓ SSS ':''} ${u.philhealthVoluntary!==false?'✓ PhilHealth ':''} ${u.pagibigVoluntary!==false?'✓ Pag-IBIG ':''} ${u.withholdingTax!==false?'✓ Tax':''}
-      </div>
-      <button class="btn btn-gold btn-sm" style="width:100%;" onclick="openStaffComp(${u.id})">✏ Edit Compensation</button>
-    </div>`;
-  }).join('');
-}
 
 let editCompUserId=null;
 function openStaffComp(uid){
@@ -9810,11 +9775,13 @@ const dailyRate=workingDays>0?salary/workingDays:0;
 
         <div class="payslip-row total"><span>NET PAY</span><span style="color:var(--gold-dk);font-size:16px;">${fp2(netPay)}</span></div>
         ${daysAbsent>0?`<div style="font-size:11px;color:var(--danger);text-align:center;margin-top:6px;">⚠ ${daysAbsent} absent day${daysAbsent!==1?'s':''} deducted (${fp2(absenceDeduction)})</div>`:''}
-        <button class="btn btn-outline btn-sm" style="width:100%;margin-top:10px;" onclick="printOnePayslip(${u.id})">🖨 Print Payslip</button>
+        <div style="display:flex;gap:8px;margin-top:10px;">
+          <button class="btn btn-outline btn-sm" style="flex:1;" onclick="printOnePayslip(${u.id})">🖨 Print</button>
+          <button class="btn btn-gold btn-sm" style="flex:1;" onclick="openStaffComp(${u.id})">✏ Edit Rates</button>
+        </div>
       </div>
     </div>`;
   }).join('');
-  renderCommissionRates();
 }
 
 function printOnePayslip(uid){
