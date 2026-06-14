@@ -2302,7 +2302,99 @@ function refreshSummary(){
       if(!dp)notYetPaid+=p;
     });
   });
-  renderExpensesSplSummary();
+
+  // ── SPL schedule computation ──
+  const _splItems=[];
+  CATS.forEach(cat=>{
+    cat.items.forEach((item,i)=>{
+      const s=getS(cat.id,i);const pb=s.paidBy||'';
+      if(pb!=='shopee1'&&pb!=='shopee3')return;
+      const dp=s.dp||0;if(!dp)return;
+      _splItems.push({name:item.name,catName:cat.name,dp,pb,purchaseMonth:(s.purchaseDate||'').slice(0,7)});
+    });
+  });
+  const _moN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const _td=new Date(),_tY=_td.getFullYear(),_tM=_td.getMonth()+1;
+  const _nM=_tM===12?1:_tM+1,_nY=_tM===12?_tY+1:_tY;
+  const _nextKey=_nY+'-'+String(_nM).padStart(2,'0');
+  const _sched={};
+  _splItems.forEach(({name,catName,dp,pb,purchaseMonth})=>{
+    if(!purchaseMonth){if(!_sched.unknown)_sched.unknown=[];_sched.unknown.push({name,catName,amount:dp,pb,installment:'full',isOverdue:false});return;}
+    const[pY,pM]=purchaseMonth.split('-').map(Number);
+    if(pb==='shopee1'){
+      let yr=pY,mo=pM+1;if(mo>12){mo=1;yr++;}
+      const key=yr+'-'+String(mo).padStart(2,'0');
+      if(!_sched[key])_sched[key]=[];
+      _sched[key].push({name,catName,amount:dp,pb,installment:'Full',isOverdue:(yr<_tY)||(yr===_tY&&mo<=_tM)});
+    }else{
+      const inst=Math.round(dp/3);
+      for(let m=1;m<=3;m++){
+        let yr=pY,mo=pM+m;while(mo>12){mo-=12;yr++;}
+        const key=yr+'-'+String(mo).padStart(2,'0');
+        if(!_sched[key])_sched[key]=[];
+        _sched[key].push({name,catName,amount:inst,pb,installment:`${m}/3`,isOverdue:(yr<_tY)||(yr===_tY&&mo<=_tM)});
+      }
+    }
+  });
+  const _schedKeys=Object.keys(_sched).filter(k=>k!=='unknown').sort();
+  if(_sched.unknown)_schedKeys.push('unknown');
+  const _allPay=Object.values(_sched).flat();
+  const _totalSpl=_splItems.reduce((s,it)=>s+it.dp,0);
+  const _overdueItems=_allPay.filter(p=>p.isOverdue);
+  const _overdueTotal=_overdueItems.reduce((s,p)=>s+p.amount,0);
+  const _nextItems=_sched[_nextKey]||[];
+  const _nextTotal=_nextItems.reduce((s,p)=>s+p.amount,0);
+
+  let splCardHtml='';
+  if(_splItems.length){
+    splCardHtml=`<div class="metric" style="grid-column:1/-1;border:1.5px solid #f0a500;background:linear-gradient(135deg,#fff8ed,#fffbf5);padding:14px 16px">
+      <div style="font-size:13px;font-weight:700;color:#c96b00;margin-bottom:12px">💳 Shopee Pay Later</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+        <div style="background:#fff3cd;border:0.5px solid #f0c060;border-radius:8px;padding:8px 12px;min-width:100px">
+          <div style="font-size:9px;color:#856404;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Total Debt</div>
+          <div style="font-size:15px;font-weight:700;color:#664d03">${fmt(_totalSpl)}</div>
+          <div style="font-size:10px;color:#856404;margin-top:2px">${_splItems.length} item${_splItems.length!==1?'s':''}</div>
+        </div>
+        ${_overdueTotal>0?`<div style="background:#fff5f5;border:1px solid var(--red);border-radius:8px;padding:8px 12px;min-width:100px">
+          <div style="font-size:9px;color:var(--red);font-weight:600;text-transform:uppercase;letter-spacing:0.5px">⚠ Overdue / Due Now</div>
+          <div style="font-size:15px;font-weight:700;color:var(--red)">${fmt(_overdueTotal)}</div>
+          <div style="font-size:10px;color:var(--red);margin-top:2px">${[...new Set(_overdueItems.map(p=>p.name))].join(', ')}</div>
+        </div>`:'<div style="background:#f0fff4;border:0.5px solid #badbcc;border-radius:8px;padding:8px 12px;min-width:100px"><div style="font-size:9px;color:#0f5132;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Overdue</div><div style="font-size:15px;font-weight:700;color:#0f5132">₱0</div><div style="font-size:10px;color:#0f5132;margin-top:2px">None ✓</div></div>'}
+        ${_nextTotal>0?`<div style="background:#fafaf8;border:0.5px solid #e0d0b0;border-radius:8px;padding:8px 12px;min-width:100px">
+          <div style="font-size:9px;color:#8a7a50;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Due Next Month</div>
+          <div style="font-size:15px;font-weight:700;color:#8a7a50">${fmt(_nextTotal)}</div>
+          <div style="font-size:10px;color:#8a7a50;margin-top:2px">${[...new Set(_nextItems.map(p=>p.name))].join(', ')}</div>
+        </div>`:''}
+      </div>
+      <div style="font-size:10px;font-weight:700;color:#c96b00;text-transform:uppercase;letter-spacing:0.7px;margin-bottom:6px">Payment Schedule</div>
+      <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px">
+        <tr style="border-bottom:1px solid #e0d0b0">
+          <th style="text-align:left;padding:4px 8px;font-size:10px;color:var(--muted);font-weight:600;white-space:nowrap">Month</th>
+          <th style="text-align:left;padding:4px 8px;font-size:10px;color:var(--muted);font-weight:600">Items</th>
+          <th style="text-align:right;padding:4px 8px;font-size:10px;color:var(--muted);font-weight:600;white-space:nowrap">Amount Due</th>
+        </tr>
+        ${_schedKeys.map(key=>{
+          const pays=_sched[key];
+          const mT=pays.reduce((s,p)=>s+p.amount,0);
+          const anyOD=pays.some(p=>p.isOverdue);
+          const isNext=key===_nextKey;
+          let mLabel=key==='unknown'?'No purchase month set':_moN[parseInt(key.split('-')[1])-1]+' '+key.split('-')[0];
+          const bg=anyOD?'#fff5f5':isNext?'#fffbf0':'transparent';
+          const tc=anyOD?'var(--red)':isNext?'#c96b00':'var(--text)';
+          const badge=anyOD?'<span style="background:var(--red);color:#fff;border-radius:3px;padding:0 4px;font-size:9px;margin-left:5px">OVERDUE</span>':isNext?'<span style="background:#f0a500;color:#fff;border-radius:3px;padding:0 4px;font-size:9px;margin-left:5px">NEXT</span>':'';
+          return `<tr style="background:${bg};border-bottom:1px solid #f0e8d0">
+            <td style="padding:5px 8px;font-weight:600;color:${tc};white-space:nowrap">${anyOD?'⚠ ':''}${mLabel}${badge}</td>
+            <td style="padding:5px 8px;color:${tc}">${pays.map(p=>`${p.name} <span style="color:var(--muted);font-size:10px">[${p.pb==='shopee1'?'1mo':'3mo'} · ${p.installment}]</span>`).join('<br>')}</td>
+            <td style="padding:5px 8px;text-align:right;font-weight:700;color:${tc};white-space:nowrap">${fmt(mT)}</td>
+          </tr>`;
+        }).join('')}
+      </table></div>
+    </div>`;
+  }
+
+  const el_spl=document.getElementById('expenses-spl-summary');
+  if(el_spl)el_spl.style.display='none';
+
   const paidTotal=kylieDp+mcjamesDp;
   const contingency=TOTAL_FUNDS-grandTotal;
   const availableCash=TOTAL_FUNDS-totalDpAll;
@@ -2326,11 +2418,6 @@ function refreshSummary(){
       <div class="metric-value ${availableCash<0?'r':availableCash<50000?'a':'g'}">${fmt(Math.abs(availableCash))}${availableCash<0?' over':''}</div>
       <div style="font-size:10px;color:var(--muted);margin-top:2px">₱500K − total downpayments</div>
     </div>
-    ${shopDp>0?`<div class="metric" style="border:0.5px solid #f0a500">
-      <div class="metric-label" style="color:#c96b00">🛒 Shopee Pay Later</div>
-      <div class="metric-value" style="color:#c96b00">${fmt(shopDp)}</div>
-      <div style="font-size:10px;color:var(--muted);margin-top:3px">Total paid via Shopee</div>
-    </div>`:''}
     <div class="metric">
       <div class="metric-label">Not Yet Paid</div>
       <div class="metric-value a">${fmt(notYetPaid)}</div>
@@ -2340,7 +2427,8 @@ function refreshSummary(){
       <div class="metric-label" style="color:${contingency<0?'var(--red)':contingency<50000?'var(--warn)':'#0f5132'}">Contingency Fund</div>
       <div class="metric-value" style="color:${contingency<0?'var(--red)':contingency<50000?'var(--warn)':'#0f5132'}">${contingency<0?'−':''}${fmt(Math.abs(contingency))}</div>
       <div style="font-size:10px;color:var(--muted);margin-top:3px">₱500K − all planned amounts</div>
-    </div>`;
+    </div>
+    ${splCardHtml}`;
   const pct=Math.min(100,Math.round(totalDpAll/TOTAL_FUNDS*100));
   const bar=document.getElementById('budget-bar');
   bar.style.width=pct+'%';bar.style.background=pct>100?'var(--red)':pct>85?'#E4A834':'linear-gradient(90deg,var(--gold-l),var(--gold))';
