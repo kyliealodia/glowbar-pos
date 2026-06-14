@@ -2948,6 +2948,36 @@ html{height:-webkit-fill-available;}
   </div>
 </div>
 
+<!-- Custom Service Modal -->
+<div class="overlay hidden" id="customSvcModal">
+  <div class="modal" style="max-width:360px;">
+    <div class="modal-hdr">
+      <div class="modal-title">➕ Custom Service</div>
+      <div class="modal-x" onclick="closeM('customSvcModal')">✕</div>
+    </div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:14px;">
+      <div class="form-group">
+        <label class="form-label">Service Name</label>
+        <input class="form-input" type="text" id="csSvcName" placeholder="e.g. Touch up, Special treatment" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Price (₱)</label>
+        <input class="form-input" type="number" id="csSvcPrice" placeholder="0" min="0" inputmode="decimal">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Staff <span style="color:var(--ink3);font-weight:400;">(optional — can also assign in cart)</span></label>
+        <select class="form-input" id="csSvcStaff">
+          <option value="">Select staff...</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeM('customSvcModal')">Cancel</button>
+      <button class="btn btn-gold" onclick="addCustomToCart()">Add to Cart</button>
+    </div>
+  </div>
+</div>
+
 <!-- Add-ons Modal -->
 <div class="overlay hidden" id="addonModal">
   <div class="modal modal-md">
@@ -4453,7 +4483,7 @@ function renderSvcs(){
       items.push({type:'package',data:p});
     });
   }
-  g.innerHTML=items.map(({type,data})=>{
+  const itemsHtml=items.map(({type,data})=>{
     if(type==='package'){
       return `<div class="svc-card pkg" onclick="checkClientPackage('${data.id}')">
         <div class="sc-cat" style="color:var(--gold-dk);">✨ Package</div>
@@ -4472,7 +4502,34 @@ function renderSvcs(){
       <div class="sc-nm">${data.name}</div>
       <div class="sc-pr">${fmtPrice(data.price)}</div>
       ${sl?`<div class="sc-st ${sc}">${sl}</div>`:''}</div>`;
-  }).join('')||'<div style="grid-column:1/-1;text-align:center;color:var(--ink3);padding:30px;font-size:13px;">No items found</div>';
+  }).join('');
+  const customTile=`<div class="svc-card" style="border:2px dashed var(--gold-l);background:var(--cream2);color:var(--ink3);" onclick="openCustomSvc()">
+    <div class="sc-cat" style="color:var(--gold-dk);">One-time</div>
+    <div class="sc-nm" style="color:var(--ink2);">➕ Custom Service</div>
+    <div class="sc-pr" style="font-size:11px;color:var(--ink3);">Enter name & price</div>
+  </div>`;
+  g.innerHTML=(itemsHtml||'<div style="grid-column:1/-1;text-align:center;color:var(--ink3);padding:30px;font-size:13px;">No items found</div>')+customTile;
+}
+
+function openCustomSvc(){
+  document.getElementById('csSvcName').value='';
+  document.getElementById('csSvcPrice').value='';
+  const sel=document.getElementById('csSvcStaff');
+  sel.innerHTML='<option value="">Select staff...</option>'+(S.users||[]).filter(u=>u.role==='staff').map(u=>`<option value="${u.name}">${u.name}</option>`).join('');
+  if(selStaff) sel.value=selStaff.name||'';
+  openM('customSvcModal');
+  setTimeout(()=>document.getElementById('csSvcName').focus(),150);
+}
+function addCustomToCart(){
+  const name=(document.getElementById('csSvcName').value||'').trim();
+  const price=parseFloat(document.getElementById('csSvcPrice').value)||0;
+  const staffName=document.getElementById('csSvcStaff').value||'';
+  if(!name){showToast('Please enter a service name','err');return;}
+  if(!price){showToast('Please enter a price','err');return;}
+  cart.push({type:'custom',id:'custom_'+Date.now(),name,price,qty:1,unit:'service',addons:[],staffName});
+  closeM('customSvcModal');
+  renderCart();
+  showToast('Added ✓ — tap Order tab to checkout');
 }
 
 function addToCart(id,skipAddons=false){
