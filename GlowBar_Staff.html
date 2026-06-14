@@ -1333,6 +1333,9 @@ function goPage(name){
 function updateClockBtn(){
   const btn=document.getElementById('clockBtn');
   if(!btn||!currentUser) return;
+  // Owners don't clock in/out
+  if(currentUser.role==='owner'){btn.style.display='none';return;}
+  btn.style.display='';
   const today=new Date().toDateString();
   const logs=(S.loginLogs||[]).filter(l=>(l.userId===currentUser.id||l.user===currentUser.name||l.name===currentUser.name)&&new Date(l.time||l.date).toDateString()===today);
   const lastIn=logs.filter(l=>l.action==='clockin'||l.action==='in').sort((a,b)=>new Date(b.time)-new Date(a.time))[0];

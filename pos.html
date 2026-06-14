@@ -4118,17 +4118,22 @@ let _clockAction=null, _clockCamStream=null, _clockSnapTaken=false;
 
 function updateClockButtons(){
   if(!currentUser) return;
+  const inBtn=document.getElementById('clockInBtn');
+  const outBtn=document.getElementById('clockOutBtn');
+  const attBtn=document.getElementById('attClockBtn');
+  // Owners don't clock in/out
+  if(currentUser.role==='owner'){
+    if(inBtn) inBtn.style.display='none';
+    if(outBtn) outBtn.style.display='none';
+    if(attBtn) attBtn.style.display='none';
+    return;
+  }
   const today=td();
-  // Find if already clocked in today (no matching clock-out after)
   const todayLogs=S.loginLogs.filter(l=>l.userId===currentUser.id&&(l.time||l.date||'').startsWith(today));
   const lastLog=todayLogs[todayLogs.length-1];
   const isClockedIn=lastLog&&lastLog.action==='clockin';
-  const inBtn=document.getElementById('clockInBtn');
-  const outBtn=document.getElementById('clockOutBtn');
   if(inBtn) inBtn.style.display=isClockedIn?'none':'flex';
   if(outBtn) outBtn.style.display=isClockedIn?'flex':'none';
-  // Update prominent attendance page button
-  const attBtn=document.getElementById('attClockBtn');
   if(attBtn){
     attBtn.style.display='block';
     if(isClockedIn){
@@ -9095,10 +9100,11 @@ function renderAttendance(){
   const filterDate = document.getElementById('attFilterDate')?.value||'';
   const filterStaff = document.getElementById('attFilterStaff')?.value||'';
 
-  // Populate staff filter dropdown from known users
+  // Populate staff filter dropdown — exclude owner role users
   const staffSel=document.getElementById('attFilterStaff');
   if(staffSel){
-    const names=[...new Set(S.loginLogs.map(l=>l.name||l.user||'').filter(Boolean))].sort();
+    const ownerNames=new Set((S.users||[]).filter(u=>u.role==='owner').map(u=>u.name));
+    const names=[...new Set(S.loginLogs.map(l=>l.name||l.user||'').filter(n=>n&&!ownerNames.has(n)))].sort();
     const cur=staffSel.value;
     staffSel.innerHTML='<option value="">All Staff</option>'+names.map(n=>`<option value="${n}"${n===cur?' selected':''}>${n}</option>`).join('');
   }
@@ -9555,7 +9561,7 @@ const _startDateS=u.startDate?new Date(u.startDate+'T12:00'):null;
 const _monthStartS=new Date(py,pm-1,1);
 const effectiveFromS=(_startDateS&&_startDateS>_monthStartS)?_startDateS:null;
 const elapsedWorkingDays=getWorkingDays(py,pm,effectiveFromS,effectiveEndS,uRestDays);
-const daysAbsent=(!u.onCall&&hasClockData)?Math.max(0,elapsedWorkingDays-daysPresent-leaveDays):0;
+const daysAbsent=(u.role!=='owner'&&!u.onCall&&hasClockData)?Math.max(0,elapsedWorkingDays-daysPresent-leaveDays):0;
     const dailyRate=workingDays>0?salary/workingDays:0;
     const earnedBasic=salary-Math.round(dailyRate*daysAbsent);
     const grossPay=Math.max(0,earnedBasic)+commAmt;
@@ -9740,7 +9746,7 @@ const _monthStart=new Date(py,pm-1,1);
 const effectiveFrom=(_startDate&&_startDate>_monthStart)?_startDate:null;
 const elapsedWorkingDays=getWorkingDays(py,pm,effectiveFrom,effectiveEnd,uRestDays2);
 // On-call staff: no absent deductions — only track actual days worked
-const daysAbsent=(!u.onCall&&hasClockData)?Math.max(0,elapsedWorkingDays-daysPresent-leaveDays):0;
+const daysAbsent=(u.role!=='owner'&&!u.onCall&&hasClockData)?Math.max(0,elapsedWorkingDays-daysPresent-leaveDays):0;
 const salary=u.salary||0;
 const dailyRate=workingDays>0?salary/workingDays:0;
     const absenceDeduction=Math.round(dailyRate*daysAbsent);
