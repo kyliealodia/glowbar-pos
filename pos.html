@@ -5066,6 +5066,11 @@ function stopRefCam(){
 }
 
 function confirmPay(){
+  // Guard against double-click / double-submit
+  const _confirmBtn=document.querySelector('#payModal .btn-gold');
+  if(_confirmBtn&&_confirmBtn.disabled)return;
+  if(_confirmBtn)_confirmBtn.disabled=true;
+  const _reenableBtn=()=>{if(_confirmBtn)_confirmBtn.disabled=false;};
   const method=document.querySelector('.pay-m.sel')?.dataset.m||'cash';
   // Split payment
   const isSplit=document.getElementById('splitPayToggle')?.checked;
@@ -5086,7 +5091,7 @@ function confirmPay(){
   const scpwdEnabled=document.getElementById('scpwdToggle')?.checked;
   const scpwdType=document.getElementById('scpwdType')?.value||'SC';
   const scpwdId=(document.getElementById('scpwdIdNum')?.value||'').trim();
-  if(scpwdEnabled&&!scpwdId){showToast('SC/PWD ID number is required','err');return;}
+  if(scpwdEnabled&&!scpwdId){showToast('SC/PWD ID number is required','err');_reenableBtn();return;}
   const scpwdDiscAmt=scpwdEnabled?Math.round(afterDisc*0.20*100)/100:0;
   const afterScpwd=afterDisc-scpwdDiscAmt;
   const vatOn=false;
@@ -5097,6 +5102,7 @@ function confirmPay(){
   const _orStart=parseInt(S.settings?.orStart)||1;
   const _orCounter=parseInt(S.settings?.orCounter)||_orStart;
   const orNumber=String(_orCounter).padStart(8,'0');
+  const txRef=(S.settings?.orPrefix||'GB')+'-'+orNumber;
   if(S.settings) S.settings.orCounter=_orCounter+1;
   const dep=window._linkedDepositAmt||0;
   let finalTotal=Math.max(0,total-dep);
@@ -5250,7 +5256,7 @@ function confirmPay(){
     });
   }
   const _rcptId=uid('RCP-').toUpperCase();
-  S.transactions.push({id:txid,client:cn,clientId:selClient?.id||null,items:JSON.parse(JSON.stringify(cart)),sub,disc,discType,tip,vat,vatOn,total:finalTotal,originalAmount:payFeeAmt>0?originalAmount:null,payFee:payFeeAmt||null,feePct:payFeePct||null,feeTerm:payFeeTerm||null,depositApplied:dep||null,method,cashGiven:cashGiven||null,cashChange:cashChange||null,refPhoto:_refPhotoData||null,time:now.toISOString(),staff:(selStaff||currentUser)?.name,installmentInfo:instMeta||null,internalInstallment:internalInstInfo||null,scpwd:scpwdEnabled?{type:scpwdType,idNum:scpwdId,discAmt:scpwdDiscAmt}:null,orNumber,splitPayment:splitPaymentData||null,refNumber:refNumber||null,commissionBreakdown:commInfo.length?commInfo:null,surgeAmt:surgeAmt||null,surgeMeta:surge||null,receiptId:_rcptId});
+  S.transactions.push({id:txid,ref:txRef,client:cn,clientId:selClient?.id||null,items:JSON.parse(JSON.stringify(cart)),sub,disc,discType,tip,vat,vatOn,total:finalTotal,originalAmount:payFeeAmt>0?originalAmount:null,payFee:payFeeAmt||null,feePct:payFeePct||null,feeTerm:payFeeTerm||null,depositApplied:dep||null,method,cashGiven:cashGiven||null,cashChange:cashChange||null,refPhoto:_refPhotoData||null,time:now.toISOString(),staff:(selStaff||currentUser)?.name,installmentInfo:instMeta||null,internalInstallment:internalInstInfo||null,scpwd:scpwdEnabled?{type:scpwdType,idNum:scpwdId,discAmt:scpwdDiscAmt}:null,orNumber,splitPayment:splitPaymentData||null,refNumber:refNumber||null,commissionBreakdown:commInfo.length?commInfo:null,surgeAmt:surgeAmt||null,surgeMeta:surge||null,receiptId:_rcptId});
   window.lastTx=S.transactions[S.transactions.length-1];
   window._lastPaidClientId = selClient?.id||null;
   window._lastTxId = txid;
@@ -5285,7 +5291,7 @@ function confirmPay(){
   window._linkedDepositAmt=0;
   // Build receipt
   document.getElementById('receiptContent').innerHTML=`
-    <div style="text-align:center;margin-bottom:12px;"><div style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:500;">GlowBar</div><div style="font-size:10px;color:var(--ink3);letter-spacing:1px;text-transform:uppercase;">Beauty · Confidence · Glow</div><div style="font-size:10px;color:var(--ink3);margin-top:3px;">${now.toLocaleString('en-PH')} · Ref: ${txid}</div></div>
+    <div style="text-align:center;margin-bottom:12px;"><div style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:500;">GlowBar</div><div style="font-size:10px;color:var(--ink3);letter-spacing:1px;text-transform:uppercase;">Beauty · Confidence · Glow</div><div style="font-size:10px;color:var(--ink3);margin-top:3px;">${now.toLocaleString('en-PH')} · Ref: ${txRef}</div></div>
     <div style="font-size:12px;color:var(--ink2);margin-bottom:10px;">Client: <strong>${cn}</strong><br>Staff: <strong>${currentUser.name}</strong></div>
     <hr style="border:none;border-top:1px dashed var(--cream3);margin:10px 0;">
     ${cart.map(i=>`<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink2);margin-bottom:3px;"><span>${i.name} × ${i.qty}${i.type==='package'?' 📋':''}</span><span>${fmtPrice(i.price*i.qty)}</span></div>`).join('')}
@@ -5353,7 +5359,7 @@ function confirmPay(){
       installmentInfo:instMeta||null,internalInstallment:internalInstInfo||null,
       scpwd:scpwdEnabled?{type:scpwdType,idNum:scpwdId,discAmt:scpwdDiscAmt}:null,
       surgeAmt:surgeAmt||null,surgeMeta:surge||null,
-      orNumber,
+      orNumber,ref:txRef,
       businessName:S.settings?.clinicName||'GlowBar Beauty Clinic',
       businessAddress:S.settings?.businessAddress||'',
       tin:S.settings?.tin||'',
@@ -5501,7 +5507,7 @@ function shareReceipt(){
     'GlowBar Beauty Clinic',
     'BEAUTY · CONFIDENCE · GLOW',
     '─────────────────────',
-    `Ref: ${tx.id}`,
+    `Ref: ${tx.ref||tx.id}`,
     `Date: ${new Date(tx.time).toLocaleString('en-PH')}`,
     `Client: ${tx.client}`,
     tx.staff?`Staff: ${tx.staff}`:'',
@@ -8920,7 +8926,7 @@ function exportReport(){
   let csv='Date,Time,Ref,Client,Items,Subtotal,Discount,Total,Method,Staff\n';
   txns.forEach(t=>{
     const d=new Date(t.time);
-    csv+=`${d.toLocaleDateString('en-PH')},${d.toLocaleTimeString('en-PH')},${t.id},"${t.client}","${t.items.map(i=>i.name+' x'+i.qty).join('; ')}",${t.sub||t.total},${t.disc||0},${t.total},${t.method},"${t.staff}"\n`;
+    csv+=`${d.toLocaleDateString('en-PH')},${d.toLocaleTimeString('en-PH')},${t.ref||t.id},"${t.client}","${t.items.map(i=>i.name+' x'+i.qty).join('; ')}",${t.sub||t.total},${t.disc||0},${t.total},${t.method},"${t.staff}"\n`;
   });
   const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);a.download='GlowBar_Report_'+td()+'.csv';a.click();
 }
