@@ -9470,13 +9470,96 @@ function _getAttendanceStats(userId, userName, period){
     if(prevIn){const ms=new Date(lo.time)-new Date(prevIn.time);if(ms>0)totalMins+=Math.round(ms/60000);}
   });
 
-  return {presentDays:presentDates.size,totalMins,hasClockData:presentDates.size>0};
+  return {presentDays:presentDates.size,totalMins,hasClockData:presentDates.size>0,presentDatesSet:presentDates};
 }
 
 function getDaysPresent(userId, period){
   const u=S.users.find(x=>x.id===userId);
   return _getAttendanceStats(userId,u?.name||'',period).presentDays;
 }
+// ── Philippine Holidays ──────────────────────────────────────────────────────
+const PH_HOLIDAYS=[
+  // 2025 Regular
+  {date:'2025-01-01',name:"New Year's Day",type:'regular'},
+  {date:'2025-04-09',name:"Araw ng Kagitingan",type:'regular'},
+  {date:'2025-04-17',name:"Maundy Thursday",type:'regular'},
+  {date:'2025-04-18',name:"Good Friday",type:'regular'},
+  {date:'2025-05-01',name:"Labor Day",type:'regular'},
+  {date:'2025-06-12',name:"Independence Day",type:'regular'},
+  {date:'2025-08-25',name:"National Heroes Day",type:'regular'},
+  {date:'2025-11-30',name:"Bonifacio Day",type:'regular'},
+  {date:'2025-12-25',name:"Christmas Day",type:'regular'},
+  {date:'2025-12-30',name:"Rizal Day",type:'regular'},
+  // 2025 Special
+  {date:'2025-01-29',name:"Chinese New Year",type:'special'},
+  {date:'2025-02-25',name:"EDSA People Power",type:'special'},
+  {date:'2025-04-19',name:"Black Saturday",type:'special'},
+  {date:'2025-08-21',name:"Ninoy Aquino Day",type:'special'},
+  {date:'2025-11-01',name:"All Saints Day",type:'special'},
+  {date:'2025-11-02',name:"All Souls Day",type:'special'},
+  {date:'2025-12-08',name:"Feast of Immaculate Conception",type:'special'},
+  {date:'2025-12-24',name:"Christmas Eve",type:'special'},
+  {date:'2025-12-31',name:"New Year's Eve",type:'special'},
+  // 2026 Regular
+  {date:'2026-01-01',name:"New Year's Day",type:'regular'},
+  {date:'2026-04-09',name:"Araw ng Kagitingan",type:'regular'},
+  {date:'2026-04-17',name:"Maundy Thursday",type:'regular'},
+  {date:'2026-04-18',name:"Good Friday",type:'regular'},
+  {date:'2026-05-01',name:"Labor Day",type:'regular'},
+  {date:'2026-06-12',name:"Independence Day",type:'regular'},
+  {date:'2026-08-25',name:"National Heroes Day",type:'regular'},
+  {date:'2026-11-30',name:"Bonifacio Day",type:'regular'},
+  {date:'2026-12-25',name:"Christmas Day",type:'regular'},
+  {date:'2026-12-30',name:"Rizal Day",type:'regular'},
+  // 2026 Special
+  {date:'2026-01-29',name:"Chinese New Year",type:'special'},
+  {date:'2026-02-25',name:"EDSA People Power",type:'special'},
+  {date:'2026-04-19',name:"Black Saturday",type:'special'},
+  {date:'2026-08-21',name:"Ninoy Aquino Day",type:'special'},
+  {date:'2026-11-01',name:"All Saints Day",type:'special'},
+  {date:'2026-11-02',name:"All Souls Day",type:'special'},
+  {date:'2026-12-08',name:"Feast of Immaculate Conception",type:'special'},
+  {date:'2026-12-24',name:"Christmas Eve",type:'special'},
+  {date:'2026-12-31',name:"New Year's Eve",type:'special'},
+];
+
+// Returns holiday pay extra amounts and regular-holiday absence offset for a period.
+// presentDatesSet: Set of YYYY-MM-DD strings (PH dates worked by this staff)
+// dailyRate: number, restDays: [0-6] day numbers that are off
+function getHolidayPay(period, presentDatesSet, dailyRate, restDays){
+  const rds=restDays||[1];
+  const holidays=PH_HOLIDAYS.filter(h=>h.date.startsWith(period));
+  let regularUnworked=0; // regular holidays not worked → exclude from absent count
+  let totalHolidayPay=0;
+  const breakdown=[];
+  holidays.forEach(h=>{
+    const dow=new Date(h.date+'T12:00').getDay();
+    const isWorkDay=!rds.includes(dow); // falls on a scheduled work day
+    const worked=presentDatesSet.has(h.date);
+    if(h.type==='regular'){
+      if(worked){
+        // Worked on regular holiday → extra 100% (total = 200%)
+        const extra=Math.round(dailyRate);
+        totalHolidayPay+=extra;
+        breakdown.push({name:h.name,date:h.date,type:'regular',worked:true,amount:extra,note:'+100% extra (worked)'});
+      } else if(isWorkDay){
+        // Not worked but it's a scheduled day → paid day off, don't count as absent
+        regularUnworked++;
+        breakdown.push({name:h.name,date:h.date,type:'regular',worked:false,amount:0,note:'Paid day off'});
+      }
+    } else { // special
+      if(worked){
+        // Worked on special holiday → extra 30% (total = 130%)
+        const extra=Math.round(dailyRate*0.30);
+        totalHolidayPay+=extra;
+        breakdown.push({name:h.name,date:h.date,type:'special',worked:true,amount:extra,note:'+30% extra (worked)'});
+      }
+      // Special not worked → no pay, no deduction → no entry
+    }
+  });
+  return{totalHolidayPay,regularUnworked,breakdown};
+}
+
 function getWorkingDays(yr, mo, from, to, restDays){
   if(!restDays)restDays=[1]; // default: Monday off
   const monthStart=new Date(yr,mo-1,1);
@@ -9517,7 +9600,7 @@ function renderPayrollSummary(staffList, txns, period){
     // Attendance-aware basic pay
     const uRestDays=u.restDays||[1];
     const workingDays=getWorkingDays(py,pm,null,null,uRestDays);
-    const {presentDays:daysPresent,hasClockData}=_getAttendanceStats(u.id,u.name,period);
+    const {presentDays:daysPresent,hasClockData,presentDatesSet}=_getAttendanceStats(u.id,u.name,period);
     const leaveDays=(S.leaveRequests||[]).filter(l=>l.userId===u.id&&l.status==='approved'&&l.from?.startsWith(period)).reduce((s,l)=>s+(l.days||1),0);
     const today=new Date(); today.setHours(23,59,59,0);
 const monthEndS=new Date(py,pm,0);
@@ -9526,10 +9609,11 @@ const _startDateS=u.startDate?new Date(u.startDate+'T12:00'):null;
 const _monthStartS=new Date(py,pm-1,1);
 const effectiveFromS=(_startDateS&&_startDateS>_monthStartS)?_startDateS:null;
 const elapsedWorkingDays=getWorkingDays(py,pm,effectiveFromS,effectiveEndS,uRestDays);
-const daysAbsent=(u.role!=='owner'&&!u.onCall&&hasClockData)?Math.max(0,elapsedWorkingDays-daysPresent-leaveDays):0;
-    const dailyRate=workingDays>0?salary/workingDays:0;
-    const earnedBasic=salary-Math.round(dailyRate*daysAbsent);
-    const grossPay=Math.max(0,earnedBasic)+commAmt;
+const dailyRate=workingDays>0?salary/workingDays:0;
+const holidayResult=getHolidayPay(period,presentDatesSet,dailyRate,uRestDays);
+const daysAbsent=(u.role!=='owner'&&!u.onCall&&hasClockData)?Math.max(0,elapsedWorkingDays-daysPresent-leaveDays-holidayResult.regularUnworked):0;
+    const earnedBasic=u.onCall?Math.min(salary,Math.round(dailyRate*daysPresent)):salary-Math.round(dailyRate*daysAbsent);
+    const grossPay=Math.max(0,earnedBasic)+commAmt+holidayResult.totalHolidayPay;
     const d=computeDeductions(u, grossPay);
 
     // Employer shares
@@ -9687,7 +9771,7 @@ function renderPayslip(){
     const sessions=myTxns.reduce((s,t)=>s+(t.items?.length||0),0);
 
     // Attendance from clock logs (both formats)
-    const {presentDays:daysPresent,totalMins,hasClockData}=_getAttendanceStats(u.id,u.name,period);
+    const {presentDays:daysPresent,totalMins,hasClockData,presentDatesSet:presSet}=_getAttendanceStats(u.id,u.name,period);
     const hrs=Math.floor(totalMins/60), mins=totalMins%60;
     const uRestDays2=u.restDays||[1];
     const workingDays=getWorkingDays(py,pm,null,null,uRestDays2);
@@ -9710,20 +9794,21 @@ const _startDate=u.startDate?new Date(u.startDate+'T12:00'):null;
 const _monthStart=new Date(py,pm-1,1);
 const effectiveFrom=(_startDate&&_startDate>_monthStart)?_startDate:null;
 const elapsedWorkingDays=getWorkingDays(py,pm,effectiveFrom,effectiveEnd,uRestDays2);
-// On-call staff: no absent deductions — only track actual days worked
-const daysAbsent=(u.role!=='owner'&&!u.onCall&&hasClockData)?Math.max(0,elapsedWorkingDays-daysPresent-leaveDays):0;
 const salary=u.salary||0;
 const dailyRate=workingDays>0?salary/workingDays:0;
+const holidayInfo=getHolidayPay(period,presSet,dailyRate,uRestDays2);
+// On-call: no absent deductions — only pay days actually worked
+const daysAbsent=(u.role!=='owner'&&!u.onCall&&hasClockData)?Math.max(0,elapsedWorkingDays-daysPresent-leaveDays-holidayInfo.regularUnworked):0;
     const absenceDeduction=Math.round(dailyRate*daysAbsent);
-    const earnedBasic=salary-absenceDeduction;
+    const earnedBasic=u.onCall?Math.min(salary,Math.round(dailyRate*daysPresent)):salary-absenceDeduction;
 
     // Cash advance deductions for this pay period
     const caDeduct=(S.cashAdvances||[]).filter(ca=>
       ca.userId===u.id&&ca.status==='approved'&&
       ca.approvedAt&&ca.approvedAt.startsWith(period)
     ).reduce((s,ca)=>s+ca.amount,0);
-    // Gross = earned basic + commission + allowance
-    const grossPay=Math.max(0, earnedBasic)+commissionAmt;
+    // Gross = earned basic + commission + holiday pay
+    const grossPay=Math.max(0,earnedBasic)+commissionAmt+holidayInfo.totalHolidayPay;
     const uWithCA={...u,otherDeductions:(u.otherDeductions||0)+caDeduct};
     const d=computeDeductions(uWithCA, grossPay);
     const netPay=d.netPay;
@@ -9745,17 +9830,29 @@ const dailyRate=workingDays>0?salary/workingDays:0;
           <span style="color:var(--success);">✓ Present: <strong>${daysPresent}</strong></span>
           ${leaveDays>0?`<span style="color:var(--info);">🌿 On leave: <strong>${leaveDays}</strong></span>`:''}
           ${!u.onCall&&daysAbsent>0?`<span style="color:var(--danger);">✗ Absent: <strong>${daysAbsent}</strong></span>`:''}
+          ${holidayInfo.breakdown.length?`<span style="color:#c96b00;">🎌 Holidays: <strong>${holidayInfo.breakdown.length}</strong></span>`:''}
           <span style="color:var(--ink3);">Daily rate: <strong>${fp2(dailyRate)}</strong></span>
         </div>
       </div>
       <div class="payslip-body">
         <div style="font-size:10px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;">Earnings</div>
-        <div class="payslip-row"><span>Basic Salary (${workingDays} working days · ${_scheduleLabel(uRestDays2)})</span><span style="color:var(--success);">${fp2(salary)}</span></div>
+        ${u.onCall
+          ?`<div class="payslip-row"><span>Days Worked (${daysPresent}) × Daily Rate (${fp2(dailyRate)})</span><span style="color:var(--success);">${fp2(earnedBasic)}</span></div>`
+          :`<div class="payslip-row"><span>Basic Salary (${workingDays} days · ${_scheduleLabel(uRestDays2)})</span><span style="color:var(--success);">${fp2(salary)}</span></div>
         ${daysAbsent>0?`<div class="payslip-row"><span style="color:var(--danger);">Absent Deduction (${daysAbsent} day${daysAbsent!==1?'s':''})</span><span style="color:var(--danger);">-${fp2(absenceDeduction)}</span></div>`:''}
         ${leaveDays>0?`<div class="payslip-row"><span style="color:var(--info);">Approved Leave (${leaveDays} day${leaveDays!==1?'s':''})</span><span style="color:var(--info);">no deduction</span></div>`:''}
-        <div class="payslip-row"><span>Earned Basic Pay</span><span style="color:var(--success);">${fp2(earnedBasic)}</span></div>
+        <div class="payslip-row"><span>Earned Basic Pay</span><span style="color:var(--success);">${fp2(earnedBasic)}</span></div>`}
         ${commissionAmt>0&&catCommDetails.length?catCommDetails.map(cd=>`<div class="payslip-row"><span>Commission — ${cd.cat} (${cd.rate}%)</span><span style="color:var(--success);">+${fp2(cd.amount)}</span></div>`).join(''):''}
         ${commissionAmt>0&&!catCommDetails.length?`<div class="payslip-row"><span>Commission (${u.commission||0}% of ${fp2(totalSales)})</span><span style="color:var(--success);">+${fp2(commissionAmt)}</span></div>`:''}
+        ${holidayInfo.breakdown.length?`
+        <div style="font-size:10px;font-weight:600;color:#c96b00;text-transform:uppercase;letter-spacing:0.8px;margin:8px 0 4px;">🎌 Holiday Pay</div>
+        ${holidayInfo.breakdown.map(h=>{
+          const dLabel=new Date(h.date+'T12:00').toLocaleDateString('en-PH',{month:'short',day:'numeric'});
+          const typeTag=h.type==='regular'?'<span style="font-size:9px;background:#fff3cd;color:#856404;border-radius:3px;padding:0 4px;margin-left:4px;">Regular</span>':'<span style="font-size:9px;background:#f0f0f0;color:#666;border-radius:3px;padding:0 4px;margin-left:4px;">Special</span>';
+          return h.amount>0
+            ?`<div class="payslip-row"><span style="color:#c96b00;">${dLabel} ${h.name}${typeTag} <span style="font-size:10px;color:var(--ink3);">${h.note}</span></span><span style="color:#c96b00;">+${fp2(h.amount)}</span></div>`
+            :`<div class="payslip-row"><span style="color:var(--ink3);">${dLabel} ${h.name}${typeTag} <span style="font-size:10px;">${h.note}</span></span><span style="color:var(--ink3);">—</span></div>`;
+        }).join('')}`:''}
         ${d.allowance>0?`<div class="payslip-row"><span>Allowances</span><span style="color:var(--success);">+${fp2(d.allowance)}</span></div>`:''}
         <div class="payslip-row"><span style="font-weight:600;">Gross Pay</span><span style="font-weight:600;">${fp2(grossPay+d.allowance)}</span></div>
 
