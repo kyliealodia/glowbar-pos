@@ -1563,9 +1563,28 @@ function renderCutoff(){
 
   const grossPay=baseEarned+commEarned+coAllowances+totalCOHolidayPay+otPay;
 
-  // Deductions: half of monthly statutory (PH standard — split across two cut-offs)
-  // Use grossPay*2 as estimated monthly gross for consistent deduction base
-  const estMonthlyGross=grossPay*2;
+  // Deductions: half of the MONTHLY statutory amounts.
+  // Compute monthly gross the same way renderPayslip() does — scan full month logs.
+  const _moPeriod=`${yr}-${String(mo).padStart(2,'0')}`;
+  const _moPresent=new Set();
+  if(!_isCOOwner){
+    (S.loginLogs||[]).forEach(l=>{
+      const mu=l.userId===viewUser.id||l.user===viewUser.name||l.name===viewUser.name;
+      if(!mu) return;
+      let ds='';
+      if(!l.action&&l.in) ds=l.date||toPHDateStr(l.in);
+      else if(l.action==='clockin'||l.action==='in') ds=toPHDateStr(l.time||'');
+      if(ds&&ds.startsWith(_moPeriod)) _moPresent.add(ds);
+    });
+  }
+  const _moEarnedBasic=Math.round(dailyRate*(_isCOOwner?workingDaysInCO*2:_moPresent.size));
+  let _moHolReg=0,_moHolSp=0;
+  [..._moPresent].forEach(ds=>{
+    if(PH_HOLIDAYS.regular.includes(ds)) _moHolReg++;
+    else if(PH_HOLIDAYS.special.includes(ds)) _moHolSp++;
+  });
+  const _moHolPay=Math.round(dailyRate*_moHolReg)+Math.round(dailyRate*0.30*_moHolSp);
+  const estMonthlyGross=_moEarnedBasic+allowances+_moHolPay;
   const sss=Math.round(computeSSS(estMonthlyGross)/2);
   const philhealth=Math.round(computePhilHealth(estMonthlyGross)/2);
   const pagibig=Math.round(computePagibig()/2);
