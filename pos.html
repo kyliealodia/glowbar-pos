@@ -9592,8 +9592,9 @@ function renderPayrollSummary(staffList, txns, period){
   let totalTax=0, totalCommission=0, totalSalaries=0;
 
   const rows=staffList.map(u=>{
-    const myTxns=txns.filter(t=>t.staff===u.name);
-    const totalSales=myTxns.reduce((s,t)=>s+t.total,0);
+    const _myIt=[];
+    txns.forEach(t=>{(t.items||[]).forEach(ci=>{if((ci.staffName||t.staff||'')===u.name)_myIt.push(ci);});});
+    const totalSales=_myIt.reduce((s,ci)=>s+ci.price*(ci.qty||1),0);
     const commAmt=Math.round(totalSales*(u.commission||0)/100);
     const salary=u.salary||0;
 
@@ -9748,27 +9749,31 @@ function renderPayslip(){
   renderPayrollSummary(staffList, txns, period);
 
   g.innerHTML=staffList.map(u=>{
-    const myTxns=txns.filter(t=>t.staff===u.name);
-    const totalSales=myTxns.reduce((s,t)=>s+t.total,0);
+    // Attribute items to this staff member: per-item staffName takes priority, falls back to tx.staff
+    const myItems=[];
+    txns.forEach(t=>{
+      (t.items||[]).forEach(ci=>{
+        if((ci.staffName||t.staff||'')===u.name) myItems.push({t,ci});
+      });
+    });
+    const totalSales=myItems.reduce((s,{ci})=>s+ci.price*(ci.qty||1),0);
+    const sessions=myItems.length;
     // Calculate commission using per-category rates if available
     let commissionAmt=0;
     const catCommDetails=[];
     if(u.categoryCommissions&&Object.keys(u.categoryCommissions).length){
-      myTxns.forEach(t=>{
-        (t.items||[]).forEach(ci=>{
-          const prod=S.products.find(p=>p.id===ci.id)||S.packages?.find(p=>p.id===ci.id);
-          const cat=prod?.cat||'Other';
-          const rate=u.categoryCommissions[cat]!==undefined?u.categoryCommissions[cat]:u.commission||0;
-          const amt=Math.round(ci.price*ci.qty*(rate/100)*100)/100;
-          commissionAmt+=amt;
-          if(amt>0){const existing=catCommDetails.find(x=>x.cat===cat);if(existing)existing.amount+=amt;else catCommDetails.push({cat,rate,amount:amt});}
-        });
+      myItems.forEach(({t,ci})=>{
+        const prod=S.products.find(p=>p.id===ci.id)||S.packages?.find(p=>p.id===ci.id);
+        const cat=prod?.cat||'Other';
+        const rate=u.categoryCommissions[cat]!==undefined?u.categoryCommissions[cat]:u.commission||0;
+        const amt=Math.round(ci.price*(ci.qty||1)*(rate/100)*100)/100;
+        commissionAmt+=amt;
+        if(amt>0){const existing=catCommDetails.find(x=>x.cat===cat);if(existing)existing.amount+=amt;else catCommDetails.push({cat,rate,amount:amt});}
       });
       commissionAmt=Math.round(commissionAmt);
     } else {
       commissionAmt=Math.round(totalSales*(u.commission||0)/100);
     }
-    const sessions=myTxns.reduce((s,t)=>s+(t.items?.length||0),0);
 
     // Attendance from clock logs (both formats)
     const {presentDays:daysPresent,totalMins,hasClockData,presentDatesSet:presSet}=_getAttendanceStats(u.id,u.name,period);
@@ -11834,10 +11839,20 @@ function openEditTx(txId){
   document.getElementById('txeClient').textContent=tx.client||'—';
   document.getElementById('txeServices').textContent=(tx.items||[]).map(i=>i.name).join(', ')||'—';
   document.getElementById('txeTotal').textContent=fmtPrice(tx.total);
-  // Staff dropdown
-  const staffSel=document.getElementById('txeStaff');
-  staffSel.innerHTML='<option value="">— No staff assigned —</option>'+(S.users||[]).map(u=>`<option value="${u.name}"${u.name===tx.staff?' selected':''}>${u.name}${u.title?' · '+u.title:''}</option>`).join('');
-  if(tx.staff) staffSel.value=tx.staff;
+  // Per-item staff dropdowns
+  const _uOpts=(S.users||[]).map(u=>`<option value="${u.name}">${u.name}${u.title?' · '+u.title:''}</option>`).join('');
+  document.getElementById('txeItemStaffs').innerHTML=(tx.items||[]).length
+    ?(tx.items||[]).map((ci,idx)=>{
+      const assigned=ci.staffName||tx.staff||'';
+      return `<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--cream2);border-radius:8px;">
+        <span style="flex:1;font-size:12px;font-weight:500;color:var(--ink2);">${ci.name}</span>
+        <select class="form-select" data-item-idx="${idx}" style="max-width:160px;font-size:12px;padding:4px 8px;">
+          <option value="">— No staff —</option>
+          ${(S.users||[]).map(u=>`<option value="${u.name}"${u.name===assigned?' selected':''}>${u.name}${u.title?' · '+u.title:''}</option>`).join('')}
+        </select>
+      </div>`;
+    }).join('')
+    :'<div style="color:var(--ink3);font-size:12px;padding:4px;">No services in this transaction</div>';
   // Payment method
   document.getElementById('txeMethod').value=tx.method||'cash';
   // Discount
@@ -11847,7 +11862,16 @@ function openEditTx(txId){
 function saveEditTx(){
   const tx=S.transactions.find(t=>String(t.id)===String(_editTxId));
   if(!tx){showToast('Transaction not found','err');return;}
-  tx.staff=document.getElementById('txeStaff').value||'';
+  // Save per-item staffName
+  document.querySelectorAll('#txeItemStaffs select[data-item-idx]').forEach(sel=>{
+    const idx=parseInt(sel.dataset.itemIdx);
+    if(tx.items&&tx.items[idx]!==undefined) tx.items[idx].staffName=sel.value||'';
+  });
+  // Set tx.staff to the most-assigned staff across items (backward compat)
+  const _sc={};
+  (tx.items||[]).forEach(ci=>{if(ci.staffName)_sc[ci.staffName]=(_sc[ci.staffName]||0)+1;});
+  const _primary=Object.entries(_sc).sort((a,b)=>b[1]-a[1])[0]?.[0]||tx.staff||'';
+  tx.staff=_primary;
   tx.method=document.getElementById('txeMethod').value||'cash';
   tx.disc=parseFloat(document.getElementById('txeDisc').value)||0;
   sync('transactions');
@@ -12853,8 +12877,8 @@ function _buildSignedView(client, formKey, consent){
         <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;border-top:1px solid var(--border);padding-top:6px;margin-top:2px;"><span style="color:var(--ink3);font-size:11px;">Total</span><span id="txeTotal" style="font-weight:700;font-size:15px;color:var(--gold-dk);"></span></div>
       </div>
       <div class="form-group">
-        <label class="form-label">Staff Assigned</label>
-        <select class="form-select" id="txeStaff"></select>
+        <label class="form-label">Staff per Service</label>
+        <div id="txeItemStaffs" style="display:flex;flex-direction:column;gap:6px;"></div>
       </div>
       <div class="form-group">
         <label class="form-label">Payment Method</label>
