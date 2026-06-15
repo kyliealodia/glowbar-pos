@@ -1464,6 +1464,7 @@ function renderCutoff(){
   }
 
   const viewUser=getPayslipUser();
+  console.log('[renderCutoff] viewUser=',viewUser?.name,'id=',viewUser?.id);
   const userRecord=S.users.find(u=>u.id===viewUser.id)||viewUser;
   const basicPay=userRecord.salary||userRecord.basicPay||0;
   const commRate=userRecord.commission||0;
@@ -1736,12 +1737,16 @@ function savePaydaySettings(){
 function getPayslipUser(){
   const sel=document.getElementById('payStaffSel');
   if(sel&&sel.style.display!=='none'&&sel.value){
-    return S.users.find(u=>u.id===Number(sel.value)||u.id===sel.value)||currentUser;
+    const found=S.users.find(u=>u.id===Number(sel.value)||u.id===sel.value)||currentUser;
+    console.log('[getPayslipUser] sel.value=',sel.value,'sel.display=',sel.style.display,'found=',found?.name,'id=',found?.id);
+    return found;
   }
+  console.log('[getPayslipUser] no sel or empty value — returning currentUser:',currentUser?.name);
   return currentUser;
 }
 
 function renderPayslip(){
+  console.log('[renderPayslip] START — payStaffSel.value=',document.getElementById('payStaffSel')?.value);
   renderCutoff();
   const period=document.getElementById('payPeriodSel')?.value||td().slice(0,7);
   const [yr,mo]=period.split('-').map(Number);
@@ -1763,7 +1768,9 @@ function renderPayslip(){
 
   // User record — owner can view any staff
   const viewUser=getPayslipUser();
+  console.log('[renderPayslip] MONTHLY viewUser=',viewUser?.name,'id=',viewUser?.id);
   const userRecord=S.users.find(u=>u.id===viewUser.id)||viewUser;
+  console.log('[renderPayslip] MONTHLY userRecord=',userRecord?.name,'id=',userRecord?.id);
   const basicPay=userRecord.salary||userRecord.basicPay||0;
   const commRate=userRecord.commission||0;
   const allowances=userRecord.allowances||0;
