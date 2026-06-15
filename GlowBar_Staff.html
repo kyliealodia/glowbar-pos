@@ -1564,7 +1564,7 @@ function renderCutoff(){
   const grossPay=baseEarned+commEarned+coAllowances+totalCOHolidayPay+otPay;
 
   // Deductions: half of the MONTHLY statutory amounts.
-  // Compute monthly gross the same way renderPayslip() does — scan full month logs.
+  // Compute full monthly gross exactly like renderPayslip() — scan entire month.
   const _moPeriod=`${yr}-${String(mo).padStart(2,'0')}`;
   const _moPresent=new Set();
   if(!_isCOOwner){
@@ -1584,14 +1584,32 @@ function renderCutoff(){
     else if(PH_HOLIDAYS.special.includes(ds)) _moHolSp++;
   });
   const _moHolPay=Math.round(dailyRate*_moHolReg)+Math.round(dailyRate*0.30*_moHolSp);
-  const estMonthlyGross=_moEarnedBasic+allowances+_moHolPay;
-  const sss=Math.round(computeSSS(estMonthlyGross)/2);
-  const philhealth=Math.round(computePhilHealth(estMonthlyGross)/2);
-  const pagibig=Math.round(computePagibig()/2);
+  // Full-month commission
+  const _moCommItems=[];
+  (S.transactions||[]).forEach(t=>{
+    const td=toPHDateStr(t.time||'');
+    if(!td.startsWith(_moPeriod)) return;
+    (t.items||[]).length
+      ?(t.items||[]).forEach(ci=>{if((ci.staffName||t.staff||'')===viewUser.name)_moCommItems.push(ci);})
+      :(t.staff===viewUser.name&&_moCommItems.push({price:t.subtotal||t.total||0,qty:1}));
+  });
+  const _moCommEarned=Math.round(_moCommItems.reduce((s,ci)=>s+(ci.price||0)*(ci.qty||1),0)*(commRate/100));
+  // Full-month OT
+  const _moOTPay=(S.overtimeRequests||[]).filter(o=>
+    o.userId===viewUser.id&&o.status==='approved'&&(o.date||'').startsWith(_moPeriod)
+  ).reduce((s,o)=>s+(o.amount||0),0);
+  const estMonthlyGross=_moEarnedBasic+_moCommEarned+allowances+_moHolPay+_moOTPay;
+  // Compute monthly statutory amounts first, then halve — no rounding before halving
+  const _moSSS=computeSSS(estMonthlyGross);
+  const _moPH=computePhilHealth(estMonthlyGross);
+  const _moPagibig=computePagibig();
+  const sss=_moSSS/2;
+  const philhealth=_moPH/2;
+  const pagibig=_moPagibig/2;
   const govTotal=sss+philhealth+pagibig;
-  const taxable=Math.max(0,estMonthlyGross-computeSSS(estMonthlyGross)-computePhilHealth(estMonthlyGross)-computePagibig());
-  const taxForCO=Math.round(computeWithholdingTax(taxable)/2);
-  const otherDed=Math.round(otherDeductions/2);
+  const _moTaxable=Math.max(0,estMonthlyGross-_moSSS-_moPH-_moPagibig);
+  const taxForCO=computeWithholdingTax(_moTaxable)/2;
+  const otherDed=otherDeductions/2;
   const totalDed=govTotal+taxForCO+otherDed;
   const netPay=grossPay-totalDed;
 
