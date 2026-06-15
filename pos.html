@@ -9775,8 +9775,8 @@ function renderPayslip(){
       commissionAmt=Math.round(totalSales*(u.commission||0)/100);
     }
 
-    // Attendance from clock logs (both formats)
-    const {presentDays:daysPresent,totalMins,hasClockData,presentDatesSet:presSet}=_getAttendanceStats(u.id,u.name,period);
+    // Attendance from clock logs (both formats); owners skip clock tracking — always fully present
+    const {presentDays:_dpRaw,totalMins,hasClockData,presentDatesSet:presSet}=_getAttendanceStats(u.id,u.name,period);
     const hrs=Math.floor(totalMins/60), mins=totalMins%60;
     const uRestDays2=u.restDays||[1];
     const workingDays=getWorkingDays(py,pm,null,null,uRestDays2);
@@ -9799,6 +9799,7 @@ const _startDate=u.startDate?new Date(u.startDate+'T12:00'):null;
 const _monthStart=new Date(py,pm-1,1);
 const effectiveFrom=(_startDate&&_startDate>_monthStart)?_startDate:null;
 const elapsedWorkingDays=getWorkingDays(py,pm,effectiveFrom,effectiveEnd,uRestDays2);
+const daysPresent=u.role==='owner'?elapsedWorkingDays:_dpRaw;
 const salary=u.salary||0;
 const dailyRate=workingDays>0?salary/workingDays:0;
 const holidayInfo=getHolidayPay(period,presSet,dailyRate,uRestDays2);

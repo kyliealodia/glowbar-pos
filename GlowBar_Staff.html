@@ -1503,20 +1503,23 @@ function renderCutoff(){
   // Daily rate from Users & Roles setting
   const dailyRate=userRecord.dailyRate||0;
 
-  // Days present in cut-off — handle both new {date,in,out} and old {action,time} formats, use PH dates
+  // Days present in cut-off — owners are always fully present (no attendance clock required)
+  const _isCOOwner=userRecord.role==='owner';
   const presentDatesCO=new Set();
-  (S.loginLogs||[]).forEach(l=>{
-    const matchUser=l.userId===viewUser.id||l.user===viewUser.name||l.name===viewUser.name;
-    if(!matchUser) return;
-    let dateStr='';
-    if(!l.action&&l.in){
-      dateStr=l.date||toPHDateStr(l.in);
-    } else if(l.action==='clockin'||l.action==='in'){
-      dateStr=toPHDateStr(l.time||'');
-    }
-    if(dateStr&&dateStr>=coStartStr&&dateStr<=coEndStr) presentDatesCO.add(dateStr);
-  });
-  const daysPresent=presentDatesCO.size;
+  if(!_isCOOwner){
+    (S.loginLogs||[]).forEach(l=>{
+      const matchUser=l.userId===viewUser.id||l.user===viewUser.name||l.name===viewUser.name;
+      if(!matchUser) return;
+      let dateStr='';
+      if(!l.action&&l.in){
+        dateStr=l.date||toPHDateStr(l.in);
+      } else if(l.action==='clockin'||l.action==='in'){
+        dateStr=toPHDateStr(l.time||'');
+      }
+      if(dateStr&&dateStr>=coStartStr&&dateStr<=coEndStr) presentDatesCO.add(dateStr);
+    });
+  }
+  const daysPresent=_isCOOwner?workingDaysInCO:presentDatesCO.size;
   const baseEarned=Math.round(dailyRate*daysPresent);
   const coAllowances=Math.round(allowances/2);
 
@@ -1741,20 +1744,23 @@ const _shiftDays=_dayNamesAll.filter((_,i)=>!_restDays.includes(i));
 const workingDays=getWorkingDaysSP(yr,mo,staffStart,today,_shiftDays)||1;
 const _schedLabel=_shiftDays.join(', ')||'No days';
 
-  // Days present from clock-in logs — handle both log formats, use PH dates
+  // Days present — owners are always fully present (no attendance clock required)
+  const _isOwner=userRecord.role==='owner';
   const presentDatesM=new Set();
-  (S.loginLogs||[]).forEach(l=>{
-    const matchUser=l.userId===viewUser.id||l.user===viewUser.name||l.name===viewUser.name;
-    if(!matchUser) return;
-    let dateStr='';
-    if(!l.action&&l.in){
-      dateStr=l.date||toPHDateStr(l.in);
-    } else if(l.action==='clockin'||l.action==='in'){
-      dateStr=toPHDateStr(l.time||'');
-    }
-    if(dateStr&&dateStr.startsWith(period)) presentDatesM.add(dateStr);
-  });
-  const daysPresent=presentDatesM.size;
+  if(!_isOwner){
+    (S.loginLogs||[]).forEach(l=>{
+      const matchUser=l.userId===viewUser.id||l.user===viewUser.name||l.name===viewUser.name;
+      if(!matchUser) return;
+      let dateStr='';
+      if(!l.action&&l.in){
+        dateStr=l.date||toPHDateStr(l.in);
+      } else if(l.action==='clockin'||l.action==='in'){
+        dateStr=toPHDateStr(l.time||'');
+      }
+      if(dateStr&&dateStr.startsWith(period)) presentDatesM.add(dateStr);
+    });
+  }
+  const daysPresent=_isOwner?workingDays:presentDatesM.size;
   const inLogs=[...presentDatesM].map(d=>({time:d})); // keep for holiday/presentDates reference below
 
   // Approved leaves this period (count as paid days)
@@ -1771,7 +1777,7 @@ const staffStart2=userRecord.startDate?new Date(userRecord.startDate):new Date(g
 const notStartedYet=staffStart2>today2;
 const paidDays=daysPresent+leaveDays;
   const earnedBasic=notStartedYet?0:Math.round(dailyRate*paidDays);
-  const daysAbsent=notStartedYet?0:Math.max(0,workingDays-paidDays);
+  const daysAbsent=notStartedYet||_isOwner?0:Math.max(0,workingDays-paidDays);
 
   // Commission from transactions — use PH date
   const txns=(S.transactions||[]).filter(t=>{
