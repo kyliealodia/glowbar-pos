@@ -1535,12 +1535,16 @@ function renderCutoff(){
   const baseEarned=_isCOOnCall?_ocCO.totalPay:Math.round(dailyRate*daysPresent);
   const coAllowances=Math.round(allowances/2);
 
-  // Commission from transactions in cut-off — use PH date
-  const txns=(S.transactions||[]).filter(t=>{
+  // Commission from transactions in cut-off — item-level staff attribution
+  const _coCommItems=[];
+  (S.transactions||[]).forEach(t=>{
     const d=toPHDateStr(t.time||'');
-    return t.staff===viewUser.name&&d>=coStartStr&&d<=coEndStr;
+    if(d<coStartStr||d>coEndStr) return;
+    (t.items||[]).length
+      ?(t.items||[]).forEach(ci=>{if((ci.staffName||t.staff||'')===viewUser.name)_coCommItems.push(ci);})
+      :(t.staff===viewUser.name&&_coCommItems.push({price:t.subtotal||t.total||0,qty:1}));
   });
-  const commEarned=Math.round(txns.reduce((s,t)=>s+(t.subtotal||t.total||0),0)*(commRate/100));
+  const commEarned=Math.round(_coCommItems.reduce((s,ci)=>s+(ci.price||0)*(ci.qty||1),0)*(commRate/100));
 
   // Approved OT in cut-off
   const otPay=(S.overtimeRequests||[]).filter(o=>
@@ -1848,12 +1852,16 @@ const paidDays=daysPresent+leaveDays;
   const daysAbsent=notStartedYet||_isOwner||_isOnCallM?0:Math.max(0,workingDays-paidDays);
   const absenceDeduction=Math.round(dailyRate*daysAbsent);
 
-  // Commission from transactions — use PH date
-  const txns=(S.transactions||[]).filter(t=>{
+  // Commission from transactions — item-level staff attribution
+  const _mCommItems=[];
+  (S.transactions||[]).forEach(t=>{
     const d=toPHDate(t.time);
-    return t.staff===viewUser.name&&d.getFullYear()===yr&&d.getMonth()===mo-1;
+    if(d.getFullYear()!==yr||d.getMonth()!==mo-1) return;
+    (t.items||[]).length
+      ?(t.items||[]).forEach(ci=>{if((ci.staffName||t.staff||'')===viewUser.name)_mCommItems.push(ci);})
+      :(t.staff===viewUser.name&&_mCommItems.push({price:t.subtotal||t.total||0,qty:1}));
   });
-  const txnRevenue=txns.reduce((s,t)=>s+(t.subtotal||t.total||0),0);
+  const txnRevenue=_mCommItems.reduce((s,ci)=>s+(ci.price||0)*(ci.qty||1),0);
   const commEarned=Math.round(txnRevenue*(commRate/100));
 
   // Holiday pay — check each present date against PH holidays
