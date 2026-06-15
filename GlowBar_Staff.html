@@ -1466,7 +1466,7 @@ function renderCutoff(){
   const viewUser=getPayslipUser();
   console.log('[renderCutoff] viewUser=',viewUser?.name,'id=',viewUser?.id);
   const userRecord=S.users.find(u=>u.id===viewUser.id)||viewUser;
-  const basicPay=userRecord.salary||userRecord.basicPay||0;
+  const basicPay=userRecord.basicSalary||userRecord.salary||userRecord.basicPay||0;
   const commRate=userRecord.commission||0;
   const allowances=userRecord.allowances||0;
   const otherDeductions=userRecord.otherDeductions||0;
@@ -1781,7 +1781,7 @@ function renderPayslip(){
   console.log('[renderPayslip] MONTHLY viewUser=',viewUser?.name,'id=',viewUser?.id);
   const userRecord=S.users.find(u=>u.id===viewUser.id)||viewUser;
   console.log('[renderPayslip] MONTHLY userRecord=',userRecord?.name,'id=',userRecord?.id);
-  const basicPay=userRecord.salary||userRecord.basicPay||0;
+  const basicPay=userRecord.basicSalary||userRecord.salary||userRecord.basicPay||0;
   const commRate=userRecord.commission||0;
   const allowances=userRecord.allowances||0;
   const otherDeductions=userRecord.otherDeductions||0;

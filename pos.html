@@ -9347,7 +9347,7 @@ function openStaffComp(uid){
   const u=S.users.find(x=>x.id===uid);if(!u)return;
   editCompUserId=uid;
   document.getElementById('staffCompTitle').textContent='Compensation — '+u.name;
-  document.getElementById('scSalary').value=u.salary||0;
+  document.getElementById('scSalary').value=u.basicSalary||u.salary||0;
   document.getElementById('scCommission').value=u.commission||0;
   document.getElementById('scOnCall').checked=u.onCall===true;
   const _restDays=u.restDays||[1];
@@ -9636,7 +9636,7 @@ function renderPayrollSummary(staffList, txns, period){
     txns.forEach(t=>{(t.items||[]).forEach(ci=>{if((ci.staffName||t.staff||'')===u.name)_myIt.push(ci);});});
     const totalSales=_myIt.reduce((s,ci)=>s+ci.price*(ci.qty||1),0);
     const commAmt=Math.round(totalSales*(u.commission||0)/100);
-    const salary=u.salary||0;
+    const salary=u.basicSalary||u.salary||0;
 
     // Attendance-aware basic pay
     const uRestDays=u.restDays||[1];
@@ -9841,7 +9841,7 @@ const _monthStart=new Date(py,pm-1,1);
 const effectiveFrom=(_startDate&&_startDate>_monthStart)?_startDate:null;
 const elapsedWorkingDays=getWorkingDays(py,pm,effectiveFrom,effectiveEnd,uRestDays2);
 const daysPresent=u.role==='owner'?elapsedWorkingDays:_dpRaw;
-const salary=u.salary||0;
+const salary=u.basicSalary||u.salary||0;
 const dailyRate=workingDays>0?salary/workingDays:0;
 const _ocBreak=u.onCall?_getOnCallDailyBreakdown(u.id,u.name,period,dailyRate):{days:[],totalPay:0,totalHours:0};
 const holidayInfo=getHolidayPay(period,presSet,dailyRate,uRestDays2);
@@ -9980,9 +9980,9 @@ function exportPayslip(){
     const myTxns=txns.filter(t=>t.staff===u.name);
     const sales=myTxns.reduce((s,t)=>s+t.total,0);
     const comm=Math.round(sales*(u.commission||0)/100);
-    const gross=(u.salary||0)+comm;
+    const gross=(u.basicSalary||u.salary||0)+comm;
     const d=computeDeductions(u,gross);
-    csv+=`"${u.name}","${u.role}",${u.salary||0},${u.commission||0},${sales},${comm},${u.allowances||0},${d.sss},${d.ph},${d.pagibig},${d.tax},${d.otherDeduct},${d.totalDeductions},${Math.round(d.netPay)}\n`;
+    csv+=`"${u.name}","${u.role}",${u.basicSalary||u.salary||0},${u.commission||0},${sales},${comm},${u.allowances||0},${d.sss},${d.ph},${d.pagibig},${d.tax},${d.otherDeduct},${d.totalDeductions},${Math.round(d.netPay)}\n`;
   });
   const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);a.download='GlowBar_Payroll_'+period+'.csv';a.click();
 }
