@@ -1614,9 +1614,9 @@ function renderCutoff(){
                     <th style="text-align:right;padding:3px 4px;color:#8C7B65;font-weight:600;">Pay</th>
                   </tr></thead>
                   <tbody>${_ocCO.days.map(d=>{
-                    const dl=new Date(d.date+'T12:00').toLocaleDateString('en-PH',{month:'short',day:'numeric'});
-                    const inS=d.inTime?d.inTime.toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'}):'—';
-                    const outS=d.outTime?d.outTime.toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'}):'—';
+                    const dl=d.inTime?d.inTime.toLocaleString('en-PH',{timeZone:'Asia/Manila',month:'short',day:'numeric'}):new Date(d.date+'T12:00+08:00').toLocaleDateString('en-PH',{month:'short',day:'numeric'});
+                    const inS=d.inTime?d.inTime.toLocaleString('en-PH',{timeZone:'Asia/Manila',hour:'numeric',minute:'2-digit',hour12:true}):'—';
+                    const outS=d.outTime?d.outTime.toLocaleString('en-PH',{timeZone:'Asia/Manila',hour:'numeric',minute:'2-digit',hour12:true}):'—';
                     return `<tr style="border-bottom:1px solid #F5EFE3;">
                       <td style="padding:3px 4px;font-weight:500;">${dl}</td>
                       <td style="padding:3px 4px;text-align:center;color:#8C7B65;">${inS}</td>
@@ -1980,9 +1980,9 @@ const paidDays=daysPresent+leaveDays;
                       <th style="text-align:right;padding:3px 4px;color:#8C7B65;font-weight:600;">Pay</th>
                     </tr></thead>
                     <tbody>${_ocDailyM.days.map(d=>{
-                      const dl=new Date(d.date+'T12:00').toLocaleDateString('en-PH',{month:'short',day:'numeric'});
-                      const inS=d.inTime?d.inTime.toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'}):'—';
-                      const outS=d.outTime?d.outTime.toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'}):'—';
+                      const dl=d.inTime?d.inTime.toLocaleString('en-PH',{timeZone:'Asia/Manila',month:'short',day:'numeric'}):new Date(d.date+'T12:00+08:00').toLocaleDateString('en-PH',{month:'short',day:'numeric'});
+                      const inS=d.inTime?d.inTime.toLocaleString('en-PH',{timeZone:'Asia/Manila',hour:'numeric',minute:'2-digit',hour12:true}):'—';
+                      const outS=d.outTime?d.outTime.toLocaleString('en-PH',{timeZone:'Asia/Manila',hour:'numeric',minute:'2-digit',hour12:true}):'—';
                       return `<tr style="border-bottom:1px solid #F5EFE3;">
                         <td style="padding:3px 4px;font-weight:500;">${dl}</td>
                         <td style="padding:3px 4px;text-align:center;color:#8C7B65;">${inS}</td>
