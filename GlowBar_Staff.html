@@ -1546,14 +1546,25 @@ function renderCutoff(){
   });
   const commEarned=Math.round(_coCommItems.reduce((s,ci)=>s+(ci.price||0)*(ci.qty||1),0)*(commRate/100));
 
+  // Holiday pay for cut-off period — same logic as monthly payslip
+  let coHolidayRegularDays=0,coHolidaySpecialDays=0;
+  [...presentDatesCO].forEach(dateStr=>{
+    if(PH_HOLIDAYS.regular.includes(dateStr)) coHolidayRegularDays++;
+    else if(PH_HOLIDAYS.special.includes(dateStr)) coHolidaySpecialDays++;
+  });
+  const coHolidayPayRegular=Math.round(dailyRate*coHolidayRegularDays);
+  const coHolidayPaySpecial=Math.round(dailyRate*0.30*coHolidaySpecialDays);
+  const totalCOHolidayPay=coHolidayPayRegular+coHolidayPaySpecial;
+
   // Approved OT in cut-off
   const otPay=(S.overtimeRequests||[]).filter(o=>
     o.userId===viewUser.id&&o.status==='approved'&&o.date>=coStartStr&&o.date<=coEndStr
   ).reduce((s,o)=>s+(o.amount||0),0);
 
-  const grossPay=baseEarned+commEarned+coAllowances+otPay;
+  const grossPay=baseEarned+commEarned+coAllowances+totalCOHolidayPay+otPay;
 
   // Deductions: half of monthly statutory (PH standard — split across two cut-offs)
+  // Use grossPay*2 as estimated monthly gross for consistent deduction base
   const estMonthlyGross=grossPay*2;
   const sss=Math.round(computeSSS(estMonthlyGross)/2);
   const philhealth=Math.round(computePhilHealth(estMonthlyGross)/2);
@@ -1635,6 +1646,8 @@ function renderCutoff(){
             : coRow('Basic Pay ('+daysPresent+' day'+(daysPresent!==1?'s':'')+' × '+f(dailyRate)+')',f(baseEarned))}
           ${commEarned>0?coRow(`Commission (${commRate}%)`,'+'+f(commEarned)):''}
           ${coAllowances>0?coRow('Allowances','+'+f(coAllowances)):''}
+          ${coHolidayPayRegular>0?coRow('Holiday Pay — Regular ('+coHolidayRegularDays+' day'+(coHolidayRegularDays!==1?'s':'')+', +100%)','<span style="color:#B8935A;">+'+f(coHolidayPayRegular)+'</span>'):''}
+          ${coHolidayPaySpecial>0?coRow('Holiday Pay — Special ('+coHolidaySpecialDays+' day'+(coHolidaySpecialDays!==1?'s':'')+', +30%)','<span style="color:#B8935A;">+'+f(coHolidayPaySpecial)+'</span>'):''}
           ${otPay>0?coRow('Overtime Pay','+'+f(otPay)):''}
           <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;padding-top:8px;margin-top:4px;border-top:1px solid #E8DFD0;color:#2C2318;">
             <span>Gross Pay</span><span>${f(grossPay)}</span>
