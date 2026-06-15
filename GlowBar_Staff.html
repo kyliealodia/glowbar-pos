@@ -1575,14 +1575,23 @@ function renderCutoff(){
       </div>
       <div style="padding:14px 18px;">
         <div style="display:flex;gap:10px;margin-bottom:14px;">
-          <div style="flex:1;background:#F5EFE3;border-radius:10px;padding:10px;text-align:center;">
-            <div style="font-size:9px;color:#8C7B65;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Working Days</div>
-            <div style="font-size:20px;font-weight:700;color:#2C2318;">${workingDaysInCO}</div>
-          </div>
-          <div style="flex:1;background:#F5EFE3;border-radius:10px;padding:10px;text-align:center;">
-            <div style="font-size:9px;color:#8C7B65;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Days Present</div>
-            <div style="font-size:20px;font-weight:700;color:#2C2318;">${daysPresent}</div>
-          </div>
+          ${_isCOOnCall
+            ? `<div style="flex:1;background:#E8F4FF;border-radius:10px;padding:10px;text-align:center;">
+                <div style="font-size:9px;color:#8C7B65;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Days Logged</div>
+                <div style="font-size:20px;font-weight:700;color:#2C2318;">${_ocCO.days.length}</div>
+              </div>
+              <div style="flex:1;background:#E8F4FF;border-radius:10px;padding:10px;text-align:center;">
+                <div style="font-size:9px;color:#8C7B65;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Hours Worked</div>
+                <div style="font-size:20px;font-weight:700;color:#2C2318;">${_ocCO.totalHours.toFixed(1)}h</div>
+              </div>`
+            : `<div style="flex:1;background:#F5EFE3;border-radius:10px;padding:10px;text-align:center;">
+                <div style="font-size:9px;color:#8C7B65;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Working Days</div>
+                <div style="font-size:20px;font-weight:700;color:#2C2318;">${workingDaysInCO}</div>
+              </div>
+              <div style="flex:1;background:#F5EFE3;border-radius:10px;padding:10px;text-align:center;">
+                <div style="font-size:9px;color:#8C7B65;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Days Present</div>
+                <div style="font-size:20px;font-weight:700;color:#2C2318;">${daysPresent}</div>
+              </div>`}
           <div style="flex:1;background:#F5EFE3;border-radius:10px;padding:10px;text-align:center;">
             <div style="font-size:9px;color:#8C7B65;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Daily Rate</div>
             <div style="font-size:13px;font-weight:700;color:#2C2318;">${f(dailyRate)}</div>
@@ -1925,10 +1934,14 @@ const paidDays=daysPresent+leaveDays;
 
         <!-- Attendance bar -->
         <div style="padding:10px 24px;background:#fff;border-bottom:1px solid #E8DFD0;display:flex;gap:20px;flex-wrap:wrap;align-items:center;">
-          <div style="font-size:12px;"><span style="color:#8C7B65;">Working Days (${_schedLabel}): </span><strong>${workingDays}</strong></div>
-          <div style="font-size:12px;"><span style="color:#8C7B65;">Days Present: </span><strong style="color:#4A8C5C;">${daysPresent}</strong></div>
-          ${leaveDays>0?`<div style="font-size:12px;"><span style="color:#8C7B65;">On Leave: </span><strong style="color:#4A7CB8;">${leaveDays} day${leaveDays!==1?'s':''}</strong></div>`:''}
-          ${daysAbsent>0?`<div style="font-size:12px;"><span style="color:#8C7B65;">Absent: </span><strong style="color:#C44A4A;">${daysAbsent} day${daysAbsent!==1?'s':''}</strong></div>`:''}
+          ${_isOnCallM
+            ? `<div style="font-size:12px;"><span style="background:#dbeafe;color:#1d4ed8;border-radius:4px;padding:1px 7px;font-weight:600;font-size:11px;">📋 On-Call</span></div>
+               <div style="font-size:12px;"><span style="color:#8C7B65;">Days Logged: </span><strong style="color:#4A8C5C;">${_ocDailyM.days.length}</strong></div>
+               <div style="font-size:12px;"><span style="color:#8C7B65;">Hours Worked: </span><strong>${_ocDailyM.totalHours.toFixed(1)}h</strong></div>`
+            : `<div style="font-size:12px;"><span style="color:#8C7B65;">Working Days (${_schedLabel}): </span><strong>${workingDays}</strong></div>
+               <div style="font-size:12px;"><span style="color:#8C7B65;">Days Present: </span><strong style="color:#4A8C5C;">${daysPresent}</strong></div>
+               ${leaveDays>0?`<div style="font-size:12px;"><span style="color:#8C7B65;">On Leave: </span><strong style="color:#4A7CB8;">${leaveDays} day${leaveDays!==1?'s':''}</strong></div>`:''}
+               ${daysAbsent>0?`<div style="font-size:12px;"><span style="color:#8C7B65;">Absent: </span><strong style="color:#C44A4A;">${daysAbsent} day${daysAbsent!==1?'s':''}</strong></div>`:''}`}
           <div style="font-size:12px;"><span style="color:#8C7B65;">Daily Rate: </span><strong>${fmtPrice(dailyRate)}</strong></div>
           <div style="font-size:12px;"><span style="color:#8C7B65;">Sick Leave: </span><strong>${sickTaken} day${sickTaken!==1?'s':''}</strong></div>
           <div style="font-size:12px;"><span style="color:#8C7B65;">Vacation Leave: </span><strong>${vacTaken} day${vacTaken!==1?'s':''}</strong></div>
