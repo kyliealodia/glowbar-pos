@@ -315,6 +315,7 @@ function isComboBooking(){
 
 function fmtPrice(n){ return '₱'+(Math.round((n||0)*100)/100).toLocaleString('en-PH'); }
 function fmt12h(t){ if(!t) return ''; const [h,m]=t.split(':').map(Number); const ampm=h<12?'AM':'PM'; const hr=h%12||12; return `${hr}:${String(m).padStart(2,'0')} ${ampm}`; }
+function parseDateLocal(ds){ const [y,m,d]=(ds||'').split('-'); return new Date(+y,+m-1,+d); }
 
 // ── PROMO ENGINE ──
 // Returns the active promo for a given tab based on today's date, or null.
@@ -958,7 +959,7 @@ function pickDate(ds){
   if(staffCard) staffCard.style.display='none';
   const sub=document.getElementById('timeSub');
   if(sub){
-    const d=new Date(ds+'T00:00');
+    const d=parseDateLocal(ds);
     sub.innerHTML=`Available slots for <strong>${d.toLocaleDateString('en-PH',{weekday:'long',month:'long',day:'numeric'})}</strong>`;
   }
   renderSlots(ds);
@@ -1127,7 +1128,7 @@ function selectStaff(type, name, color, role){
 function goStep3(){
   if(!booking.date||!booking.time)return;
   setStep(3);
-  const d=new Date(booking.date+'T00:00');
+  const d=parseDateLocal(booking.date);
   const dateStr=d.toLocaleDateString('en-PH',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
   show(`<div class="card">
     <div class="card-title">Your Details</div>
@@ -1163,7 +1164,7 @@ function updateStep3Btn(){
 function goStep4(){
   if(!booking.name||!booking.phone)return;
   setStep(4);
-  const d=new Date(booking.date+'T00:00');
+  const d=parseDateLocal(booking.date);
   const dateStr=d.toLocaleDateString('en-PH',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
   show(`<div class="card">
     <div class="card-title">Confirm Your Booking</div>
@@ -1260,7 +1261,7 @@ async function submitBooking(){
 }
 
 function showSuccess(ref){
-  const d=new Date(booking.date+'T00:00');
+  const d=parseDateLocal(booking.date);
   const dateStr=d.toLocaleDateString('en-PH',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
   [1,2,3,4].forEach(i=>{
     const el=document.getElementById('step'+i);
@@ -1293,7 +1294,7 @@ async function sendConfirmationEmail(appt, ref){
   if(!appt.email) return;
   if(EMAILJS_PUBLIC_KEY==='YOUR_EMAILJS_PUBLIC_KEY') return;
   try {
-    const d = new Date(appt.date+'T00:00');
+    const d = parseDateLocal(appt.date);
     const dateStr = d.toLocaleDateString('en-PH',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
     const total = appt.totalPrice||appt.servicePrice||0;
     const deposit = appt.depositAmt||0;
