@@ -476,7 +476,10 @@ nav{flex:1;padding:12px 0;overflow-y:auto;}
         </div>
         <!-- Cash Advance requests pending -->
         <div class="card" style="margin-bottom:16px;">
-          <div class="card-hdr"><h3>💸 Pending Cash Advance Requests</h3></div>
+          <div class="card-hdr" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+            <h3>💸 Pending Cash Advance Requests</h3>
+            <button class="btn btn-gold btn-sm" onclick="openOwnerCaRecordModal()">+ Add Record</button>
+          </div>
           <div class="card-body" style="padding:0;">
             <table class="tbl">
               <thead><tr><th>Staff</th><th>Amount</th><th>Reason</th><th>Date</th><th>Actions</th></tr></thead>
@@ -976,6 +979,47 @@ const zSal=salaries[0]||0,rSal=salaries[1]||0;
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('cashAdvanceModal')">Cancel</button>
       <button class="btn btn-gold" onclick="submitCashAdvance()">Submit Request</button>
+    </div>
+  </div>
+</div>
+
+<!-- Owner Manual Cash Advance Record Modal (Staff Portal) -->
+<div class="overlay hidden" id="ownerCaRecordModal">
+  <div class="modal">
+    <div class="modal-hdr">
+      <div class="modal-title">💸 Add Cash Advance Record</div>
+      <div class="modal-x" onclick="closeModal('ownerCaRecordModal')">✕</div>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:11px;color:var(--ink3);background:var(--cream2);border-radius:8px;padding:10px 12px;margin-bottom:12px;">
+        Record a cash advance directly for a staff member. Does not count against their monthly request limit.
+      </div>
+      <div class="form-group">
+        <label class="form-label">Staff Member</label>
+        <select class="form-select" id="ocrStaff"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Amount (₱)</label>
+        <input class="form-input" type="number" id="ocrAmount" placeholder="e.g. 1500" min="1" step="1">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="form-group">
+          <label class="form-label">Date</label>
+          <input class="form-input" type="date" id="ocrDate" onchange="onOcrDateChange()">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Pay Period</label>
+          <input class="form-input" type="text" id="ocrPayPeriod" placeholder="e.g. 2026-06-CO2" style="font-size:12px;">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Reason / Notes (optional)</label>
+        <textarea class="form-textarea" id="ocrReason" placeholder="e.g. Emergency advance…" style="min-height:70px;"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('ownerCaRecordModal')">Cancel</button>
+      <button class="btn btn-gold" onclick="saveOwnerCaRecord()">Save Record</button>
     </div>
   </div>
 </div>
@@ -2704,6 +2748,66 @@ function adminRejectCa(id){
   ca.status='rejected';ca.approvedBy=currentUser.name;ca.approvedAt=new Date().toISOString();
   syncCashAdvances();renderAdmin();
   showToast('Cash advance rejected','ok');
+}
+
+// ══ OWNER MANUAL CASH ADVANCE RECORD ══
+console.log('Owner cash advance record feature loaded');
+function _ocrDateToPayPeriod(dateStr){
+  if(!dateStr) return '';
+  const [yr,mo,dy]=dateStr.split('-');
+  return `${yr}-${mo}-${parseInt(dy)<=15?'CO1':'CO2'}`;
+}
+function openOwnerCaRecordModal(){
+  const sel=document.getElementById('ocrStaff');
+  const staff=S.users.filter(u=>u.role==='staff'||u.role==='owner');
+  sel.innerHTML=staff.map(u=>`<option value="${u.id}" data-name="${u.name}">${u.name}</option>`).join('');
+  const todayPH=toPHDateStr(new Date().toISOString());
+  document.getElementById('ocrDate').value=todayPH;
+  document.getElementById('ocrPayPeriod').value=_ocrDateToPayPeriod(todayPH);
+  document.getElementById('ocrAmount').value='';
+  document.getElementById('ocrReason').value='';
+  openModal('ownerCaRecordModal');
+}
+function onOcrDateChange(){
+  const d=document.getElementById('ocrDate').value;
+  if(d) document.getElementById('ocrPayPeriod').value=_ocrDateToPayPeriod(d);
+}
+function saveOwnerCaRecord(){
+  const staffSel=document.getElementById('ocrStaff');
+  const staffId=staffSel.value;
+  const staffName=staffSel.options[staffSel.selectedIndex]?.dataset.name||staffSel.options[staffSel.selectedIndex]?.text||'';
+  const amount=parseFloat(document.getElementById('ocrAmount').value)||0;
+  const dateStr=document.getElementById('ocrDate').value;
+  const payPeriod=(document.getElementById('ocrPayPeriod').value||'').trim();
+  const reason=(document.getElementById('ocrReason').value||'').trim();
+  if(!staffId){showToast('Please select a staff member','err');return;}
+  if(amount<1){showToast('Please enter a valid amount','err');return;}
+  if(!dateStr){showToast('Please select a date','err');return;}
+  if(!payPeriod){showToast('Please enter a pay period','err');return;}
+  if(!S.cashAdvances) S.cashAdvances=[];
+  const now=new Date().toISOString();
+  const rec={
+    id:'CA'+Date.now(),
+    userId:staffId,
+    userName:staffName,
+    amount,
+    amountRequested:amount,
+    maxAllowed:null,
+    payPeriod,
+    reason,
+    status:'approved',
+    ownerRecorded:true,
+    recordedBy:currentUser.name,
+    requestedAt:dateStr+'T00:00:00.000Z',
+    approvedBy:currentUser.name,
+    approvedAt:now
+  };
+  S.cashAdvances.push(rec);
+  syncCashAdvances();
+  closeModal('ownerCaRecordModal');
+  renderAdmin();
+  if(document.getElementById('cashAdvanceHistory')) renderCashAdvanceHistory();
+  showToast('Cash advance recorded for '+staffName,'ok');
 }
 
 // ══ ADMIN ══
