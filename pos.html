@@ -9311,22 +9311,75 @@ function renderCashAdvanceAdmin(){
   const el=document.getElementById('cashAdvanceAdminList');if(!el)return;
   const advances=S.cashAdvances||[];
   if(!advances.length){el.innerHTML='<div style="color:var(--ink3);font-size:13px;text-align:center;padding:16px;">No cash advance requests.</div>';return;}
-  el.innerHTML=advances.slice().reverse().map(ca=>{
-    const statusColor={pending:'var(--warn)',approved:'var(--success)',rejected:'var(--danger)'}[ca.status]||'var(--ink3)';
-    return `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);">
-      <div style="flex:1;">
-        <div style="font-size:13px;font-weight:600;">${ca.userName}</div>
-        <div style="font-size:12px;color:var(--ink2);">${fmtPrice(ca.amount)} — ${ca.reason||'No reason given'}</div>
-        <div style="font-size:10px;color:var(--ink3);">${ca.requestedAt?new Date(ca.requestedAt).toLocaleDateString('en-PH'):''}</div>
-      </div>
-      <span style="font-size:11px;font-weight:700;color:${statusColor};text-transform:uppercase;">${ca.status}</span>
-      ${ca.status==='pending'?`
-        <div style="display:flex;gap:5px;">
-          <button class="btn btn-sm" style="background:var(--success);color:#fff;border:none;border-radius:7px;padding:5px 10px;font-size:11px;cursor:pointer;" onclick="approveCashAdvance('${ca.id}')">✓ Approve</button>
-          <button class="btn btn-sm" style="background:var(--danger);color:#fff;border:none;border-radius:7px;padding:5px 10px;font-size:11px;cursor:pointer;" onclick="rejectCashAdvance('${ca.id}')">✕ Reject</button>
-        </div>`:''}
+
+  const fp=fmtPrice;
+  const pending=advances.filter(ca=>ca.status==='pending');
+  const history=advances.filter(ca=>ca.status!=='pending').slice().reverse();
+
+  // Pending section
+  let html='';
+  if(pending.length){
+    html+=`<div style="font-size:11px;font-weight:700;color:var(--warn);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px;">⏳ Pending Approval (${pending.length})</div>`;
+    html+=pending.map(ca=>`
+      <div style="background:rgba(196,128,42,0.06);border:1px solid rgba(196,128,42,0.2);border-radius:10px;padding:12px 14px;margin-bottom:8px;">
+        <div style="display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:160px;">
+            <div style="font-size:13px;font-weight:700;">${ca.userName||'Unknown'}</div>
+            <div style="font-size:12px;color:var(--ink2);margin-top:2px;">Requested: <strong style="color:var(--gold-dk);">${fp(ca.amount)}</strong></div>
+            <div style="font-size:12px;color:var(--ink3);">Max allowed: <strong>${ca.maxAllowed?fp(ca.maxAllowed):'—'}</strong></div>
+            ${ca.payPeriod?`<div style="font-size:11px;color:var(--ink3);">Period: ${ca.payPeriod}</div>`:''}
+            ${ca.reason?`<div style="font-size:11px;color:var(--ink2);margin-top:4px;font-style:italic;">"${ca.reason}"</div>`:''}
+            <div style="font-size:10px;color:var(--ink3);margin-top:3px;">${ca.requestedAt?new Date(ca.requestedAt).toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'}):''}</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-shrink:0;">
+            <button style="background:var(--success);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-family:inherit;cursor:pointer;font-weight:600;" onclick="approveCashAdvance('${ca.id}')">✓ Approve</button>
+            <button style="background:var(--danger);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-family:inherit;cursor:pointer;font-weight:600;" onclick="rejectCashAdvance('${ca.id}')">✕ Reject</button>
+          </div>
+        </div>
+      </div>`).join('');
+  } else {
+    html+=`<div style="font-size:12px;color:var(--ink3);padding:8px 0 12px;">No pending requests.</div>`;
+  }
+
+  // Running totals per staff (approved only)
+  const approved=advances.filter(ca=>ca.status==='approved');
+  if(approved.length){
+    const totals={};
+    approved.forEach(ca=>{
+      if(!totals[ca.userName]) totals[ca.userName]={name:ca.userName,total:0,count:0};
+      totals[ca.userName].total+=ca.amount||0;
+      totals[ca.userName].count++;
+    });
+    const staffTotals=Object.values(totals).sort((a,b)=>b.total-a.total);
+    html+=`<div style="font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.7px;margin:14px 0 8px;">📊 Approved — Running Totals</div>`;
+    html+=`<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+      ${staffTotals.map(st=>`<div style="background:rgba(74,140,92,0.08);border:1px solid rgba(74,140,92,0.2);border-radius:8px;padding:8px 12px;font-size:12px;">
+        <div style="font-weight:600;">${st.name}</div>
+        <div style="color:var(--success);font-weight:700;">${fp(st.total)}</div>
+        <div style="font-size:10px;color:var(--ink3);">${st.count} advance${st.count!==1?'s':''}</div>
+      </div>`).join('')}
     </div>`;
-  }).join('');
+  }
+
+  // History (non-pending)
+  if(history.length){
+    html+=`<div style="font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px;">📋 History</div>`;
+    html+=history.map(ca=>{
+      const statusColor={approved:'var(--success)',rejected:'var(--danger)'}[ca.status]||'var(--ink3)';
+      return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">
+        <div style="flex:1;">
+          <span style="font-size:13px;font-weight:600;">${ca.userName||'Unknown'}</span>
+          <span style="font-size:12px;color:var(--ink2);margin-left:8px;">${fp(ca.amount)}</span>
+          ${ca.maxAllowed?`<span style="font-size:11px;color:var(--ink3);margin-left:4px;">/ max ${fp(ca.maxAllowed)}</span>`:''}
+          ${ca.reason?`<span style="font-size:11px;color:var(--ink3);margin-left:4px;">— ${ca.reason}</span>`:''}
+          <div style="font-size:10px;color:var(--ink3);margin-top:2px;">${ca.requestedAt?new Date(ca.requestedAt).toLocaleDateString('en-PH'):''} ${ca.approvedBy?'· '+ca.status+' by '+ca.approvedBy:''}</div>
+        </div>
+        <span style="font-size:11px;font-weight:700;color:${statusColor};text-transform:uppercase;">${ca.status}</span>
+      </div>`;
+    }).join('');
+  }
+
+  el.innerHTML=html;
 }
 function approveCashAdvance(id){
   const ca=S.cashAdvances.find(x=>x.id===id);if(!ca)return;
@@ -9938,7 +9991,7 @@ const daysAbsent=(u.role!=='owner'&&!u.onCall&&hasClockData)?Math.max(0,elapsedW
         ${u.pagibigVoluntary!==false?`<div class="payslip-row"><span>Pag-IBIG</span><span style="color:var(--danger);">-${fp2(d.pagibig)}</span></div>`:''}
         ${u.withholdingTax!==false&&d.tax>0?`<div class="payslip-row"><span>Withholding Tax</span><span style="color:var(--danger);">-${fp2(d.tax)}</span></div>`:''}
         ${(d.otherDeduct-caDeduct)>0?`<div class="payslip-row"><span>Other Deductions</span><span style="color:var(--danger);">-${fp2(d.otherDeduct-caDeduct)}</span></div>`:''}
-        ${caDeduct>0?`<div class="payslip-row"><span>Cash Advance Recovery</span><span style="color:var(--danger);">-${fp2(caDeduct)}</span></div>`:''}
+        ${caDeduct>0?`<div class="payslip-row"><span>Cash Advance Deduction</span><span style="color:var(--danger);">-${fp2(caDeduct)}</span></div>`:''}
         <div class="payslip-row"><span style="font-weight:600;">Total Deductions</span><span style="font-weight:600;color:var(--danger);">-${fp2(d.totalDeductions)}</span></div>
 
         <div style="font-size:10px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:0.8px;margin:10px 0 6px;">Activity</div>

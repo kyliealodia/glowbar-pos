@@ -429,15 +429,14 @@ nav{flex:1;padding:12px 0;overflow-y:auto;}
       <div id="page-cashadvance" class="page" style="display:none;">
         <div class="page-hdr">
           <div class="page-title">💸 Cash Advance</div>
-          <button class="btn btn-gold btn-sm" onclick="openCashAdvanceRequest()" style="margin-top:10px;">+ Request Cash Advance</button>
         </div>
-        <div id="cashAdvanceBanner" style="margin-bottom:12px;"></div>
+        <div id="cashAdvanceSummary" style="margin-bottom:16px;"></div>
         <div class="card">
           <div class="card-hdr"><h3>My Cash Advance History</h3></div>
           <div class="card-body" style="padding:0;">
             <div class="tbl-wrap">
               <table class="tbl">
-                <thead><tr><th>Amount</th><th>Reason</th><th>Date</th><th>Status</th></tr></thead>
+                <thead><tr><th>Amount</th><th>Max Allowed</th><th>Reason</th><th>Date</th><th>Status</th></tr></thead>
                 <tbody id="cashAdvanceHistory"></tbody>
               </table>
             </div>
@@ -961,12 +960,13 @@ const zSal=salaries[0]||0,rSal=salaries[1]||0;
   <div class="modal">
     <div class="modal-hdr"><div class="modal-title">💸 Request Cash Advance</div><div class="modal-x" onclick="closeModal('cashAdvanceModal')">✕</div></div>
     <div class="modal-body">
+      <div id="caEarningsInfo" style="background:var(--cream2);border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:12px;"></div>
       <div class="form-group">
-        <label class="form-label">Amount (₱)</label>
+        <label class="form-label">Amount (₱) <span id="caMaxLabel" style="color:var(--ink3);font-weight:400;font-size:11px;"></span></label>
         <input class="form-input" type="number" id="caAmount" placeholder="e.g. 1000" min="100" step="100">
       </div>
       <div class="form-group">
-        <label class="form-label">Reason</label>
+        <label class="form-label">Reason (optional)</label>
         <textarea class="form-textarea" id="caReason" placeholder="Brief reason for cash advance request…" style="min-height:80px;"></textarea>
       </div>
       <div style="font-size:11px;color:var(--ink3);background:var(--cream2);border-radius:8px;padding:10px 12px;margin-top:4px;">
@@ -1125,6 +1125,66 @@ function syncCashAdvances(){
   const obj={};
   (S.cashAdvances||[]).forEach((ca,i)=>{ obj[ca.id||i]=ca; });
   db.ref('gb/cashAdvances').set(obj);
+}
+
+function computeCurrentCutoffEarnings(){
+  const todayPH=toPHDateStr(new Date().toISOString());
+  const yr=parseInt(todayPH.slice(0,4));
+  const mo=parseInt(todayPH.slice(5,7));
+  const day=parseInt(todayPH.slice(8,10));
+  const moStr=String(mo).padStart(2,'0');
+  const isCO1=day<=15;
+  const coStartDay=isCO1?1:16;
+  const coEndDay=isCO1?15:new Date(yr,mo,0).getDate();
+  const pad=x=>String(x).padStart(2,'0');
+  const coStartStr=`${yr}-${moStr}-${pad(coStartDay)}`;
+  const coEndStr=`${yr}-${moStr}-${pad(coEndDay)}`;
+  const effectiveEnd=todayPH<coEndStr?todayPH:coEndStr;
+
+  const userRecord=S.users.find(u=>u.id===currentUser?.id)||currentUser||{};
+  const dailyRate=userRecord.dailyRate||0;
+  const commRate=userRecord.commission||0;
+
+  const presentDates=new Set();
+  (S.loginLogs||[]).forEach(l=>{
+    const mu=l.userId===currentUser?.id||l.user===currentUser?.name||l.name===currentUser?.name;
+    if(!mu) return;
+    let ds='';
+    if(!l.action&&l.in) ds=l.date||toPHDateStr(l.in);
+    else if(l.action==='clockin'||l.action==='in') ds=toPHDateStr(l.time||'');
+    if(ds&&ds>=coStartStr&&ds<=effectiveEnd) presentDates.add(ds);
+  });
+
+  const daysWorked=presentDates.size;
+  const baseEarned=Math.round(dailyRate*daysWorked);
+
+  const commItems=[];
+  (S.transactions||[]).forEach(t=>{
+    const d=toPHDateStr(t.time||'');
+    if(!d||d<coStartStr||d>effectiveEnd) return;
+    (t.items||[]).length
+      ?(t.items||[]).forEach(ci=>{if((ci.staffName||t.staff||'')===currentUser?.name)commItems.push(ci);})
+      :(t.staff===currentUser?.name&&commItems.push({price:t.subtotal||t.total||0,qty:1}));
+  });
+  const commEarned=Math.round(commItems.reduce((s,ci)=>s+(ci.price||0)*(ci.qty||1),0)*(commRate/100));
+
+  const totalEarned=baseEarned+commEarned;
+  const maxAllowed=Math.floor(totalEarned*0.5);
+  const payPeriod=`${yr}-${moStr}-${isCO1?'CO1':'CO2'}`;
+  const moLabel=new Date(yr,mo-1,1).toLocaleString('en-PH',{month:'long'});
+  const periodLabel=isCO1?`${moLabel} 1–15, ${yr}`:`${moLabel} 16–${coEndDay}, ${yr}`;
+
+  return {payPeriod,periodLabel,totalEarned,maxAllowed,daysWorked,commEarned,baseEarned,dailyRate,coStartStr,coEndStr:effectiveEnd};
+}
+
+function getCashAdvanceMonthlyUsage(){
+  const todayPH=toPHDateStr(new Date().toISOString());
+  const ym=todayPH.slice(0,7);
+  return (S.cashAdvances||[]).filter(ca=>
+    ca.userId===currentUser?.id&&
+    ca.status!=='rejected'&&
+    ca.requestedAt&&ca.requestedAt.startsWith(ym)
+  ).length;
 }
 
 // Philippine public holidays — regular (200%) and special non-working (130%)
@@ -1563,6 +1623,13 @@ function renderCutoff(){
 
   const grossPay=baseEarned+commEarned+coAllowances+totalCOHolidayPay+otPay;
 
+  // Cash advance deduction for this cut-off period
+  const pad2=x=>String(x).padStart(2,'0');
+  const _coPeriodKey=`${String(yr).padStart(4,'0')}-${pad2(mo)}-${n===1?'CO1':'CO2'}`;
+  const caDeductCO=(S.cashAdvances||[]).filter(ca=>
+    ca.userId===viewUser.id&&ca.status==='approved'&&ca.payPeriod===_coPeriodKey
+  ).reduce((s,ca)=>s+(ca.amount||0),0);
+
   // Deductions: half of the MONTHLY statutory amounts.
   // Compute full monthly gross exactly like renderPayslip() — scan entire month.
   const _moPeriod=`${yr}-${String(mo).padStart(2,'0')}`;
@@ -1610,7 +1677,7 @@ function renderCutoff(){
   const _moTaxable=Math.max(0,estMonthlyGross-_moSSS-_moPH-_moPagibig);
   const taxForCO=computeWithholdingTax(_moTaxable)/2;
   const otherDed=otherDeductions/2;
-  const totalDed=govTotal+taxForCO+otherDed;
+  const totalDed=govTotal+taxForCO+otherDed+caDeductCO;
   const netPay=grossPay-totalDed;
 
   el.innerHTML=`
@@ -1697,6 +1764,7 @@ function renderCutoff(){
           ${coRow('Pag-IBIG','−'+f(pagibig))}
           ${taxForCO>0?coRow('Withholding Tax','−'+f(taxForCO)):''}
           ${otherDed>0?coRow('Other Deductions','−'+f(otherDed)):''}
+          ${caDeductCO>0?coRow('Cash Advance Deduction','<span style="color:#C44A4A;">−'+f(caDeductCO)+'</span>'):''}
           <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;padding-top:8px;margin-top:4px;border-top:1px solid #E8DFD0;color:#c0392b;">
             <span>Total Deductions</span><span>−${f(totalDed)}</span>
           </div>
@@ -1935,6 +2003,12 @@ const paidDays=daysPresent+leaveDays;
 
   const grossPay=earnedBasic+commEarned+allowances+totalHolidayPay+totalOTPay;
 
+  // Cash advance deductions approved this month
+  const caDeductM=(S.cashAdvances||[]).filter(ca=>
+    ca.userId===viewUser.id&&ca.status==='approved'&&
+    ca.approvedAt&&ca.approvedAt.startsWith(period)
+  ).reduce((s,ca)=>s+(ca.amount||0),0);
+
   // Statutory deductions
   const sss=computeSSS(grossPay);
   const philhealth=computePhilHealth(grossPay);
@@ -1942,7 +2016,7 @@ const paidDays=daysPresent+leaveDays;
   const govTotal=sss+philhealth+pagibig;
   const taxable=Math.max(0,grossPay-govTotal);
   const withholdingTax=Math.round(computeWithholdingTax(taxable));
-  const totalDeductions=govTotal+withholdingTax+otherDeductions;
+  const totalDeductions=govTotal+withholdingTax+otherDeductions+caDeductM;
   const netPay=grossPay-totalDeductions;
 
   // Employer shares (informational)
@@ -2072,6 +2146,7 @@ const paidDays=daysPresent+leaveDays;
             <div style="font-size:10px;color:#8C7B65;font-weight:600;margin:8px 0 4px;text-transform:uppercase;">Tax</div>
             ${row('Withholding Tax',fmtPrice(withholdingTax),'#5C4F3D')}
             ${otherDeductions>0?`<div style="font-size:10px;color:#8C7B65;font-weight:600;margin:8px 0 4px;text-transform:uppercase;">Other</div>${row('Other Deductions',fmtPrice(otherDeductions),'#5C4F3D')}`:''}
+            ${caDeductM>0?`${!otherDeductions?'<div style="font-size:10px;color:#8C7B65;font-weight:600;margin:8px 0 4px;text-transform:uppercase;">Other</div>':''}${row('Cash Advance Deduction','-'+fmtPrice(caDeductM),'#C44A4A')}`:''}
             <div style="display:flex;justify-content:space-between;padding:8px 0;border-top:1.5px solid #2C2318;margin-top:6px;font-weight:700;font-size:13px;">
               <span>Total Deductions</span><span style="color:#C44A4A;">-${fmtPrice(totalDeductions)}</span>
             </div>
@@ -2434,22 +2509,54 @@ function submitLeave(){
 
 // ══ CASH ADVANCE ══
 function openCashAdvanceRequest(){
-  document.getElementById('caAmount').value='';
+  const used=getCashAdvanceMonthlyUsage();
+  if(used>=2){showToast('Monthly cash advance limit reached (2 per month)','err');return;}
+  const info=computeCurrentCutoffEarnings();
+  const f=fmtPrice;
+
+  const earningsEl=document.getElementById('caEarningsInfo');
+  if(earningsEl){
+    earningsEl.innerHTML=`<div style="font-weight:600;margin-bottom:6px;color:var(--ink2);">${info.periodLabel}</div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;">
+        <span>Days worked: <strong>${info.daysWorked}</strong></span>
+        <span>Earnings so far: <strong style="color:var(--success);">${f(info.totalEarned)}</strong></span>
+        <span>Max advance: <strong style="color:var(--gold-dk);">${f(info.maxAllowed)}</strong></span>
+      </div>`;
+  }
+  const maxLabel=document.getElementById('caMaxLabel');
+  if(maxLabel) maxLabel.textContent=`— max ${f(info.maxAllowed)}`;
+
+  const amtInput=document.getElementById('caAmount');
+  if(amtInput){
+    amtInput.max=info.maxAllowed;
+    amtInput.placeholder=`100 – ${f(info.maxAllowed)}`;
+    amtInput.value='';
+  }
   document.getElementById('caReason').value='';
+  window._caInfo=info;
   openModal('cashAdvanceModal');
 }
 function submitCashAdvance(){
   const amount=parseFloat(document.getElementById('caAmount')?.value)||0;
   const reason=(document.getElementById('caReason')?.value||'').trim();
+  const info=window._caInfo||computeCurrentCutoffEarnings();
+
+  const used=getCashAdvanceMonthlyUsage();
+  if(used>=2){showToast('Monthly cash advance limit reached (2 per month)','err');return;}
   if(amount<100){showToast('Minimum cash advance is ₱100','err');return;}
-  if(!reason){showToast('Please provide a reason','err');return;}
+  if(info.maxAllowed<=0){showToast('No earnings recorded yet for this cut-off period','err');return;}
+  if(amount>info.maxAllowed){showToast('Amount exceeds maximum allowed of '+fmtPrice(info.maxAllowed)+' (50% of earnings so far)','err');return;}
+
   if(!S.cashAdvances) S.cashAdvances=[];
   const req={
     id:'CA'+Date.now(),
     userId:currentUser.id,
     userName:currentUser.name,
     amount,
-    reason,
+    amountRequested:amount,
+    maxAllowed:info.maxAllowed,
+    payPeriod:info.payPeriod,
+    reason:reason||'',
     status:'pending',
     requestedAt:new Date().toISOString(),
     approvedBy:null,
@@ -2462,16 +2569,66 @@ function submitCashAdvance(){
   showToast('Cash advance request submitted ✓','ok');
 }
 function renderCashAdvanceHistory(){
+  // Summary card
+  const sumEl=document.getElementById('cashAdvanceSummary');
+  if(sumEl){
+    const info=computeCurrentCutoffEarnings();
+    const used=getCashAdvanceMonthlyUsage();
+    const remaining=2-used;
+    const limitReached=used>=2;
+    const noEarnings=info.totalEarned<=0;
+    const f=fmtPrice;
+    const usageColor=used>=2?'var(--danger)':used===1?'var(--warn)':'var(--success)';
+    sumEl.innerHTML=`
+      <div class="card" style="margin-bottom:0;">
+        <div class="card-hdr" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+          <h3>📊 Current Pay Period</h3>
+          <span style="font-size:12px;font-weight:600;color:${usageColor};">${used} of 2 requests used this month</span>
+        </div>
+        <div class="card-body">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:14px;">
+            <div style="background:var(--cream2);border-radius:10px;padding:11px 13px;">
+              <div style="font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.7px;margin-bottom:3px;">Period</div>
+              <div style="font-size:12px;font-weight:600;">${info.periodLabel}</div>
+            </div>
+            <div style="background:var(--cream2);border-radius:10px;padding:11px 13px;">
+              <div style="font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.7px;margin-bottom:3px;">Days Worked</div>
+              <div style="font-size:20px;font-weight:700;">${info.daysWorked}</div>
+            </div>
+            <div style="background:var(--cream2);border-radius:10px;padding:11px 13px;">
+              <div style="font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.7px;margin-bottom:3px;">Earnings So Far</div>
+              <div style="font-size:17px;font-weight:700;color:var(--success);">${f(info.totalEarned)}</div>
+              ${info.commEarned>0?`<div style="font-size:10px;color:var(--ink3);">incl. ${f(info.commEarned)} comm.</div>`:''}
+            </div>
+            <div style="background:${info.maxAllowed>0?'rgba(184,147,90,0.1)':'var(--cream2)'};border-radius:10px;padding:11px 13px;border:${info.maxAllowed>0?'1px solid rgba(184,147,90,0.25)':'none'};">
+              <div style="font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.7px;margin-bottom:3px;">Max Advance (50%)</div>
+              <div style="font-size:17px;font-weight:700;color:${info.maxAllowed>0?'var(--gold-dk)':'var(--ink3)'};">${f(info.maxAllowed)}</div>
+            </div>
+          </div>
+          ${limitReached
+            ?`<div style="background:rgba(196,74,74,0.08);border:1px solid rgba(196,74,74,0.2);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--danger);font-weight:500;">✕ Monthly limit reached (2 of 2). You may request again next month.</div>`
+            :noEarnings
+              ?`<div style="background:rgba(92,79,61,0.06);border:1px solid rgba(92,79,61,0.12);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--ink3);">No attendance recorded for this cut-off yet — cash advance is based on actual days worked.</div>`
+              :`<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                  <button class="btn btn-gold btn-sm" onclick="openCashAdvanceRequest()">+ Request Cash Advance</button>
+                  <span style="font-size:12px;color:var(--ink3);">${remaining} request${remaining!==1?'s':''} remaining this month</span>
+                </div>`}
+        </div>
+      </div>`;
+  }
+
+  // History table
   const tbody=document.getElementById('cashAdvanceHistory');
   if(!tbody)return;
   const myCA=(S.cashAdvances||[]).filter(ca=>ca.userId===currentUser?.id)
     .sort((a,b)=>new Date(b.requestedAt)-new Date(a.requestedAt));
   if(!myCA.length){
-    tbody.innerHTML='<tr><td colspan="4" style="text-align:center;color:var(--ink3);padding:20px;">No cash advance requests yet</td></tr>';
+    tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--ink3);padding:20px;">No cash advance requests yet</td></tr>';
     return;
   }
   tbody.innerHTML=myCA.map(ca=>`<tr>
     <td style="font-weight:600;">${fmtPrice(ca.amount)}</td>
+    <td style="font-size:12px;color:var(--ink3);">${ca.maxAllowed?fmtPrice(ca.maxAllowed):'—'}</td>
     <td style="font-size:12px;color:var(--ink3);">${ca.reason||'—'}</td>
     <td style="font-size:12px;">${ca.requestedAt?new Date(ca.requestedAt).toLocaleDateString('en-PH'):''}</td>
     <td><span class="pill ${ca.status==='approved'?'pill-green':ca.status==='rejected'?'pill-red':'pill-amber'}">${cap(ca.status)}</span>
