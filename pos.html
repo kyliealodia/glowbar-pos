@@ -895,6 +895,7 @@ html{height:-webkit-fill-available;}
         <div style="margin-top:20px;background:#fff;border-radius:var(--radius-lg);border:1px solid var(--border2);overflow:hidden;">
           <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);">
             <div style="font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:500;">💸 Cash Advance Requests</div>
+            <button class="btn btn-gold btn-sm" onclick="openOwnerCaModal()">+ Add Record</button>
           </div>
           <div id="cashAdvanceAdminList" style="padding:14px 18px;"></div>
         </div>
@@ -2714,6 +2715,54 @@ html{height:-webkit-fill-available;}
       <button class="btn btn-outline" onclick="previewComp()" style="flex:1;">👁 Preview</button>
       <button class="btn btn-outline" onclick="closeM('staffCompModal')">Cancel</button>
       <button class="btn btn-gold" onclick="saveStaffComp()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Owner Manual Cash Advance Record Modal -->
+<div class="overlay hidden" id="ownerCaModal">
+  <div class="modal modal-sm">
+    <div class="modal-hdr">
+      <div class="modal-title">💸 Add Cash Advance Record</div>
+      <div class="modal-x" onclick="closeM('ownerCaModal')">✕</div>
+    </div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
+      <div style="font-size:12px;color:var(--ink3);background:var(--cream2);border-radius:8px;padding:10px 12px;">
+        Manually record a cash advance on behalf of a staff member. This bypasses the staff request flow and does not count against their monthly request limit.
+      </div>
+      <div class="form-group">
+        <label class="form-label">Staff Member</label>
+        <select class="form-select" id="ocaStaff"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Amount (₱)</label>
+        <input class="form-input" type="number" id="ocaAmount" placeholder="e.g. 1500" min="1" step="1">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Date</label>
+          <input class="form-input" type="date" id="ocaDate" onchange="onOwnerCaDateChange()">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Pay Period</label>
+          <input class="form-input" type="text" id="ocaPayPeriod" placeholder="e.g. 2026-06-CO2" style="font-size:12px;">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Reason / Notes (optional)</label>
+        <textarea class="form-textarea" id="ocaReason" placeholder="e.g. Emergency advance, historical entry…" style="min-height:70px;"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Status</label>
+        <select class="form-select" id="ocaStatus">
+          <option value="approved">Approved</option>
+          <option value="pending">Pending</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeM('ownerCaModal')">Cancel</button>
+      <button class="btn btn-gold" onclick="saveOwnerCaRecord()">Save Record</button>
     </div>
   </div>
 </div>
@@ -9392,6 +9441,74 @@ function rejectCashAdvance(id){
   ca.status='rejected';ca.approvedBy=currentUser.name;ca.approvedAt=new Date().toISOString();
   sync('cashAdvances');renderCashAdvanceAdmin();
   showToast('Cash advance rejected','ok');
+}
+
+function _dateToPayPeriod(dateStr){
+  if(!dateStr) return '';
+  const [yr,mo,dy]=dateStr.split('-');
+  const co=parseInt(dy)<=15?'CO1':'CO2';
+  return `${yr}-${mo}-${co}`;
+}
+
+function openOwnerCaModal(){
+  // Populate staff dropdown
+  const sel=document.getElementById('ocaStaff');
+  const staff=S.users.filter(u=>u.role==='staff'||u.role==='owner');
+  sel.innerHTML=staff.map(u=>`<option value="${u.id}" data-name="${u.name}">${u.name}</option>`).join('');
+
+  // Default date to today (Manila)
+  const todayStr=new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Manila'});
+  document.getElementById('ocaDate').value=todayStr;
+  document.getElementById('ocaPayPeriod').value=_dateToPayPeriod(todayStr);
+  document.getElementById('ocaAmount').value='';
+  document.getElementById('ocaReason').value='';
+  document.getElementById('ocaStatus').value='approved';
+  openM('ownerCaModal');
+}
+
+function onOwnerCaDateChange(){
+  const d=document.getElementById('ocaDate').value;
+  if(d) document.getElementById('ocaPayPeriod').value=_dateToPayPeriod(d);
+}
+
+function saveOwnerCaRecord(){
+  const staffSel=document.getElementById('ocaStaff');
+  const staffId=staffSel.value;
+  const staffName=staffSel.options[staffSel.selectedIndex]?.dataset.name||staffSel.options[staffSel.selectedIndex]?.text||'';
+  const amount=parseFloat(document.getElementById('ocaAmount').value)||0;
+  const dateStr=document.getElementById('ocaDate').value;
+  const payPeriod=(document.getElementById('ocaPayPeriod').value||'').trim();
+  const reason=(document.getElementById('ocaReason').value||'').trim();
+  const status=document.getElementById('ocaStatus').value||'approved';
+
+  if(!staffId){showToast('Please select a staff member','err');return;}
+  if(amount<1){showToast('Please enter a valid amount','err');return;}
+  if(!dateStr){showToast('Please select a date','err');return;}
+  if(!payPeriod){showToast('Please enter a pay period','err');return;}
+
+  if(!S.cashAdvances) S.cashAdvances=[];
+  const now=new Date().toISOString();
+  const rec={
+    id:'CA'+Date.now(),
+    userId:parseInt(staffId)||staffId,
+    userName:staffName,
+    amount,
+    amountRequested:amount,
+    maxAllowed:null,
+    payPeriod,
+    reason,
+    status,
+    ownerRecorded:true,
+    recordedBy:currentUser.name,
+    requestedAt:dateStr+'T00:00:00.000Z',
+    approvedBy:status==='approved'?currentUser.name:null,
+    approvedAt:status==='approved'?now:null
+  };
+  S.cashAdvances.push(rec);
+  sync('cashAdvances');
+  closeM('ownerCaModal');
+  renderCashAdvanceAdmin();
+  showToast('Cash advance record saved for '+staffName,'ok');
 }
 
 

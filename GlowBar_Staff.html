@@ -1182,6 +1182,7 @@ function getCashAdvanceMonthlyUsage(){
   const ym=todayPH.slice(0,7);
   return (S.cashAdvances||[]).filter(ca=>
     ca.userId===currentUser?.id&&
+    !ca.ownerRecorded&&
     ca.status!=='rejected'&&
     ca.requestedAt&&ca.requestedAt.startsWith(ym)
   ).length;
@@ -2627,12 +2628,13 @@ function renderCashAdvanceHistory(){
     return;
   }
   tbody.innerHTML=myCA.map(ca=>`<tr>
-    <td style="font-weight:600;">${fmtPrice(ca.amount)}</td>
+    <td style="font-weight:600;">${fmtPrice(ca.amount)}${ca.ownerRecorded?'<div style="font-size:9px;color:var(--ink3);font-weight:400;">owner recorded</div>':''}</td>
     <td style="font-size:12px;color:var(--ink3);">${ca.maxAllowed?fmtPrice(ca.maxAllowed):'—'}</td>
     <td style="font-size:12px;color:var(--ink3);">${ca.reason||'—'}</td>
     <td style="font-size:12px;">${ca.requestedAt?new Date(ca.requestedAt).toLocaleDateString('en-PH'):''}</td>
     <td><span class="pill ${ca.status==='approved'?'pill-green':ca.status==='rejected'?'pill-red':'pill-amber'}">${cap(ca.status)}</span>
-      ${ca.approvedBy?`<div style="font-size:10px;color:var(--ink3);">by ${ca.approvedBy}</div>`:''}
+      ${ca.ownerRecorded?`<div style="font-size:10px;color:var(--ink3);">by ${ca.recordedBy||ca.approvedBy||'owner'}</div>`
+        :ca.approvedBy?`<div style="font-size:10px;color:var(--ink3);">by ${ca.approvedBy}</div>`:''}
     </td>
   </tr>`).join('');
 }
