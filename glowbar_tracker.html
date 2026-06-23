@@ -4351,15 +4351,26 @@ function buildConsumables(){
   const filtered=activeConsFilter==='all'?CONS_DATA:CONS_DATA.filter(g=>g.cat===activeConsFilter);
   con.innerHTML=filtered.map(group=>{
     const isOpen=openConsGroups.has(group.id);
-    let newGT=0;
-    group.items.forEach((it,i)=>{ const nt=newTotal(it,group.id,i); newGT+=nt!==null?nt:(it.total||0); });
+    let newGT=0,paidT=0,unpaidT=0,splT=0,paidN=0,unpaidN=0,splN=0;
+    group.items.forEach((it,i)=>{
+      const nt=newTotal(it,group.id,i);
+      const eff=nt!==null?nt:(it.total||0);
+      newGT+=eff;
+      const ps=(getCS(group.id,i).paymentStatus)||'unpaid';
+      if(ps==='paid'){paidT+=eff;paidN++;}
+      else if(ps==='shopee1'||ps==='shopee3'){splT+=eff;splN++;}
+      else{unpaidT+=eff;unpaidN++;}
+    });
     const rows=group.items.map((item,i)=>consRowHtml(group,item,i)).join('');
+    const fp=n=>'₱'+Math.round(n).toLocaleString();
     return `<div class="cons-group">
       <div class="cons-group-hdr" onclick="toggleConsGroup('${group.id}')">
         <span><span id="cg-ch-${group.id}" style="margin-right:6px">${isOpen?'▾':'▸'}</span>${group.name}</span>
-        <span style="display:flex;align-items:center;gap:12px;font-size:12px">
-          <span style="color:var(--muted)">₱${Math.round(newGT).toLocaleString()}</span>
-          <span style="color:var(--muted)">${group.items.length} items</span>
+        <span style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-weight:400;">
+          <span style="color:#0f5132;font-size:11px;" title="Paid">✓ ${fp(paidT)} <span style="color:var(--muted);font-size:10px;">(${paidN})</span></span>
+          <span style="color:#842029;font-size:11px;" title="Not yet paid">✗ ${fp(unpaidT)} <span style="color:var(--muted);font-size:10px;">(${unpaidN})</span></span>
+          ${splT>0?`<span style="color:#c96b00;font-size:11px;" title="Shopee Pay Later">🛒 ${fp(splT)} <span style="color:var(--muted);font-size:10px;">(${splN})</span></span>`:''}
+          <span style="color:var(--muted);font-size:11px;border-left:1px solid var(--border-l);padding-left:10px;">${group.items.length} items</span>
         </span>
       </div>
       <div class="cons-group-body${isOpen?' open':''}" id="cg-body-${group.id}">
