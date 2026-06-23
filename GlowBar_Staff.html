@@ -1225,7 +1225,7 @@ function getCashAdvanceMonthlyUsage(){
   const todayPH=toPHDateStr(new Date().toISOString());
   const ym=todayPH.slice(0,7);
   return (S.cashAdvances||[]).filter(ca=>
-    ca.userId===currentUser?.id&&
+    String(ca.userId)===String(currentUser?.id)&&
     !ca.ownerRecorded&&
     ca.status!=='rejected'&&
     ca.requestedAt&&ca.requestedAt.startsWith(ym)
@@ -1671,9 +1671,14 @@ function renderCutoff(){
   // Cash advance deduction for this cut-off period
   const pad2=x=>String(x).padStart(2,'0');
   const _coPeriodKey=`${String(yr).padStart(4,'0')}-${pad2(mo)}-${n===1?'CO1':'CO2'}`;
-  const caDeductCO=(S.cashAdvances||[]).filter(ca=>
-    ca.userId===viewUser.id&&ca.status==='approved'&&ca.payPeriod===_coPeriodKey
-  ).reduce((s,ca)=>s+(ca.amount||0),0);
+  const _caUidCO=String(viewUser.id);
+  console.log('[caDeductCO] payPeriod key:',_coPeriodKey,'userId:',_caUidCO,'all CAs:',JSON.stringify((S.cashAdvances||[]).map(c=>({id:c.id,userId:c.userId,status:c.status,payPeriod:c.payPeriod,amount:c.amount}))));
+  const caDeductCO=(S.cashAdvances||[]).filter(ca=>{
+    const match=String(ca.userId)===_caUidCO&&ca.status==='approved'&&ca.payPeriod===_coPeriodKey;
+    if(match) console.log('[caDeductCO] matched:',ca.id,ca.amount);
+    return match;
+  }).reduce((s,ca)=>s+(ca.amount||0),0);
+  console.log('[caDeductCO] total deduction:',caDeductCO);
 
   // Deductions: half of the MONTHLY statutory amounts.
   // Compute full monthly gross exactly like renderPayslip() — scan entire month.
@@ -2049,10 +2054,15 @@ const paidDays=daysPresent+leaveDays;
   const grossPay=earnedBasic+commEarned+allowances+totalHolidayPay+totalOTPay;
 
   // Cash advance deductions approved this month
-  const caDeductM=(S.cashAdvances||[]).filter(ca=>
-    ca.userId===viewUser.id&&ca.status==='approved'&&
-    ca.approvedAt&&ca.approvedAt.startsWith(period)
-  ).reduce((s,ca)=>s+(ca.amount||0),0);
+  const _caUidM=String(viewUser.id);
+  console.log('[caDeductM] period:',period,'userId:',_caUidM,'all CAs:',JSON.stringify((S.cashAdvances||[]).map(c=>({id:c.id,userId:c.userId,status:c.status,approvedAt:c.approvedAt,amount:c.amount}))));
+  const caDeductM=(S.cashAdvances||[]).filter(ca=>{
+    const match=String(ca.userId)===_caUidM&&ca.status==='approved'&&
+      ca.approvedAt&&ca.approvedAt.startsWith(period);
+    if(match) console.log('[caDeductM] matched:',ca.id,ca.amount);
+    return match;
+  }).reduce((s,ca)=>s+(ca.amount||0),0);
+  console.log('[caDeductM] total deduction:',caDeductM);
 
   // Statutory deductions
   const sss=computeSSS(grossPay);
@@ -2665,7 +2675,7 @@ function renderCashAdvanceHistory(){
   // History table
   const tbody=document.getElementById('cashAdvanceHistory');
   if(!tbody)return;
-  const myCA=(S.cashAdvances||[]).filter(ca=>ca.userId===currentUser?.id)
+  const myCA=(S.cashAdvances||[]).filter(ca=>String(ca.userId)===String(currentUser?.id))
     .sort((a,b)=>new Date(b.requestedAt)-new Date(a.requestedAt));
   if(!myCA.length){
     tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--ink3);padding:20px;">No cash advance requests yet</td></tr>';
