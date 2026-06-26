@@ -2672,6 +2672,35 @@ function loadSvcState(){
       SVC_CATS=mergedCats;
     }
   }catch(e){ svcCatState={}; }
+  // Inject isCombo + memberServiceIds onto nail packages so they use
+  // the COMBO rebuild system instead of manually-entered consumable lists.
+  // This runs after every load (from storage or source default) so it's
+  // always up-to-date even for users who already have localStorage data.
+  const _nailPkgComboMap = {
+    's17': ['s1','s2'],
+    's18': ['s3','s4'],
+    's90': ['s1','s2','s7'],
+    's91': ['s1','s2','s7','hp1'],
+    's92': ['s1','s2','s8'],
+    's93': ['s1','s2','s8','fp1'],
+    's95': ['s1','s2','s7','s8','hp1','fp1'],
+    's96': ['s3','s4','s7'],
+    's97': ['s3','s4','s7','hp1'],
+    's98': ['s3','s4','s8'],
+    's99': ['s3','s4','s8','fp1'],
+    's100': ['s3','s4','s7','s8'],
+    's101': ['s3','s4','s7','s8','hp1','fp1'],
+  };
+  const _nailPkgCat = SVC_CATS.find(c=>c.id==='nails_pkg');
+  if(_nailPkgCat){
+    _nailPkgCat.services.forEach(svc=>{
+      if(_nailPkgComboMap[svc.id]){
+        svc.isCombo=true;
+        if(!svc.memberServiceIds||!svc.memberServiceIds.length)
+          svc.memberServiceIds=_nailPkgComboMap[svc.id];
+      }
+    });
+  }
 }
 function saveSvcState(){
   localStorage.setItem('glowbar_svc2',JSON.stringify({state:svcCatState,cats:SVC_CATS,deletedSvcIds:[...deletedSvcIds],deletedCatIds:[...deletedCatIds]}));
