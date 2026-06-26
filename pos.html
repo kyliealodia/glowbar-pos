@@ -5393,6 +5393,20 @@ function confirmPay(){
         }
       }
     }
+    // Package purchase — deduct all consumables for all sessions from inventory
+    if(ci.type==='package'){
+      const pkg=S.packages.find(x=>x.id===ci.id);
+      if(pkg&&pkg.consumables&&pkg.consumables.length){
+        const totalSessions=(pkg.sessions||1)*ci.qty;
+        pkg.consumables.forEach(c=>{
+          const inv=S.products.find(x=>x.id===c.productId);
+          if(inv){
+            inv.stock=Math.max(0,inv.stock-(c.qty*totalSessions));
+            if(inv.stock<=inv.lowAt) showToast(`⚠ Low stock: ${inv.name} (${inv.stock} ${inv.unit} left)`,'err');
+          }
+        });
+      }
+    }
     // Package purchase — add all sessions, track total and purchase date
     if(ci.type==='package' && selClient){
       const cl=S.clients.find(c=>c.id===selClient.id);
@@ -8047,7 +8061,12 @@ function getSessionsRemaining(prod){
 // ══ PACKAGES ══
 function renderPackages(){
   const g=document.getElementById('pkgGrid');if(!g)return;
-  g.innerHTML=S.packages.map(p=>`
+  g.innerHTML=S.packages.map(p=>{
+    const pkgCost=p.cost||0;
+    const profit=p.price-pkgCost;
+    const margin=p.price>0?Math.round(profit/p.price*100):0;
+    const consCount=(p.consumables||[]).filter(c=>c.productId||c.qty>0).length;
+    return `
     <div class="pkg-card">
       <div class="pkg-card-hdr">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
@@ -8056,6 +8075,7 @@ function renderPackages(){
         </div>
         <div class="pkg-price">${fmtPrice(p.price)}</div>
         <div class="pkg-sessions">${p.sessions} sessions · Valid ${p.validity} days</div>
+        ${pkgCost>0?`<div style="font-size:11px;color:var(--ink3);margin-top:4px;">Cost: ${fmtPrice(pkgCost)} · Profit: <span style="color:${profit>=0?'var(--success)':'var(--danger)'};">${fmtPrice(profit)}</span> <span style="color:var(--ink4);">(${margin}%)</span>${consCount>0?' · 📦 '+consCount+' consumable'+(consCount!==1?'s':''):''}</div>`:''}
       </div>
       <div class="pkg-card-body">
         <div class="pkg-services">${(p.services||[]).map(s=>`<div class="pkg-svc-item">${s}</div>`).join('')}</div>
@@ -8065,7 +8085,8 @@ function renderPackages(){
           <button class="btn btn-outline btn-sm" style="flex:1;" onclick="togglePkgActive(${p.id})">${p.active?'Deactivate':'Activate'}</button>
         </div>
       </div>
-    </div>`).join('')||'<div style="color:var(--ink3);font-size:13px;">No packages yet.</div>';
+    </div>`;
+  }).join('')||'<div style="color:var(--ink3);font-size:13px;">No packages yet.</div>';
 }
 function openAddPkg(){
   editPkgId=null;document.getElementById('addPkgTitle').textContent='New Package';
@@ -8699,7 +8720,7 @@ function renderReports(){
   const tips=txns.reduce((s,t)=>s+(t.tip||0),0);
   const totalCost=txns.reduce((s,t)=>{
     const c=(t.items||[]).reduce((cs,i)=>{
-      const p=S.products.find(x=>x.id===i.id);
+      const p=S.products.find(x=>x.id===i.id)||S.packages?.find(x=>x.id===i.id);
       return cs+((p?.cost||0)*i.qty);
     },0);
     return s+c;
@@ -8949,7 +8970,7 @@ function renderRptExpense(txns){
     </div>`).join(''):'<div style="color:var(--ink3);font-size:12px;">No cost data — add costs to your services</div>';
 
   // Cost breakdown totals
-  const totalCost=txns.reduce((s,t)=>{return s+(t.items||[]).reduce((cs,i)=>{const p=S.products.find(x=>x.id===i.id);return cs+((p?.cost||0)*i.qty);},0);},0);
+  const totalCost=txns.reduce((s,t)=>{return s+(t.items||[]).reduce((cs,i)=>{const p=S.products.find(x=>x.id===i.id)||S.packages?.find(x=>x.id===i.id);return cs+((p?.cost||0)*i.qty);},0);},0);
   const totalRev=txns.reduce((s,t)=>s+t.total,0);
   const totalDisc=txns.reduce((s,t)=>s+(t.disc||0),0);
   const totalTips=txns.reduce((s,t)=>s+(t.tip||0),0);
@@ -8993,8 +9014,8 @@ function renderRptRevenue(txns, rev, totalCost, profit){
   // Revenue by category
   const catRev={};
   txns.forEach(t=>(t.items||[]).forEach(i=>{
-    const p=S.products.find(x=>x.id===i.id);
-    const cat=p?.cat||'Other';
+    const p=S.products.find(x=>x.id===i.id)||(i.type==='package'?S.packages?.find(x=>x.id===i.id):null);
+    const cat=i.type==='package'?'Packages':(p?.cat||'Other');
     if(!catRev[cat]) catRev[cat]={rev:0,qty:0,cost:0};
     catRev[cat].rev+=i.price*i.qty;
     catRev[cat].qty+=i.qty;

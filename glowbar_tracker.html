@@ -177,6 +177,18 @@ function calcTrackerCost(svc, st){
 // ── PUSH PACKAGES → gb/packages (POS sync) ───────────────────────
 window.pushPackagesToPOS = async function(){
   try {
+    // Build a lookup of service name → {svc, st} from tracker data so we can
+    // compute combined consumables + cost for each package
+    const _svcData = JSON.parse(localStorage.getItem('glowbar_svc2')||'{}');
+    const _svcCats = _svcData.cats || (typeof SVC_CATS !== 'undefined' ? SVC_CATS : []);
+    const _svcState = _svcData.state || {};
+    const svcLookup = {}; // service name → {svc, st}
+    _svcCats.forEach(cat => {
+      (cat.services||[]).forEach(svc => {
+        svcLookup[svc.name] = {svc, st: _svcState[svc.id]||{}};
+      });
+    });
+
     const PACKAGES = [
       // Glow Nails packages
       {name:'Classic Mani and Pedi',price:500,sessions:1,validity:365,services:['Classic Manicure','Classic Pedicure'],desc:'Classic Manicure + Classic Pedicure',active:true},
@@ -257,16 +269,39 @@ window.pushPackagesToPOS = async function(){
     const updated = [...existing];
     const baseId = Date.now();
     PACKAGES.forEach((pkg, i) => {
+      // Compute combined consumables + cost from component services
+      const mergedCons = {}; // groupId → merged consumable entry
+      let perSessionCost = 0;
+      (pkg.services||[]).forEach(svcName => {
+        const lookup = svcLookup[svcName];
+        if(!lookup) return;
+        const {svc, st} = lookup;
+        const cons = st.consumables || svc.consumables || [];
+        cons.forEach(c => {
+          const key = c.groupId || ('_iIdx_'+(c.iIdx??''));
+          if(!mergedCons[key]) mergedCons[key] = {...c, amt: 0};
+          mergedCons[key].amt += parseFloat(c.amt) || 0;
+        });
+        perSessionCost += calcTrackerCost(svc, st);
+      });
+      const pkgConsumables = Object.values(mergedCons).map(c => ({
+        productId: c.groupId || '',
+        qty: parseFloat(c.amt) || 0,
+        unit: c.unit || 'ml'
+      }));
+      // Total cost = per-session cost × number of sessions (all sessions delivered for the package price)
+      const pkgCost = Math.round(perSessionCost * (pkg.sessions || 1));
+
       const ex = existing.find(p => p && p.name === pkg.name);
       if(!ex){
-        updated.push({id: baseId + i, ...pkg});
+        updated.push({id: baseId + i, ...pkg, consumables: pkgConsumables, cost: pkgCost});
       } else {
         const idx = updated.indexOf(ex);
-        updated[idx] = {...ex, price: pkg.price, sessions: pkg.sessions, services: pkg.services, desc: pkg.desc};
+        updated[idx] = {...ex, price: pkg.price, sessions: pkg.sessions, services: pkg.services, desc: pkg.desc, consumables: pkgConsumables, cost: pkgCost};
       }
     });
     await set(pkgRef, updated);
-    console.log('GlowBar Tracker: pushed', PACKAGES.length, 'packages to POS gb/packages');
+    console.log('GlowBar Tracker: pushed', PACKAGES.length, 'packages (with consumables+cost) to POS gb/packages');
   } catch(e) {
     console.error('pushPackagesToPOS error:', e);
   }
