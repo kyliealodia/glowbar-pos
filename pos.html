@@ -1674,6 +1674,14 @@ html{height:-webkit-fill-available;}
       <div class="pay-m" data-m="internal-installment" onclick="selPay(this)"><span class="pay-ico">🏠</span><span style="font-size:10px;">Internal<br>Install.</span></div>
       <div class="pay-m" data-m="bank-installment" onclick="selPay(this)"><span class="pay-ico">🏛</span><span style="font-size:10px;">Bank<br>Install.</span></div>
       <div class="pay-m" data-m="veritaspay" onclick="selPay(this)"><span class="pay-ico">💼</span><span style="font-size:10px;">VeritasPay</span></div>
+      <div class="pay-m" data-m="client-deposit" onclick="selPay(this)" id="payDepositBtn" style="display:none;"><span class="pay-ico">💰</span><span style="font-size:10px;">Deposit</span></div>
+    </div>
+
+    <!-- Client Deposit Balance -->
+    <div id="clientDepositWrap" style="display:none;margin-top:10px;padding:12px 14px;background:rgba(74,140,92,0.06);border-radius:12px;border:1.5px solid var(--success);">
+      <div style="font-size:10px;font-weight:700;color:var(--success);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">💰 Client Deposit Balance</div>
+      <div style="font-size:13px;color:var(--ink2);">Available: <strong id="clientDepositBalTxt" style="color:var(--success);"></strong></div>
+      <div style="font-size:11px;color:var(--ink3);margin-top:4px;" id="clientDepositNote"></div>
     </div>
 
     <!-- Split Payment Toggle -->
@@ -3139,6 +3147,19 @@ html{height:-webkit-fill-available;}
         <div id="cpPackages" style="display:flex;flex-direction:column;gap:10px;"></div>
       </div>
 
+      <!-- Client Deposits -->
+      <div id="cpDepositsWrap">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;">💰 Deposits</div>
+            <div id="cpDepositBal" style="display:none;font-size:13px;font-weight:700;color:var(--success);background:rgba(74,140,92,0.1);padding:2px 10px;border-radius:20px;"></div>
+          </div>
+          <button class="btn btn-outline btn-sm" onclick="openAddDepositModal()">+ Add Deposit</button>
+        </div>
+        <div id="cpDeposits" style="display:flex;flex-direction:column;gap:8px;"></div>
+        <div id="cpDepositsEmpty" style="font-size:12px;color:var(--ink4);padding:10px 0;text-align:center;background:var(--cream2);border-radius:10px;">No deposits yet.</div>
+      </div>
+
       <!-- Before & After Photos -->
       <div id="cpPhotosWrap">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
@@ -3200,6 +3221,41 @@ html{height:-webkit-fill-available;}
         <div id="cpMsgHistory" style="display:flex;flex-direction:column;gap:8px;max-height:320px;overflow-y:auto;"></div>
       </div>
 
+    </div>
+  </div>
+</div>
+
+<!-- Add Client Deposit Modal -->
+<div class="overlay hidden" id="addDepositModal">
+  <div class="modal modal-sm">
+    <div class="modal-hdr"><div class="modal-title">💰 Add Deposit</div><div class="modal-x" onclick="closeM('addDepositModal')">✕</div></div>
+    <div class="modal-body" style="padding:20px;display:flex;flex-direction:column;gap:14px;">
+      <div class="form-group">
+        <label class="form-label">Amount (₱) <span style="color:var(--danger)">*</span></label>
+        <input class="form-input" type="number" id="adAmount" min="1" step="50" placeholder="0.00" style="font-size:18px;font-weight:600;">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Payment Method</label>
+        <select class="form-select" id="adMethod">
+          <option value="cash">Cash</option>
+          <option value="gcash">GCash</option>
+          <option value="card">Card</option>
+          <option value="qrph">QR Ph</option>
+          <option value="bank">Bank Transfer</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Date</label>
+        <input class="form-input" type="date" id="adDate">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notes (optional)</label>
+        <input class="form-input" type="text" id="adNotes" placeholder="e.g. Advance for laser session">
+      </div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-outline" style="flex:1" onclick="closeM('addDepositModal')">Cancel</button>
+        <button class="btn btn-gold" style="flex:1" onclick="saveDeposit()">Save Deposit</button>
+      </div>
     </div>
   </div>
 </div>
@@ -4896,6 +4952,22 @@ function _openPaymentCore(){
   const cashWrapEl=document.getElementById('cashWrap');
   if(cashWrapEl)cashWrapEl.style.display='block';
   checkInstallmentEligibility();
+  // Show deposit pay button if client has balance
+  const depBtn=document.getElementById('payDepositBtn');
+  const cdWrap=document.getElementById('clientDepositWrap');
+  const cdBalTxt=document.getElementById('clientDepositBalTxt');
+  const cdNote=document.getElementById('clientDepositNote');
+  if(depBtn&&cdWrap&&cdBalTxt){
+    const depBal=selClient?(S.clients.find(c=>c.id===selClient.id)?.depositBalance||0):0;
+    if(depBal>0){
+      depBtn.style.display='flex';
+      cdBalTxt.textContent=fmtPrice(depBal);
+      if(cdNote) cdNote.textContent=depBal>=total?'Covers full amount of '+fmtPrice(total):'Covers '+fmtPrice(depBal)+' of '+fmtPrice(total)+' — remaining: '+fmtPrice(total-depBal);
+    } else {
+      depBtn.style.display='none';
+      cdWrap.style.display='none';
+    }
+  }
   openM('payModal');
 }
 function selPay(el){
@@ -4947,6 +5019,9 @@ function selPay(el){
       if(qrImg&&qrDisp){qrImg.src=qr;qrDisp.style.display=qr?'block':'none';}
     }
   }
+  // Client deposit info panel
+  const cdWrap=document.getElementById('clientDepositWrap');
+  if(cdWrap) cdWrap.style.display=method==='client-deposit'?'block':'none';
   // Update split method1 label if split is active
   if(document.getElementById('splitPayToggle')?.checked){
     const lbl=document.getElementById('splitMethod1Label');
@@ -5360,6 +5435,17 @@ function confirmPay(){
       }
     }
   }
+  // Deduct client deposit balance if deposit payment method used
+  let depositUsedAmt=0;
+  if(method==='client-deposit'&&selClient){
+    const cl=S.clients.find(c=>c.id===selClient.id);
+    if(cl&&(cl.depositBalance||0)>0){
+      depositUsedAmt=Math.min(finalTotal,cl.depositBalance);
+      cl.depositBalance=Math.max(0,(cl.depositBalance||0)-depositUsedAmt);
+      if(!cl.depositHistory) cl.depositHistory=[];
+      cl.depositHistory.push({id:uid('DEP'),type:'use',amount:depositUsedAmt,method:'client-deposit',date:td(),notes:'Applied at checkout',addedAt:new Date().toISOString(),addedBy:currentUser?.name||'POS',txId:uid('TXN')});
+    }
+  }
   const cashGiven=method==='cash'?(parseFloat(document.getElementById('cashGiven').value)||0):0;
   const cashChange=method==='cash'?Math.max(0,cashGiven-finalTotal):0;
   const instMeta=_pendingInstallmentPlan?{visit:1,totalVisits:_pendingInstallmentPlan.schedule.length,totalPrice:_pendingInstallmentPlan.totalPrice,packageName:_pendingInstallmentPlan.pkg.name}:null;
@@ -5376,7 +5462,7 @@ function confirmPay(){
     });
   }
   const _rcptId=uid('RCP-').toUpperCase();
-  S.transactions.push({id:txid,ref:txRef,client:cn,clientId:selClient?.id||null,items:JSON.parse(JSON.stringify(cart)),sub,disc,discType,tip,vat,vatOn,total:finalTotal,originalAmount:payFeeAmt>0?originalAmount:null,payFee:payFeeAmt||null,feePct:payFeePct||null,feeTerm:payFeeTerm||null,depositApplied:dep||null,method,cashGiven:cashGiven||null,cashChange:cashChange||null,refPhoto:_refPhotoData||null,time:now.toISOString(),staff:(selStaff||currentUser)?.name,installmentInfo:instMeta||null,internalInstallment:internalInstInfo||null,scpwd:scpwdEnabled?{type:scpwdType,idNum:scpwdId,discAmt:scpwdDiscAmt}:null,orNumber,splitPayment:splitPaymentData||null,refNumber:refNumber||null,commissionBreakdown:commInfo.length?commInfo:null,surgeAmt:surgeAmt||null,surgeMeta:surge||null,receiptId:_rcptId});
+  S.transactions.push({id:txid,ref:txRef,client:cn,clientId:selClient?.id||null,items:JSON.parse(JSON.stringify(cart)),sub,disc,discType,tip,vat,vatOn,total:finalTotal,originalAmount:payFeeAmt>0?originalAmount:null,payFee:payFeeAmt||null,feePct:payFeePct||null,feeTerm:payFeeTerm||null,depositApplied:dep||null,clientDepositUsed:depositUsedAmt||null,method,cashGiven:cashGiven||null,cashChange:cashChange||null,refPhoto:_refPhotoData||null,time:now.toISOString(),staff:(selStaff||currentUser)?.name,installmentInfo:instMeta||null,internalInstallment:internalInstInfo||null,scpwd:scpwdEnabled?{type:scpwdType,idNum:scpwdId,discAmt:scpwdDiscAmt}:null,orNumber,splitPayment:splitPaymentData||null,refNumber:refNumber||null,commissionBreakdown:commInfo.length?commInfo:null,surgeAmt:surgeAmt||null,surgeMeta:surge||null,receiptId:_rcptId});
   window.lastTx=S.transactions[S.transactions.length-1];
   window._lastPaidClientId = selClient?.id||null;
   window._lastTxId = txid;
@@ -5421,8 +5507,9 @@ function confirmPay(){
     ${tip>0?`<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink2);margin-bottom:3px;"><span>Tip 🫶</span><span>+${fmtPrice(tip)}</span></div>`:''}
     ${vatOn?`<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink2);margin-bottom:3px;"><span>VAT (12%)</span><span>${fmtPrice(vat)}</span></div>`:''}
     ${dep>0?`<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--success);margin-bottom:3px;"><span>💰 Deposit Applied</span><span>-${fmtPrice(dep)}</span></div>`:''}
+    ${depositUsedAmt>0?`<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--success);margin-bottom:3px;"><span>💰 Client Deposit Used</span><span>-${fmtPrice(depositUsedAmt)}</span></div>`:''}
     <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:600;border-top:1px solid var(--cream3);padding-top:8px;margin-top:4px;"><span>TOTAL</span><span>${fmtPrice(finalTotal)}</span></div>
-    <div style="text-align:center;margin-top:12px;padding:10px;background:rgba(74,140,92,0.08);border-radius:10px;color:var(--success);font-weight:600;font-size:13px;">✓ PAID via ${isSplit?`${method.toUpperCase()} + ${splitMethod2.toUpperCase()}`:method.toUpperCase()}</div>
+    <div style="text-align:center;margin-top:12px;padding:10px;background:rgba(74,140,92,0.08);border-radius:10px;color:var(--success);font-weight:600;font-size:13px;">✓ PAID via ${method==='client-deposit'?'CLIENT DEPOSIT':isSplit?`${method.toUpperCase()} + ${splitMethod2.toUpperCase()}`:method.toUpperCase()}</div>
     ${isSplit&&splitPaymentData?`<div style="margin-top:6px;padding:8px 12px;background:var(--cream2);border-radius:10px;font-size:11px;color:var(--ink2);">
       <div style="display:flex;justify-content:space-between;"><span>${splitPaymentData.method1.toUpperCase()}</span><span>${fmtPrice(splitPaymentData.amount1)}${splitPaymentData.fee1>0?` +${fmtPrice(splitPaymentData.fee1)} fee`:''}</span></div>
       <div style="display:flex;justify-content:space-between;"><span>${splitPaymentData.method2.toUpperCase()}</span><span>${fmtPrice(splitPaymentData.amount2)}${splitPaymentData.fee2>0?` +${fmtPrice(splitPaymentData.fee2)} fee`:''}</span></div>
@@ -6048,6 +6135,60 @@ function copyPkgReminder(clientId,pkgKey){
   if(!msg)return;
   navigator.clipboard.writeText(msg).then(()=>showToast('Reminder message copied to clipboard')).catch(()=>showToast('Copy failed — try selecting and copying manually','err'));
 }
+
+// ── Client Deposits ───────────────────────────────────────────────────────────
+function openAddDepositModal(){
+  const id=window._cpClientId;
+  if(!id){showToast('No client selected','err');return;}
+  document.getElementById('adAmount').value='';
+  document.getElementById('adMethod').value='cash';
+  document.getElementById('adDate').value=td();
+  document.getElementById('adNotes').value='';
+  openM('addDepositModal');
+}
+function saveDeposit(){
+  const id=window._cpClientId;
+  const cl=S.clients.find(c=>c.id===id);
+  if(!cl){showToast('Client not found','err');return;}
+  const amt=parseFloat(document.getElementById('adAmount').value)||0;
+  if(amt<1){showToast('Enter a valid amount','err');return;}
+  const method=document.getElementById('adMethod').value||'cash';
+  const date=document.getElementById('adDate').value||td();
+  const notes=(document.getElementById('adNotes').value||'').trim();
+  if(!cl.depositHistory) cl.depositHistory=[];
+  cl.depositHistory.push({id:uid('DEP'),type:'add',amount:amt,method,date,notes,addedAt:new Date().toISOString(),addedBy:currentUser?.name||'owner'});
+  cl.depositBalance=(cl.depositBalance||0)+amt;
+  sync('clients');
+  closeM('addDepositModal');
+  showToast('Deposit saved — balance: '+fmtPrice(cl.depositBalance),'ok');
+  renderClientDeposits(cl);
+  renderClientsTable();
+}
+function renderClientDeposits(c){
+  const listEl=document.getElementById('cpDeposits');
+  const emptyEl=document.getElementById('cpDepositsEmpty');
+  const balEl=document.getElementById('cpDepositBal');
+  if(!listEl)return;
+  const history=(c.depositHistory||[]).slice().sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const bal=c.depositBalance||0;
+  if(bal>0){balEl.style.display='block';balEl.textContent='Balance: '+fmtPrice(bal);}
+  else{balEl.style.display='none';}
+  if(!history.length){listEl.innerHTML='';emptyEl.style.display='block';return;}
+  emptyEl.style.display='none';
+  const methodLabel={cash:'Cash',gcash:'GCash',card:'Card',qrph:'QR Ph',bank:'Bank Transfer','client-deposit':'Deposit Used'};
+  listEl.innerHTML=history.map(d=>{
+    const isAdd=d.type==='add';
+    const dateStr=d.date?new Date(d.date+'T12:00').toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'numeric'}):d.date;
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:${isAdd?'#fff':'#fff8f8'};border:1.5px solid ${isAdd?'var(--border2)':'rgba(220,53,69,0.2)'};border-radius:10px;">
+      <div>
+        <div style="font-size:13px;font-weight:500;color:${isAdd?'var(--success)':'var(--danger)'};">${isAdd?'+ Deposit Added':'− Deposit Used'}${d.notes?` — <span style="font-weight:400;color:var(--ink3);">${esc(d.notes)}</span>`:''}</div>
+        <div style="font-size:11px;color:var(--ink3);margin-top:2px;">📅 ${dateStr} · ${methodLabel[d.method]||d.method}${d.addedBy?' · '+esc(d.addedBy):''}${d.txId?' · Tx: '+d.txId:''}</div>
+      </div>
+      <div style="font-size:15px;font-weight:700;color:${isAdd?'var(--success)':'var(--danger)'};">${isAdd?'+':'−'}${fmtPrice(d.amount)}</div>
+    </div>`;
+  }).join('');
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 function sendClientSummary(id){
   const cl=S.clients.find(c=>c.id===id);
@@ -7134,7 +7275,7 @@ function renderClientsTable(){
       <td><div style="font-size:12px;">${esc(c.phone||'')}</div></td>
       <td><div style="font-size:12px;">${esc(c.todayService||'—')}</div></td>
       <td><div style="font-size:12px;">${addedFmt}</div></td>
-      <td><div style="display:flex;flex-direction:column;gap:4px;">${(()=>{const pkgEntries=c.packageSessions?Object.values(c.packageSessions).filter(ps=>ps.remaining>0):[];const pkgTotal=pkgEntries.reduce((s,ps)=>s+(ps.remaining||0),0);return(isKiosk?'<span class="pill pill-green" style="font-size:10px;">🖥 Intake</span>':'')+`<span class="pill ${c.vip?'pill-gold':'pill-gray'}">${c.vip?'VIP':'Regular'}</span>`+`<span class="pill ${c.intakeComplete?'pill-green':'pill-amber'}">${c.intakeComplete?'✓ Consent':'Consent needed'}</span>`+(pkgTotal>0?`<span class="pill pill-gold" style="font-size:10px;">📦 ${pkgTotal} session${pkgTotal!==1?'s':''}</span>`:'')})()}</div></td>
+      <td><div style="display:flex;flex-direction:column;gap:4px;">${(()=>{const pkgEntries=c.packageSessions?Object.values(c.packageSessions).filter(ps=>ps.remaining>0):[];const pkgTotal=pkgEntries.reduce((s,ps)=>s+(ps.remaining||0),0);return(isKiosk?'<span class="pill pill-green" style="font-size:10px;">🖥 Intake</span>':'')+`<span class="pill ${c.vip?'pill-gold':'pill-gray'}">${c.vip?'VIP':'Regular'}</span>`+`<span class="pill ${c.intakeComplete?'pill-green':'pill-amber'}">${c.intakeComplete?'✓ Consent':'Consent needed'}</span>`+(pkgTotal>0?`<span class="pill pill-gold" style="font-size:10px;">📦 ${pkgTotal} session${pkgTotal!==1?'s':''}</span>`:'')+(c.depositBalance>0?`<span class="pill pill-green" style="font-size:10px;">💰 ${fmtPrice(c.depositBalance)}</span>`:'')})()}</div></td>
       <td><div style="display:flex;gap:5px;flex-wrap:wrap;">
         <button class="btn btn-gold btn-sm" onclick="viewClientProfile(${c.id})">👁 Profile</button>
         <button class="btn btn-outline btn-sm" onclick="editClient(${c.id})">Edit</button>
@@ -10572,6 +10713,9 @@ function viewClientProfile(id){
       </div>`;
     }).join('');
   } else pkgWrap.style.display='none';
+
+  // Deposits
+  renderClientDeposits(c);
 
   // Treatment history
   const histEl=document.getElementById('cpHistory');
