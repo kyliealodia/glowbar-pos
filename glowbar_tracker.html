@@ -2992,7 +2992,7 @@ function buildSvcCardInner(svc, catId){
     const paidSessions=svc.sessions||1;
     const freeSessions=svc.freeSessions||0;
     const totalSessions=paidSessions+freeSessions;
-    const perSessionCost=laborCost/totalSessions+elec+water+consCost;
+    const perSessionCost=laborCost+elec+water+consCost;
     const effectivePricePerSession=price>0?price/paidSessions:0;
     const profitPerSession=price>0?(profit/paidSessions):0;
     const pColor2=profitPerSession>=0?'var(--green)':'var(--red)';
