@@ -2868,6 +2868,7 @@ function addSvcCons(svcId){
 }
 
 function buildComboSvcCardInner(svc, catId){
+  const st=getSvcState(svc.id);
   const allSvcs=getAllSvcsFlat();
   const {laborCost,elec,water,consCost,totalCost,price,commission,profit,margin,durationMins}=calcSvcCost(svc);
   const pColor=profit>=0?'var(--green)':'var(--red)';
@@ -2881,6 +2882,40 @@ function buildComboSvcCardInner(svc, catId){
       <button class="del-row" onclick="removeComboMember('${catId}','${svc.id}','${mid}')" style="font-size:11px;padding:1px 4px" title="Remove">&#10005;</button>
     </div>`;
   }).join('');
+  // Extra consumables section
+  const extras=st.extraConsumables||[];
+  const extraRows=extras.map((c,ci)=>{
+    const flatIdx=c.groupId?flatIdxFromGroupItem(c.groupId,c.iIdx):-1;
+    const uc=c.groupId&&c.iIdx>=0?getConsUnitCost(c.groupId,c.iIdx):0;
+    const amt=parseFloat(c.amt)||0;
+    const lc=amt*uc;
+    const group=c.groupId?CONS_DATA.find(g=>g.id===c.groupId):null;
+    const item=group&&c.iIdx>=0?group.items[c.iIdx]:null;
+    const cs=group&&item?getCS(c.groupId,c.iIdx):{};
+    const uom=cs.uom||item?.uom||'pcs';
+    const cpuDisplay=uc>0?`<span style="font-size:10px;color:var(--muted)">&#8369;${uc<1?uc.toFixed(4):uc.toFixed(2)}/${uom}</span>`:'';
+    const costDisplay=lc>0?`<span style="font-size:11px;font-weight:600;color:var(--gold-d)">&#8369;${lc.toFixed(2)}</span>`:'<span style="color:var(--muted);font-size:11px">&#8212;</span>';
+    return`<div style="background:var(--cream);border:0.5px solid var(--border-l);border-radius:8px;padding:8px;margin-bottom:6px">
+      <div style="display:grid;grid-template-columns:1fr 80px 55px;gap:5px;align-items:center;margin-bottom:4px">
+        <select class="ii" style="width:100%;font-size:11px;padding:3px 4px" onchange="setComboExtraCons('${svc.id}',${ci},'itemIdx',this.value)">${buildConsDropdown(flatIdx)}</select>
+        <div style="display:flex;gap:4px;align-items:center">
+          <input class="ii" type="number" placeholder="amt" value="${c.amt||''}" style="font-size:11px;width:55px" oninput="debounce('ec_${svc.id}_${ci}',()=>setComboExtraCons('${svc.id}',${ci},'amt',this.value),400)" title="Amount used">
+          <select class="ii" style="font-size:11px;padding:3px 3px;width:48px" onchange="setComboExtraCons('${svc.id}',${ci},'unit',this.value)">
+            <option${c.unit==='ml'?' selected':''}>ml</option>
+            <option${c.unit==='g'?' selected':''}>g</option>
+            <option${c.unit==='pcs'?' selected':''}>pcs</option>
+            <option${c.unit==='L'?' selected':''}>L</option>
+          </select>
+        </div>
+        <button class="del-row" onclick="delComboExtraCons('${svc.id}',${ci})" style="font-size:12px;justify-self:end">&#10005;</button>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
+        ${cpuDisplay}
+        <span style="color:var(--muted)">Cost per service:</span>
+        ${costDisplay}
+      </div>
+    </div>`;
+  }).join('');
   return`<div class="svc-drag-handle" draggable="true" ondragstart="onSvcDragStart(event,'${catId}','${svc.id}')" ondragover="event.preventDefault()" ondrop="onSvcDrop(event,'${catId}','${svc.id}')" style="cursor:grab;padding:2px 0 4px;font-size:16px;color:var(--border);text-align:center;letter-spacing:4px">&#8942;&#8942;</div>
   <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px;margin-bottom:8px;padding-bottom:8px;border-bottom:0.5px solid var(--border-l)">
     <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0">
@@ -2891,7 +2926,14 @@ function buildComboSvcCardInner(svc, catId){
   </div>
   <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:5px;font-weight:600">Bundled services</div>
   ${memberRows||'<div style="font-size:12px;color:var(--muted);padding:4px 0">No members — add via Rebuild</div>'}
-  <button class="add-row" style="margin:4px 0 12px;padding:3px 8px;font-size:11px" onclick="rebuildComboFromMembers('${catId}','${svc.id}')">&#8635; Rebuild costs &amp; consumables from members</button>
+  <button class="add-row" style="margin:4px 0 8px;padding:3px 8px;font-size:11px" onclick="rebuildComboFromMembers('${catId}','${svc.id}')">&#8635; Rebuild costs &amp; consumables from members</button>
+  <div style="border-top:0.5px solid var(--border-l);padding-top:8px;margin-bottom:8px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600">Additional consumables</div>
+      <button class="add-row" style="padding:2px 8px;font-size:11px" onclick="addComboExtraCons('${catId}','${svc.id}')">+ Add extra</button>
+    </div>
+    ${extraRows||'<div style="font-size:11px;color:var(--muted);padding:2px 0 4px;font-style:italic">None — click &ldquo;+ Add extra&rdquo; to add consumables not in any member service</div>'}
+  </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
     <div><div style="font-size:10px;color:var(--muted);margin-bottom:2px">Combined price (&#8369;)</div>
       <input class="ii" type="number" style="width:100%" value="${price}" oninput="debounce('p_${svc.id}',()=>{setSvcStateField('${svc.id}','price',+this.value);refreshSvcCard('${svc.id}');},400)">
@@ -2904,7 +2946,7 @@ function buildComboSvcCardInner(svc, catId){
     <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:0.5px solid var(--border-l)"><span style="color:var(--muted)">Labor</span><span>&#8369;${laborCost.toFixed(2)}</span></div>
     ${elec>0?`<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:0.5px solid var(--border-l)"><span style="color:var(--muted)">Electricity</span><span>&#8369;${elec.toFixed(2)}</span></div>`:''}
     ${water>0?`<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:0.5px solid var(--border-l)"><span style="color:var(--muted)">Water</span><span>&#8369;${water.toFixed(2)}</span></div>`:''}
-    <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:0.5px solid var(--border-l)"><span style="color:var(--muted)">Consumables (merged)</span><span>&#8369;${consCost.toFixed(2)}</span></div>
+    <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:0.5px solid var(--border-l)"><span style="color:var(--muted)">Consumables (merged + extras)</span><span>&#8369;${consCost.toFixed(2)}</span></div>
     <div style="display:flex;justify-content:space-between;padding:2px 0;font-weight:600"><span>Total cost</span><span>&#8369;${totalCost.toFixed(2)}</span></div>
   </div>
   <div style="font-size:11px;border-top:0.5px solid var(--border-l);padding-top:6px">
@@ -3393,11 +3435,61 @@ function rebuildComboFromMembers(catId,svcId){
       else{ mergedConMap[key]={...c}; mergedCons.push(mergedConMap[key]); }
     });
   });
-  svc.consumables=mergedCons;
+  // Append extra consumables so they survive rebuild
+  const st=getSvcState(svcId);
+  const extras=(st.extraConsumables||[]).filter(c=>c.groupId&&c.iIdx>=0);
+  const finalCons=[...mergedCons,...extras];
+  svc.consumables=finalCons;
   svc.durationMins=totalDuration;
-  setSvcStateField(svc.id,'consumables',mergedCons);
+  setSvcStateField(svc.id,'consumables',finalCons);
   setSvcStateField(svc.id,'durationMins',totalDuration);
   saveSvcState(); refreshSvcCard(svcId);
+}
+function addComboExtraCons(catId,svcId){
+  const st=getSvcState(svcId);
+  if(!st.extraConsumables) st.extraConsumables=[];
+  st.extraConsumables.push({groupId:'',iIdx:-1,amt:'',unit:'ml'});
+  setSvcStateField(svcId,'extraConsumables',st.extraConsumables);
+  refreshSvcCard(svcId);
+}
+function delComboExtraCons(svcId,idx){
+  const st=getSvcState(svcId);
+  if(!st.extraConsumables) return;
+  st.extraConsumables.splice(idx,1);
+  setSvcStateField(svcId,'extraConsumables',st.extraConsumables);
+  // Also remove from merged consumables and rebuild
+  const cat=SVC_CATS.find(c=>c.services.some(s=>s.id===svcId));
+  if(cat) rebuildComboFromMembers(cat.id,svcId);
+  else refreshSvcCard(svcId);
+}
+function setComboExtraCons(svcId,idx,field,value){
+  const st=getSvcState(svcId);
+  if(!st.extraConsumables||!st.extraConsumables[idx]) return;
+  if(field==='itemIdx'){
+    // value is flat index from dropdown
+    const flat=parseInt(value);
+    if(flat<0||isNaN(flat)){st.extraConsumables[idx].groupId='';st.extraConsumables[idx].iIdx=-1;}
+    else{
+      let rem=flat;
+      let found=false;
+      for(const g of CONS_DATA){
+        if(rem<g.items.length){
+          st.extraConsumables[idx].groupId=g.id;
+          st.extraConsumables[idx].iIdx=rem;
+          found=true; break;
+        }
+        rem-=g.items.length;
+      }
+      if(!found){st.extraConsumables[idx].groupId='';st.extraConsumables[idx].iIdx=-1;}
+    }
+  } else {
+    st.extraConsumables[idx][field]=value;
+  }
+  setSvcStateField(svcId,'extraConsumables',st.extraConsumables);
+  // Rebuild so cost reflects new extra
+  const cat=SVC_CATS.find(c=>c.services.some(s=>s.id===svcId));
+  if(field!=='amt'&&field!=='unit'&&cat) rebuildComboFromMembers(cat.id,svcId);
+  else refreshSvcCard(svcId);
 }
 function delSvcCat(id){
   if(!confirm('Remove this entire service category?'))return;
