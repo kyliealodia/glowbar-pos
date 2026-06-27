@@ -2706,22 +2706,24 @@ function loadSvcState(){
 }
 // ── CONSUMABLES RESTORATION (run once on load to fix iIdx-drift corruption) ──
 function _restoreServiceConsumablesV3(){
-  if(localStorage.getItem('gb_cons_restore_v3')==='done') return;
+  if(localStorage.getItem('gb_cons_restore_v4')==='done') return;
   // Helper to build a consumable entry with stable consId
   const C=(consId,groupId,iIdx,amt,unit)=>({consId,groupId,iIdx,amt,unit});
   // Correct consumables per service id — verified against CONS_DATA indices
+  // "Top Coat BOMD" and "BOMD Cat Eye" both map to bomd_gel_polish_set_120_pcs (idx 2)
+  // "Quick Dry" and "Base Coat" map to base_top_coat (idx 5)
   const RESTORE={
     // ── GLOW NAILS: Manicure & Pedicure ──────────────────────────────
-    's1':[C('nails:cuticle_remover','nails',16,'0.5','ml'),C('nails:regular_polish_48_pcs','nails',12,'1.5','ml'),C('nails:merthiolate','nails',24,'0.5','ml'),C('nails:base_top_coat','nails',5,'0.5','ml'),C('nails:alcohol_2l','nails',37,'1','ml'),C('nails:cotton_balls_1600_pcs','nails',38,'2','pcs'),C('nails:cuticle_oil_lavender','nails',46,'0.25','ml')],
-    's2':[C('nails:cuticle_remover','nails',16,'0.5','ml'),C('nails:foot_soak_1l','nails',18,'0.5','ml'),C('nails:merthiolate','nails',24,'0.5','ml'),C('nails:base_top_coat','nails',5,'0.5','ml'),C('nails:regular_polish_48_pcs','nails',12,'1.5','ml'),C('nails:alcohol_2l','nails',37,'1','ml'),C('nails:cotton_balls_1600_pcs','nails',38,'2','pcs'),C('nails:cuticle_oil_lavender','nails',46,'0.25','ml')],
-    's3':[C('nails:cuticle_remover','nails',16,'0.5','ml'),C('nails:merthiolate','nails',24,'0.5','ml'),C('nails:base_top_coat','nails',5,'1','ml'),C('nails:base_top_coat','nails',5,'1','ml'),C('nails:bomd_gel_polish_set_120_pcs','nails',2,'1.5','ml'),C('nails:alcohol_2l','nails',37,'1','ml'),C('nails:cotton_balls_1600_pcs','nails',38,'2','pcs'),C('nails:cuticle_oil_lavender','nails',46,'0.5','ml'),C('nails:nail_primer','nails',49,'0.5','ml'),C('nails:nail_dehydrator','nails',48,'0.5','ml')],
-    's4':[C('nails:cuticle_remover','nails',16,'0.5','ml'),C('nails:bomd_gel_polish_set_120_pcs','nails',2,'1','ml'),C('nails:base_top_coat','nails',5,'0.5','ml'),C('nails:nail_dehydrator','nails',48,'0.5','ml'),C('nails:base_top_coat','nails',5,'0.5','ml'),C('nails:nail_primer','nails',49,'0.5','ml'),C('nails:cuticle_oil_lavender','nails',46,'0.5','ml'),C('nails:merthiolate','nails',24,'0.5','ml'),C('nails:cotton_balls_1600_pcs','nails',38,'2','pcs'),C('nails:alcohol_2l','nails',37,'1','ml')],
+    's1':[C('nails:cuticle_remover','nails',16,'0.5','ml'),C('nails:regular_polish_48_pcs','nails',12,'1.5','ml'),C('nails:merthiolate','nails',24,'0.5','ml'),C('nails:base_top_coat','nails',5,'0.5','ml'),C('nails:cotton_balls_1600_pcs','nails',38,'2','pcs'),C('nails:cuticle_oil_lavender','nails',46,'0.25','ml')],
+    's2':[C('nails:cuticle_remover','nails',16,'0.5','ml'),C('nails:regular_polish_48_pcs','nails',12,'1.5','ml'),C('nails:merthiolate','nails',24,'0.5','ml'),C('nails:foot_soak_1l','nails',18,'0.5','ml'),C('nails:base_top_coat','nails',5,'0.5','ml'),C('nails:cotton_balls_1600_pcs','nails',38,'2','pcs'),C('nails:cuticle_oil_lavender','nails',46,'0.25','ml')],
+    's3':[C('nails:cuticle_remover','nails',16,'0.5','ml'),C('nails:merthiolate','nails',24,'0.5','ml'),C('nails:bomd_gel_polish_set_120_pcs','nails',2,'1.5','ml'),C('nails:bomd_gel_polish_set_120_pcs','nails',2,'1','ml'),C('nails:base_top_coat','nails',5,'1','ml'),C('nails:cotton_balls_1600_pcs','nails',38,'2','pcs'),C('nails:cuticle_oil_lavender','nails',46,'0.5','ml'),C('nails:nail_primer','nails',49,'0.5','ml'),C('nails:nail_dehydrator','nails',48,'0.5','ml')],
+    's4':[C('nails:cuticle_remover','nails',16,'0.5','ml'),C('nails:merthiolate','nails',24,'0.5','ml'),C('nails:bomd_gel_polish_set_120_pcs','nails',2,'1','ml'),C('nails:bomd_gel_polish_set_120_pcs','nails',2,'0.5','ml'),C('nails:nail_dehydrator','nails',48,'0.5','ml'),C('nails:base_top_coat','nails',5,'0.5','ml'),C('nails:nail_primer','nails',49,'0.5','ml'),C('nails:cuticle_oil_lavender','nails',46,'0.5','ml'),C('nails:cotton_balls_1600_pcs','nails',38,'2','pcs')],
     's7':[C('nails:cuticle_remover','nails',16,'2','ml'),C('nails:foot_scrub_1l','nails',20,'6','ml'),C('nails:foot_moisturizing_lotion','nails',22,'5','ml')],
     's8':[C('nails:foot_soak_1l','nails',18,'10','ml'),C('nails:foot_scrub_1l','nails',20,'5','ml'),C('nails:foot_moisturizing_lotion','nails',22,'4','ml'),C('nails:callous_remover','nails',19,'3','ml'),C('nails:foot_blush_spray','nails',23,'3','ml')],
     'hp1':[C('nails:paraffin_wax','nails',28,'30','g'),C('nails:mittens','nails',29,'2','pcs')],
     'fp1':[C('nails:paraffin_wax','nails',28,'60','g'),C('nails:booties','nails',30,'2','pcs')],
     // ── GLOW NAILS: Extensions ───────────────────────────────────────
-    's9':[C('nails:soft_gel_medium_square_long_coffin','nails',53,'10','pcs'),C('nails:nail_primer','nails',49,'0.5','ml'),C('nails:cuticle_remover','nails',16,'0.5','ml'),C('nails:nail_dehydrator','nails',48,'0.5','ml'),C('nails:merthiolate','nails',24,'0.5','ml'),C('nails:base_top_coat','nails',5,'1','ml'),C('nails:base_top_coat','nails',5,'1','ml'),C('nails:nail_glue','nails',52,'1','ml'),C('nails:bomd_gel_polish_set_120_pcs','nails',2,'2','ml'),C('nails:cuticle_oil_lavender','nails',46,'0.5','ml'),C('nails:cotton_balls_1600_pcs','nails',38,'3','pcs')],
+    's9':[C('nails:soft_gel_medium_square_long_coffin','nails',53,'10','pcs'),C('nails:nail_primer','nails',49,'0.5','ml'),C('nails:cuticle_remover','nails',16,'0.5','ml'),C('nails:nail_dehydrator','nails',48,'0.5','ml'),C('nails:merthiolate','nails',24,'0.5','ml'),C('nails:bomd_gel_polish_set_120_pcs','nails',2,'2','ml'),C('nails:bomd_gel_polish_set_120_pcs','nails',2,'1','ml'),C('nails:base_top_coat','nails',5,'1','ml'),C('nails:nail_glue','nails',52,'1','ml'),C('nails:cotton_balls_1600_pcs','nails',38,'3','pcs')],
     // ── GLOW NAILS: Nail Art ─────────────────────────────────────────
     's13':[C('nails:bomd_gel_polish_set_120_pcs','nails',2,'0.10','ml'),C('nails:alcohol_2l','nails',37,'0.10','ml')],
     'wh1':[C('nails:bomd_gel_polish_set_120_pcs','nails',2,'1','ml'),C('nails:alcohol_2l','nails',37,'1','ml')],
@@ -2822,7 +2824,7 @@ function _restoreServiceConsumablesV3(){
   });
   console.log('[GlowBar] _restoreServiceConsumablesV3: patched',patched,'services, cleared state for',clearedState,'. Saving…');
   saveSvcState(); // Persist corrected data immediately
-  localStorage.setItem('gb_cons_restore_v3','done');
+  localStorage.setItem('gb_cons_restore_v4','done');
 }
 function saveSvcState(){
   localStorage.setItem('glowbar_svc2',JSON.stringify({state:svcCatState,cats:SVC_CATS,deletedSvcIds:[...deletedSvcIds],deletedCatIds:[...deletedCatIds]}));
