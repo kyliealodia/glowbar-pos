@@ -2722,6 +2722,66 @@ function loadSvcState(){
       }
     });
   }
+  _autoLinkBaseServices();
+}
+function _stripPkgSuffix(name){
+  return name.replace(/\s+(\d+\+\d+(\s+Package)?|Package)$/i,'').trim();
+}
+function _findBaseService(pkgSvc,catServices){
+  const singles=catServices.filter(s=>!s.sessions);
+  const norm=s=>s.toLowerCase().replace(/\//g,' ');
+  const stripped=norm(_stripPkgSuffix(pkgSvc.name));
+  const exact=singles.filter(s=>norm(s.name)===stripped);
+  if(exact.length===1)return exact[0];
+  if(exact.length>1)return null;
+  const subMatches=singles.filter(s=>{const n=norm(s.name);return n.includes(stripped)||stripped.includes(n);});
+  if(subMatches.length===1)return subMatches[0];
+  const strippedWords=new Set(stripped.split(/\s+/).filter(Boolean));
+  const wm=singles.map(s=>{const sw=new Set(norm(s.name).split(/\s+/).filter(Boolean));const ov=[...strippedWords].filter(w=>sw.has(w)).length;return{svc:s,ov};}).filter(x=>x.ov>=2);
+  if(!wm.length)return null;
+  wm.sort((a,b)=>b.ov-a.ov);
+  if(wm.length>1&&wm[0].ov===wm[1].ov)return null;
+  return wm[0].svc;
+}
+function _autoLinkBaseServices(){
+  let linked=0,unmatched=[];
+  SVC_CATS.forEach(cat=>{
+    (cat.services||[]).forEach(svc=>{
+      if(!svc.sessions)return;
+      if(svc.baseServiceId){console.log('[base-link]',svc.id,'→',svc.baseServiceId,'(already set)');return;}
+      const base=_findBaseService(svc,cat.services);
+      if(base){svc.baseServiceId=base.id;linked++;console.log('[base-link]',svc.id,'('+svc.name+')','→',base.id,'('+base.name+')');}
+      else{unmatched.push(svc.id+' ('+svc.name+')');console.log('[base-link]',svc.id,'('+svc.name+')','→ unmatched');}
+    });
+  });
+  if(linked>0)saveSvcState();
+  if(unmatched.length)console.log('[base-link] Unmatched:',unmatched);
+}
+function syncFromBaseService(catId,pkgSvcId){
+  const cat=SVC_CATS.find(c=>c.id===catId);
+  if(!cat)return;
+  const pkgSvc=(cat.services||[]).find(s=>s.id===pkgSvcId);
+  if(!pkgSvc||!pkgSvc.baseServiceId)return;
+  const baseSvc=(cat.services||[]).find(s=>s.id===pkgSvc.baseServiceId);
+  if(!baseSvc)return;
+  const baseSt=getSvcState(baseSvc.id);
+  const pkgSt=getSvcState(pkgSvcId);
+  pkgSt.consumables=[...(Array.isArray(baseSt.consumables)?baseSt.consumables:(baseSvc.consumables||[]))];
+  pkgSt.staffRole=baseSt.staffRole!==undefined?baseSt.staffRole:(baseSvc.staffRole||'');
+  pkgSt.durationMins=baseSt.durationMins!==undefined?baseSt.durationMins:(baseSvc.durationMins||30);
+  pkgSt.noElec=baseSt.noElec!==undefined?baseSt.noElec:(baseSvc.noElec||false);
+  pkgSt.noWater=baseSt.noWater!==undefined?baseSt.noWater:(baseSvc.noWater||false);
+  saveSvcState();
+  refreshSvcCard(pkgSvcId);
+}
+function setBaseService(catId,pkgSvcId,baseSvcId){
+  const cat=SVC_CATS.find(c=>c.id===catId);
+  if(!cat)return;
+  const pkgSvc=(cat.services||[]).find(s=>s.id===pkgSvcId);
+  if(!pkgSvc)return;
+  pkgSvc.baseServiceId=baseSvcId||undefined;
+  saveSvcState();
+  if(baseSvcId)refreshSvcCard(pkgSvcId);
 }
 // ── CONSUMABLES RESTORATION v5 ───────────────────────────────────────────────
 // Patches localStorage glowbar_svc2 DIRECTLY before the merge runs, so saved.cats
@@ -3185,6 +3245,10 @@ function buildSvcCardInner(svc, catId){
     const effectivePricePerSession=price>0?price/paidSessions:0;
     const profitPerSession=price>0?(profit/paidSessions):0;
     const pColor2=profitPerSession>=0?'var(--green)':'var(--red)';
+    const _baseSingles=(SVC_CATS.find(c=>c.id===catId)?.services||[]).filter(s=>!s.sessions);
+    const _baseCtrl=svc.baseServiceId
+      ?`<button onclick="syncFromBaseService('${catId}','${svc.id}')" style="width:100%;padding:6px 10px;background:var(--cream);border:0.5px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;color:var(--gold-d);font-weight:500">&#8635; Sync consumables, labor, electricity &amp; water from base service</button>`
+      :`<select onchange="setBaseService('${catId}','${svc.id}',this.value)" style="width:100%;padding:5px 8px;border:0.5px solid var(--border);border-radius:6px;font-size:11px;background:var(--cream2);color:var(--text)"><option value="">— pick base service —</option>${_baseSingles.map(s=>`<option value="${s.id}">${s.name.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</option>`).join('')}</select>`;
     pkgBreakdown=`
     <div style="background:var(--cream2);border:0.5px solid var(--border-l);border-radius:8px;padding:10px 12px;margin-bottom:8px;font-size:11px">
       <div style="font-size:10px;font-weight:600;color:var(--gold-d);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px">📦 Package Breakdown</div>
@@ -3232,6 +3296,7 @@ function buildSvcCardInner(svc, catId){
           <div style="font-weight:600;color:var(--gold-d)">&#8369;${effectivePricePerSession.toFixed(2)}</div>
         </div>
       </div>
+      <div style="margin-top:8px">${_baseCtrl}</div>
     </div>`;
   }
 
