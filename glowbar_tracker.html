@@ -2661,7 +2661,7 @@ function loadSvcState(){
           const cs=codeCat.services?.find(x=>x.id===s.id);
           let m={...s};
           if(!s.desc&&cs?.desc) m.desc=cs.desc;
-          if((!s.consumables||s.consumables.length===0)&&cs?.consumables?.length>0) m.consumables=cs.consumables;
+          if(!Array.isArray(s.consumables)&&cs?.consumables?.length>0) m.consumables=cs.consumables;
           return m;
         });
         const mergedCat={...savedCat,services:[...mergedSvcs,...newSvcs]};
@@ -2863,7 +2863,7 @@ function calcSvcCost(svc){
 
   // consumables
   let consCost=0;
-  const cons=(st.consumables&&st.consumables.length>0)?st.consumables:(svc.consumables||[]);
+  const cons=Array.isArray(st.consumables)?st.consumables:(svc.consumables||[]);
   cons.forEach(c=>{ const r=resolveConsItem(c); if(!r)return; const uc=getConsUnitCost(r.groupId,r.iIdx); consCost+=(parseFloat(c.amt)||0)*uc; });
 
   // package: cost = sessions * per-session-cost (using labor+elec+water+cons only)
@@ -2986,7 +2986,7 @@ function svcConsRowHtml(svcId,c,ci){
 function _findSvc(svcId){ for(const cat of SVC_CATS){const s=cat.services.find(x=>x.id===svcId);if(s)return s;} return null; }
 function _initConsState(svcId){
   const st=getSvcState(svcId);
-  if(!st.consumables||!st.consumables.length){
+  if(!Array.isArray(st.consumables)){
     const svc=_findSvc(svcId);
     st.consumables=[...(svc?.consumables||[])];
   }
@@ -3130,7 +3130,7 @@ function buildSvcCardInner(svc, catId){
   const st=getSvcState(svc.id);
   const {laborCost,elec,water,consCost,totalCost,price,commission,discount,profit,margin,durationMins,roleId}=calcSvcCost(svc);
   const pColor=profit>=0?'var(--green)':'var(--red)';
-  const cons=(st.consumables&&st.consumables.length>0)?st.consumables:(svc.consumables||[]);
+  const cons=Array.isArray(st.consumables)?st.consumables:(svc.consumables||[]);
   const _nailCats=new Set(['nails_mani','nails_ext','nails_art','nails_pkg']);
   const _nonRetailCats=new Set(['skin_rej','diode','pico','tattoo','wart','exilis','waxing','glow_pkg']);
   const _isNailCat=_nailCats.has(catId);
