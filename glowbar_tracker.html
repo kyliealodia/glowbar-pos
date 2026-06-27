@@ -104,7 +104,7 @@ window.pushServicesToPOS = async function(){
         const st = state[svc.id] || {};
         const price = parseFloat(st.price || svc.price || 0);
         const durationMins = parseFloat(st.durationMins || svc.durationMins || 30);
-        const consumables = st.consumables || svc.consumables || [];
+        const consumables = Array.isArray(st.consumables)?st.consumables:(svc.consumables||[]);
 
         // Find existing POS product by name to preserve stock/other fields
         const existing = existingArr.find(p => p && p.name === svc.name);
@@ -164,7 +164,7 @@ function calcTrackerCost(svc, st){
   const water = parseFloat(document.getElementById('water-rate')?.value || 9);
   const durationMins = parseFloat(st.durationMins || svc.durationMins || 30);
   let consCost = 0;
-  const cons = st.consumables || svc.consumables || [];
+  const cons = Array.isArray(st.consumables)?st.consumables:(svc.consumables||[]);
   cons.forEach(c => {
     const r=resolveConsItem(c); if(!r) return;
     if(typeof getConsUnitCost === 'function'){
@@ -276,7 +276,7 @@ window.pushPackagesToPOS = async function(){
         const lookup = svcLookup[svcName];
         if(!lookup) return;
         const {svc, st} = lookup;
-        const cons = st.consumables || svc.consumables || [];
+        const cons = Array.isArray(st.consumables)?st.consumables:(svc.consumables||[]);
         cons.forEach(c => {
           const key = c.groupId || ('_iIdx_'+(c.iIdx??''));
           if(!mergedCons[key]) mergedCons[key] = {...c, amt: 0};
@@ -3131,6 +3131,7 @@ function buildSvcCardInner(svc, catId){
   const {laborCost,elec,water,consCost,totalCost,price,commission,discount,profit,margin,durationMins,roleId}=calcSvcCost(svc);
   const pColor=profit>=0?'var(--green)':'var(--red)';
   const cons=Array.isArray(st.consumables)?st.consumables:(svc.consumables||[]);
+  console.log('[cons]',svc.id,'st.consumables=',st.consumables,'svc.consumables=',svc.consumables,'using=',(Array.isArray(st.consumables)?'state':'default'),'len=',cons.length);
   const _nailCats=new Set(['nails_mani','nails_ext','nails_art','nails_pkg']);
   const _nonRetailCats=new Set(['skin_rej','diode','pico','tattoo','wart','exilis','waxing','glow_pkg']);
   const _isNailCat=_nailCats.has(catId);
@@ -3562,7 +3563,7 @@ function confirmComboBuilder(){
     const svc=allSvcs.find(s=>s.id===sid); if(!svc)return;
     const st=getSvcState(svc.id);
     totalDuration+=parseFloat(st.durationMins||svc.durationMins||30);
-    const cons=st.consumables||svc.consumables||[];
+    const cons=Array.isArray(st.consumables)?st.consumables:(svc.consumables||[]);
     cons.forEach(c=>{
       const r=resolveConsItem(c); if(!r) return;
       const key=c.consId||r.groupId+'_'+r.iIdx;
@@ -3595,7 +3596,7 @@ function rebuildComboFromMembers(catId,svcId){
     const ms=allSvcs.find(s=>s.id===mid); if(!ms)return;
     const st=getSvcState(ms.id);
     totalDuration+=parseFloat(st.durationMins||ms.durationMins||30);
-    const cons=st.consumables||ms.consumables||[];
+    const cons=Array.isArray(st.consumables)?st.consumables:(ms.consumables||[]);
     cons.forEach(c=>{
       const r=resolveConsItem(c); if(!r) return;
       const key=c.consId||r.groupId+'_'+r.iIdx;
