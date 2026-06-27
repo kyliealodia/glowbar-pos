@@ -166,9 +166,9 @@ function calcTrackerCost(svc, st){
   let consCost = 0;
   const cons = st.consumables || svc.consumables || [];
   cons.forEach(c => {
-    if(!c.groupId && c.iIdx === undefined) return;
+    const r=resolveConsItem(c); if(!r) return;
     if(typeof getConsUnitCost === 'function'){
-      consCost += (parseFloat(c.amt) || 0) * getConsUnitCost(c.groupId, c.iIdx);
+      consCost += (parseFloat(c.amt) || 0) * getConsUnitCost(r.groupId, r.iIdx);
     }
   });
   return Math.round(elec + water + consCost);
@@ -2733,7 +2733,7 @@ function calcSvcCost(svc){
   // consumables
   let consCost=0;
   const cons=(st.consumables&&st.consumables.length>0)?st.consumables:(svc.consumables||[]);
-  cons.forEach(c=>{ if(!c.groupId||c.iIdx==null||c.iIdx<0)return; const uc=getConsUnitCost(c.groupId,c.iIdx); consCost+=(parseFloat(c.amt)||0)*uc; });
+  cons.forEach(c=>{ const r=resolveConsItem(c); if(!r)return; const uc=getConsUnitCost(r.groupId,r.iIdx); consCost+=(parseFloat(c.amt)||0)*uc; });
 
   // package: cost = sessions * per-session-cost (using labor+elec+water+cons only)
   let totalCost=laborCost+elec+water+consCost;
@@ -2765,6 +2765,41 @@ function getConsUnitCost(groupId,iIdx){
   const total=parseFloat(item.totalCost||item.total)||0;
   return total/(unitsInPack*volPerUnit);
 }
+// ── STABLE CONSUMABLE IDs ─────────────────────────────────────────
+// Each item gets a permanent cid derived from its group+name so that
+// reordering the Consumables tab never scrambles service references.
+function initConsIds(){
+  let count=0;
+  CONS_DATA.forEach(g=>{
+    g.items.forEach(item=>{
+      if(!item.cid){
+        item.cid=g.id+':'+item.name.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
+        count++;
+      }
+    });
+  });
+  if(count>0) console.log('[GlowBar] initConsIds: assigned stable cid to',count,'consumable items. positional iIdx is no longer used for resolution.');
+}
+// Resolve a consumable entry {consId?,groupId?,iIdx?} to {groupId,iIdx}.
+// Returns null for old/corrupted entries that lack a consId — the caller
+// should treat those as "unresolved" and show a re-select placeholder.
+// IMPORTANT: we do NOT fall back to iIdx because iIdx may point to the
+// wrong item if the Consumables tab was edited (items added/removed/reordered).
+function resolveConsItem(c){
+  if(!c) return null;
+  if(c.consId){
+    for(const g of CONS_DATA){
+      for(let i=0;i<g.items.length;i++){
+        if(g.items[i].cid===c.consId) return {groupId:g.id,iIdx:i};
+      }
+    }
+    console.warn('[GlowBar] resolveConsItem: consId not found in CONS_DATA:',c.consId,'— item may have been renamed or deleted');
+    return null;
+  }
+  // No consId → old positional-only entry, possibly corrupted. Do not guess.
+  if(c.groupId!=null) console.warn('[GlowBar] resolveConsItem: legacy entry without consId (groupId='+c.groupId+',iIdx='+c.iIdx+') will show as unresolved — please re-select the consumable');
+  return null;
+}
 function buildConsDropdown(selectedFlatIdx){
   const noneSelected = selectedFlatIdx === undefined || selectedFlatIdx === null || parseInt(selectedFlatIdx) < 0;
   let opts=`<option value="-1"${noneSelected?' selected':''}>— pick consumable —</option>`;
@@ -2783,14 +2818,14 @@ function flatIdxFromGroupItem(groupId,iIdx){ let flat=0; for(const g of CONS_DAT
 
 // ── SERVICE CARD RENDERING ────────────────────────────────────────
 function svcConsRowHtml(svcId,c,ci){
-  const flatIdx=c.groupId?flatIdxFromGroupItem(c.groupId,c.iIdx):-1;
-  const uc=c.groupId&&c.iIdx>=0?getConsUnitCost(c.groupId,c.iIdx):0;
+  const _r=resolveConsItem(c); // null for old/corrupted entries without consId
+  const flatIdx=_r?flatIdxFromGroupItem(_r.groupId,_r.iIdx):-1;
+  const uc=_r?getConsUnitCost(_r.groupId,_r.iIdx):0;
   const amt=parseFloat(c.amt)||0;
   const lc=amt*uc;
-  // Get the UOM for display
-  const group=c.groupId?CONS_DATA.find(g=>g.id===c.groupId):null;
-  const item=group&&c.iIdx>=0?group.items[c.iIdx]:null;
-  const cs=group&&item?getCS(c.groupId,c.iIdx):{};
+  const group=_r?CONS_DATA.find(g=>g.id===_r.groupId):null;
+  const item=(_r&&group)?group.items[_r.iIdx]:null;
+  const cs=_r?getCS(_r.groupId,_r.iIdx):{};
   const uom=cs.uom||item?.uom||'pcs';
   const cpuDisplay=uc>0?`<span style="font-size:10px;color:var(--muted)">₱${uc<1?uc.toFixed(4):uc.toFixed(2)}/${uom}</span>`:'';
   const costDisplay=lc>0?`<span style="font-size:11px;font-weight:600;color:var(--gold-d)">₱${lc.toFixed(2)}</span>`:'<span style="color:var(--muted);font-size:11px">—</span>';
@@ -2840,6 +2875,7 @@ function setSvcCons(svcId,ci,f,v){
       for(let ii=0;ii<g.items.length;ii++){
         if(flat===target){
           c.groupId=g.id; c.iIdx=ii;
+          c.consId=g.items[ii].cid||''; // stable ID — survives reorder
           const cs=getCS(g.id,ii);
           c.unit=cs.uom||g.items[ii].uom||'ml';
           found=true; break;
@@ -2885,13 +2921,14 @@ function buildComboSvcCardInner(svc, catId){
   // Extra consumables section
   const extras=st.extraConsumables||[];
   const extraRows=extras.map((c,ci)=>{
-    const flatIdx=c.groupId?flatIdxFromGroupItem(c.groupId,c.iIdx):-1;
-    const uc=c.groupId&&c.iIdx>=0?getConsUnitCost(c.groupId,c.iIdx):0;
+    const _r=resolveConsItem(c);
+    const flatIdx=_r?flatIdxFromGroupItem(_r.groupId,_r.iIdx):-1;
+    const uc=_r?getConsUnitCost(_r.groupId,_r.iIdx):0;
     const amt=parseFloat(c.amt)||0;
     const lc=amt*uc;
-    const group=c.groupId?CONS_DATA.find(g=>g.id===c.groupId):null;
-    const item=group&&c.iIdx>=0?group.items[c.iIdx]:null;
-    const cs=group&&item?getCS(c.groupId,c.iIdx):{};
+    const group=_r?CONS_DATA.find(g=>g.id===_r.groupId):null;
+    const item=(_r&&group)?group.items[_r.iIdx]:null;
+    const cs=_r?getCS(_r.groupId,_r.iIdx):{};
     const uom=cs.uom||item?.uom||'pcs';
     const cpuDisplay=uc>0?`<span style="font-size:10px;color:var(--muted)">&#8369;${uc<1?uc.toFixed(4):uc.toFixed(2)}/${uom}</span>`:'';
     const costDisplay=lc>0?`<span style="font-size:11px;font-weight:600;color:var(--gold-d)">&#8369;${lc.toFixed(2)}</span>`:'<span style="color:var(--muted);font-size:11px">&#8212;</span>';
@@ -3396,10 +3433,10 @@ function confirmComboBuilder(){
     totalDuration+=parseFloat(st.durationMins||svc.durationMins||30);
     const cons=st.consumables||svc.consumables||[];
     cons.forEach(c=>{
-      if(!c.groupId||c.iIdx<0)return;
-      const key=c.groupId+'_'+c.iIdx;
+      const r=resolveConsItem(c); if(!r) return;
+      const key=c.consId||r.groupId+'_'+r.iIdx;
       if(mergedConMap[key]){ mergedConMap[key].amt=String(parseFloat(mergedConMap[key].amt||0)+parseFloat(c.amt||0)); }
-      else{ mergedConMap[key]={...c}; mergedCons.push(mergedConMap[key]); }
+      else{ mergedConMap[key]={...c, groupId:r.groupId, iIdx:r.iIdx}; mergedCons.push(mergedConMap[key]); }
     });
   });
   const cat=SVC_CATS.find(c=>c.id===catId); if(!cat)return;
@@ -3429,15 +3466,15 @@ function rebuildComboFromMembers(catId,svcId){
     totalDuration+=parseFloat(st.durationMins||ms.durationMins||30);
     const cons=st.consumables||ms.consumables||[];
     cons.forEach(c=>{
-      if(!c.groupId||c.iIdx<0)return;
-      const key=c.groupId+'_'+c.iIdx;
+      const r=resolveConsItem(c); if(!r) return;
+      const key=c.consId||r.groupId+'_'+r.iIdx;
       if(mergedConMap[key]){ mergedConMap[key].amt=String(parseFloat(mergedConMap[key].amt||0)+parseFloat(c.amt||0)); }
-      else{ mergedConMap[key]={...c}; mergedCons.push(mergedConMap[key]); }
+      else{ mergedConMap[key]={...c, groupId:r.groupId, iIdx:r.iIdx}; mergedCons.push(mergedConMap[key]); }
     });
   });
   // Append extra consumables so they survive rebuild
   const st=getSvcState(svcId);
-  const extras=(st.extraConsumables||[]).filter(c=>c.groupId&&c.iIdx>=0);
+  const extras=(st.extraConsumables||[]).filter(c=>resolveConsItem(c)!=null);
   const finalCons=[...mergedCons,...extras];
   svc.consumables=finalCons;
   svc.durationMins=totalDuration;
@@ -3476,6 +3513,7 @@ function setComboExtraCons(svcId,idx,field,value){
         if(rem<g.items.length){
           st.extraConsumables[idx].groupId=g.id;
           st.extraConsumables[idx].iIdx=rem;
+          st.extraConsumables[idx].consId=g.items[rem]?.cid||''; // stable ID
           found=true; break;
         }
         rem-=g.items.length;
@@ -4135,6 +4173,9 @@ const CONS_DATA = [
   ]}
 ];
 
+// Assign stable cids immediately so fresh loads (no snapshot) also have them
+initConsIds();
+
 // ── CONS STATE: stores new qty/unitCost per item keyed by "groupId_itemIndex" ──
 let consState = {};
 
@@ -4158,6 +4199,8 @@ function loadConsState(){
   Object.values(consState).forEach(s=>{
     if(!s.paymentStatus) s.paymentStatus=s.paid?'paid':'unpaid';
   });
+  // Re-assign stable cids after snapshot restore (snapshot items may be reordered)
+  initConsIds();
 }
 function saveConsState(){
   // Save both edit-state AND the current items list so deletions/additions survive reload
