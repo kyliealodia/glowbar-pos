@@ -2701,6 +2701,128 @@ function loadSvcState(){
       }
     });
   }
+  // One-time restoration of correct consumables after corruption incident
+  _restoreServiceConsumablesV3();
+}
+// ── CONSUMABLES RESTORATION (run once on load to fix iIdx-drift corruption) ──
+function _restoreServiceConsumablesV3(){
+  if(localStorage.getItem('gb_cons_restore_v3')==='done') return;
+  // Helper to build a consumable entry with stable consId
+  const C=(consId,groupId,iIdx,amt,unit)=>({consId,groupId,iIdx,amt,unit});
+  // Correct consumables per service id — verified against CONS_DATA indices
+  const RESTORE={
+    // ── GLOW NAILS: Manicure & Pedicure ──────────────────────────────
+    's1':[C('nails:cuticle_remover','nails',16,'0.5','ml'),C('nails:regular_polish_48_pcs','nails',12,'1.5','ml'),C('nails:merthiolate','nails',24,'0.5','ml'),C('nails:base_top_coat','nails',5,'0.5','ml'),C('nails:alcohol_2l','nails',37,'1','ml'),C('nails:cotton_balls_1600_pcs','nails',38,'2','pcs'),C('nails:cuticle_oil_lavender','nails',46,'0.25','ml')],
+    's2':[C('nails:cuticle_remover','nails',16,'0.5','ml'),C('nails:foot_soak_1l','nails',18,'0.5','ml'),C('nails:merthiolate','nails',24,'0.5','ml'),C('nails:base_top_coat','nails',5,'0.5','ml'),C('nails:regular_polish_48_pcs','nails',12,'1.5','ml'),C('nails:alcohol_2l','nails',37,'1','ml'),C('nails:cotton_balls_1600_pcs','nails',38,'2','pcs'),C('nails:cuticle_oil_lavender','nails',46,'0.25','ml')],
+    's3':[C('nails:cuticle_remover','nails',16,'0.5','ml'),C('nails:merthiolate','nails',24,'0.5','ml'),C('nails:base_top_coat','nails',5,'1','ml'),C('nails:base_top_coat','nails',5,'1','ml'),C('nails:bomd_gel_polish_set_120_pcs','nails',2,'1.5','ml'),C('nails:alcohol_2l','nails',37,'1','ml'),C('nails:cotton_balls_1600_pcs','nails',38,'2','pcs'),C('nails:cuticle_oil_lavender','nails',46,'0.5','ml'),C('nails:nail_primer','nails',49,'0.5','ml'),C('nails:nail_dehydrator','nails',48,'0.5','ml')],
+    's4':[C('nails:cuticle_remover','nails',16,'0.5','ml'),C('nails:bomd_gel_polish_set_120_pcs','nails',2,'1','ml'),C('nails:base_top_coat','nails',5,'0.5','ml'),C('nails:nail_dehydrator','nails',48,'0.5','ml'),C('nails:base_top_coat','nails',5,'0.5','ml'),C('nails:nail_primer','nails',49,'0.5','ml'),C('nails:cuticle_oil_lavender','nails',46,'0.5','ml'),C('nails:merthiolate','nails',24,'0.5','ml'),C('nails:cotton_balls_1600_pcs','nails',38,'2','pcs'),C('nails:alcohol_2l','nails',37,'1','ml')],
+    's7':[C('nails:cuticle_remover','nails',16,'2','ml'),C('nails:foot_scrub_1l','nails',20,'6','ml'),C('nails:foot_moisturizing_lotion','nails',22,'5','ml')],
+    's8':[C('nails:foot_soak_1l','nails',18,'10','ml'),C('nails:foot_scrub_1l','nails',20,'5','ml'),C('nails:foot_moisturizing_lotion','nails',22,'4','ml'),C('nails:callous_remover','nails',19,'3','ml'),C('nails:foot_blush_spray','nails',23,'3','ml')],
+    'hp1':[C('nails:paraffin_wax','nails',28,'30','g'),C('nails:mittens','nails',29,'2','pcs')],
+    'fp1':[C('nails:paraffin_wax','nails',28,'60','g'),C('nails:booties','nails',30,'2','pcs')],
+    // ── GLOW NAILS: Extensions ───────────────────────────────────────
+    's9':[C('nails:soft_gel_medium_square_long_coffin','nails',53,'10','pcs'),C('nails:nail_primer','nails',49,'0.5','ml'),C('nails:cuticle_remover','nails',16,'0.5','ml'),C('nails:nail_dehydrator','nails',48,'0.5','ml'),C('nails:merthiolate','nails',24,'0.5','ml'),C('nails:base_top_coat','nails',5,'1','ml'),C('nails:base_top_coat','nails',5,'1','ml'),C('nails:nail_glue','nails',52,'1','ml'),C('nails:bomd_gel_polish_set_120_pcs','nails',2,'2','ml'),C('nails:cuticle_oil_lavender','nails',46,'0.5','ml'),C('nails:cotton_balls_1600_pcs','nails',38,'3','pcs')],
+    // ── GLOW NAILS: Nail Art ─────────────────────────────────────────
+    's13':[C('nails:bomd_gel_polish_set_120_pcs','nails',2,'0.10','ml'),C('nails:alcohol_2l','nails',37,'0.10','ml')],
+    'wh1':[C('nails:bomd_gel_polish_set_120_pcs','nails',2,'1','ml'),C('nails:alcohol_2l','nails',37,'1','ml')],
+    's15':[C('nails:chrome_nail_art','nails',4,'2','pcs')],
+    's16':[C('nails:nail_glue','nails',52,'0.10','ml')],
+    'us1':[C('nails:nail_glue','nails',52,'0.5','ml')],
+    'ub1':[C('nails:nail_glue','nails',52,'1','ml')],
+    'fj1':[C('nails:foot_jelly_30_pcs','nails',25,'1','pcs')],
+    // ── GLOW WAX ─────────────────────────────────────────────────────
+    's20':[C('waxing:pre_wax_cleanser','waxing',6,'2','ml'),C('waxing:pre_post_wax_powder','waxing',1,'2','g'),C('waxing:aloe_vera_gel','waxing',7,'3','ml'),C('waxing:wax_stick_100_pcs','waxing',5,'2','pcs'),C('waxing:hard_wax_beans','waxing',0,'10','g')],
+    'gw2':[C('waxing:pre_wax_cleanser','waxing',6,'2','ml'),C('waxing:pre_post_wax_powder','waxing',1,'2','g'),C('waxing:depilatory_paper_200_pcs','waxing',3,'2','pcs'),C('waxing:aloe_vera_gel','waxing',7,'3','ml'),C('waxing:soft_wax_cartridge','waxing',8,'3','ml'),C('waxing:wax_stick_100_pcs','waxing',5,'2','pcs')],
+    'gw3':[C('waxing:pre_wax_cleanser','waxing',6,'4','ml'),C('waxing:pre_post_wax_powder','waxing',1,'4','g'),C('waxing:depilatory_paper_200_pcs','waxing',3,'4','pcs'),C('waxing:aloe_vera_gel','waxing',7,'5','ml'),C('waxing:soft_wax_cartridge','waxing',8,'6','ml'),C('waxing:wax_stick_100_pcs','waxing',5,'3','pcs')],
+    'gw4':[C('waxing:pre_wax_cleanser','waxing',6,'2','ml'),C('waxing:pre_post_wax_powder','waxing',1,'2','g'),C('waxing:depilatory_paper_200_pcs','waxing',3,'2','pcs'),C('waxing:aloe_vera_gel','waxing',7,'3','ml'),C('waxing:soft_wax_cartridge','waxing',8,'3','ml'),C('waxing:wax_stick_100_pcs','waxing',5,'2','pcs')],
+    'gw5':[C('waxing:pre_wax_cleanser','waxing',6,'5','ml'),C('waxing:pre_post_wax_powder','waxing',1,'5','g'),C('waxing:depilatory_paper_200_pcs','waxing',3,'5','pcs'),C('waxing:aloe_vera_gel','waxing',7,'7','ml'),C('waxing:soft_wax_cartridge','waxing',8,'9','ml'),C('waxing:wax_stick_100_pcs','waxing',5,'4','pcs')],
+    'gw6':[C('waxing:pre_wax_cleanser','waxing',6,'2','ml'),C('waxing:pre_post_wax_powder','waxing',1,'2','g'),C('waxing:aloe_vera_gel','waxing',7,'3','ml'),C('waxing:wax_stick_100_pcs','waxing',5,'2','pcs'),C('waxing:hard_wax_beans','waxing',0,'25','g')],
+    // ── GLOW FACIALS ─────────────────────────────────────────────────
+    's34':[C('facial:glutathione_toner_brightening','facial',15,'2','g'),C('facial:compress_mask_100_pcs','facial',34,'1','pcs'),C('nails:mittens','nails',29,'1','pcs'),C('facial:natural_anti_acne_facial_wash_tea_tree_1l','facial',3,'2','ml'),C('facial:sunscreen_cream_gel_spf50','facial',6,'2','ml'),C('facial:anesthesia_numbing_cream','facial',21,'3','g')],
+    's35':[C('facial:glutathione_toner_brightening','facial',15,'2','g'),C('facial:compress_mask_100_pcs','facial',34,'1','pcs'),C('nails:mittens','nails',29,'1','pcs'),C('facial:natural_anti_acne_facial_wash_tea_tree_1l','facial',3,'2','ml'),C('facial:rejuvenating_body_set_x10','facial',35,'2','ml'),C('facial:anesthesia_numbing_cream','facial',21,'3','g'),C('facial:hydrocortisone_1_cream_1kg','facial',43,'3','g')],
+    's36':[C('facial:glutathione_toner_brightening','facial',15,'2','g'),C('facial:compress_mask_100_pcs','facial',34,'1','pcs'),C('nails:mittens','nails',29,'1','pcs'),C('facial:glass_skin_foamy_wash_1l','facial',4,'2','ml'),C('facial:sunscreen_cream_gel_spf50','facial',6,'2','ml'),C('facial:facial_tissue','facial',45,'3','g')],
+    's37':[C('facial:glutathione_toner_brightening','facial',15,'2','g'),C('facial:compress_mask_100_pcs','facial',34,'1','pcs'),C('nails:mittens','nails',29,'1','pcs'),C('facial:niacinamide_anti_acne_toner_pore_minimizer','facial',5,'2','ml'),C('facial:glass_skin_set_premium_x10','facial',36,'2','ml'),C('facial:hydrocortisone_1_cream','facial',20,'3','g'),C('facial:facial_tissue','facial',45,'3','g'),C('facial:collagen_mask_peel_off','facial',29,'3','g')],
+    'sgf1':[C('facial:glutathione_toner_brightening','facial',15,'2','g'),C('facial:compress_mask_100_pcs','facial',34,'1','pcs'),C('nails:mittens','nails',29,'1','pcs'),C('facial:natural_anti_acne_facial_wash_tea_tree_1l','facial',3,'2','ml'),C('facial:rejuvenating_body_set_x10','facial',35,'2','ml'),C('facial:anesthesia_numbing_cream','facial',21,'3','g'),C('facial:hydrocortisone_1_cream_1kg','facial',43,'3','g')],
+    'dpf1':[C('facial:glutathione_toner_brightening','facial',15,'2','g'),C('facial:compress_mask_100_pcs','facial',34,'1','pcs'),C('nails:mittens','nails',29,'1','pcs'),C('facial:natural_anti_acne_facial_wash_tea_tree_1l','facial',3,'2','ml'),C('facial:rejuvenating_body_set_x10','facial',35,'2','ml'),C('facial:anesthesia_numbing_cream','facial',21,'3','g')],
+    // ── GLOW FACIALS: Add-ons ────────────────────────────────────────
+    's39':[], // LED Therapy: no consumables
+    's41':[C('facial:compress_mask_100_pcs','facial',34,'1','pcs')], // Collagen Mask add-on: 1 compress mask sheet
+    'mm1':[], // Moisturizing Mask: no consumables
+    'wm1':[], // Whitening Mask: no consumables
+    'gm1':[], // 24K Gold Mask: no consumables
+    // ── GLOW SKIN: Diode Laser (Razor only per session) ─────────────
+    'd1':[C('machine:razor_20_pcs','machine',1,'1','pcs')],
+    'd4':[C('machine:razor_20_pcs','machine',1,'1','pcs')],
+    'd5':[C('machine:razor_20_pcs','machine',1,'1','pcs')],
+    'd6':[C('machine:razor_20_pcs','machine',1,'1','pcs')],
+    'd7':[C('machine:razor_20_pcs','machine',1,'1','pcs')],
+    'd8':[C('machine:razor_20_pcs','machine',1,'1','pcs')],
+    'd16':[C('machine:razor_20_pcs','machine',1,'1','pcs')],
+    'd19':[C('machine:razor_20_pcs','machine',1,'1','pcs')],
+    'd9':[C('machine:razor_20_pcs','machine',1,'1','pcs')],
+    'd20':[C('machine:razor_20_pcs','machine',1,'1','pcs')],
+    'd11':[C('machine:razor_20_pcs','machine',1,'1','pcs')],
+    'd21':[C('machine:razor_20_pcs','machine',1,'1','pcs')],
+    'd12':[C('machine:razor_20_pcs','machine',1,'1','pcs')],
+    'd22':[C('machine:razor_20_pcs','machine',1,'1','pcs')],
+    'd13':[C('machine:razor_20_pcs','machine',1,'1','pcs')],
+    'd23':[C('machine:razor_20_pcs','machine',1,'1','pcs')],
+    'd14':[C('machine:razor_20_pcs','machine',1,'1','pcs')],
+    'd24':[C('machine:razor_20_pcs','machine',1,'1','pcs')],
+    'd15':[C('machine:razor_20_pcs','machine',1,'1','pcs')],
+    'd17':[C('machine:razor_20_pcs','machine',1,'1','pcs')],
+    'd18':[C('machine:razor_20_pcs','machine',1,'1','pcs')],
+    // ── GLOW SKIN: Pico Laser (no consumables) ──────────────────────
+    'p1':[],'p2':[],'p3':[],'p4':[],'p5':[],'p6':[],'p7':[],'p8':[],
+    'p17':[],'p9':[],'p18':[],'p10':[],'p19':[],'p11':[],'p20':[],'p12':[],
+    'p21':[],'p13':[],'p22':[],'p14':[],'p23':[],'p15':[],'p24':[],'p16':[],
+    // ── GLOW SKIN: Carbon Laser (single sessions: Razor; packages: none) ─
+    'c1':[C('machine:razor_20_pcs','machine',1,'1','pcs')],
+    'c2':[C('machine:razor_20_pcs','machine',1,'1','pcs')],
+    'c9':[C('machine:razor_20_pcs','machine',1,'1','pcs')],
+    'c3':[],'c4':[],'c5':[],'c6':[],'c7':[],'c8':[],
+    // ── GLOW SKIN: Underarm Combo Packages (no consumables) ─────────
+    'u1':[],'u2':[],'u3':[],'u4':[],
+    // ── GLOW INK ─────────────────────────────────────────────────────
+    't1':[C('facial:anesthesia_numbing_cream','facial',21,'3','g')],
+    // ── GLOW CLEAR ───────────────────────────────────────────────────
+    'gc1':[C('facial:anesthesia_numbing_cream','facial',21,'3','g')],
+    'gc2':[C('facial:anesthesia_numbing_cream','facial',21,'3','g')],
+    // ── EXILIS GLOW ──────────────────────────────────────────────────
+    'e1':[C('machine:rf_cream_1_gallon','machine',0,'10','g')],
+    'e2':[C('machine:rf_cream_1_gallon','machine',0,'8','g')],
+    'e3':[C('machine:rf_cream_1_gallon','machine',0,'5','g')],
+    'e4':[C('machine:rf_cream_1_gallon','machine',0,'3','g')],
+    'e5':[C('machine:grounding_pad','machine',5,'10','ml')],
+    'e6':[C('machine:grounding_pad','machine',5,'15','ml')],
+    'e7':[C('machine:grounding_pad','machine',5,'0.1','pcs'),C('machine:rf_cream_1_gallon','machine',0,'6','g')],
+    'e8':[C('machine:grounding_pad','machine',5,'0.1','pcs'),C('machine:rf_cream_1_gallon','machine',0,'6','g')],
+    'e9':[C('machine:grounding_pad','machine',5,'0.1','pcs')],
+    'e10':[C('machine:grounding_pad','machine',5,'0.1','pcs'),C('machine:rf_cream_1_gallon','machine',0,'6','g')],
+    // Exilis packages: no consumables
+    'e11':[],'e12':[],'e13':[],'e14':[],'e23':[],'e15':[],'e24':[],'e16':[],
+    'e25':[],'e17':[],'e26':[],'e18':[],'e27':[],'e19':[],'e28':[],'e20':[],
+    'e29':[],'e21':[],'e30':[],'e22':[],
+  };
+  // Clear corrupted svcCatState consumables so patched svc.consumables wins
+  let clearedState=0;
+  Object.keys(RESTORE).forEach(id=>{
+    if(svcCatState[id]&&svcCatState[id].consumables!==undefined){
+      delete svcCatState[id].consumables;
+      clearedState++;
+    }
+  });
+  // Patch in-memory SVC_CATS with correct consumables
+  let patched=0;
+  Object.entries(RESTORE).forEach(([id,cons])=>{
+    for(const cat of SVC_CATS){
+      const svc=cat.services?.find(s=>s.id===id);
+      if(svc){svc.consumables=cons;patched++;break;}
+    }
+  });
+  console.log('[GlowBar] _restoreServiceConsumablesV3: patched',patched,'services, cleared state for',clearedState,'. Saving…');
+  saveSvcState(); // Persist corrected data immediately
+  localStorage.setItem('gb_cons_restore_v3','done');
 }
 function saveSvcState(){
   localStorage.setItem('glowbar_svc2',JSON.stringify({state:svcCatState,cats:SVC_CATS,deletedSvcIds:[...deletedSvcIds],deletedCatIds:[...deletedCatIds]}));
