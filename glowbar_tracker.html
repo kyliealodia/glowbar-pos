@@ -153,15 +153,18 @@ window.pushServicesToPOS = async function(){
     await set(ref(db, 'gb/serviceNames'), serviceNames);
 
     console.log('GlowBar Tracker: pushed', updated.length, 'services to gb/products & gb/serviceNames');
-    // Sanity-check: calcTrackerCost should match calcSvcCost for s1
-    const _s1cat = cats.find(c=>(c.services||[]).some(s=>s.id==='s1'));
-    const _s1svc = _s1cat?.services.find(s=>s.id==='s1');
-    if(_s1svc){
-      const _s1st = state['s1']||{};
-      const trackerTotal = calcTrackerCost(_s1svc, _s1st);
-      const uiResult = (typeof calcSvcCost==='function') ? calcSvcCost(_s1svc) : null;
-      console.log('[cost-check s1] calcTrackerCost=', trackerTotal, ' | calcSvcCost totalCost=', uiResult?.totalCost, ' | match=', uiResult ? Math.abs(trackerTotal - uiResult.totalCost) < 0.01 : 'calcSvcCost not available here');
-    }
+    // Sanity-check: calcTrackerCost must match calcSvcCost for regular and package services
+    ['s1','d19','p17','p18','c3'].forEach(id=>{
+      const _cat=cats.find(c=>(c.services||[]).some(s=>s.id===id));
+      const _svc=_cat?.services.find(s=>s.id===id);
+      if(!_svc) return;
+      const _st=state[id]||{};
+      const trackerVal=calcTrackerCost(_svc,_st);
+      const uiVal=(typeof calcSvcCost==='function')?calcSvcCost(_svc)?.totalCost:null;
+      const match=uiVal!=null?Math.abs(trackerVal-(uiVal||0))<0.01:'calcSvcCost unavailable';
+      const sessions=_svc.sessions?`sessions=${_svc.sessions}+${_svc.freeSessions||0}free `:'';
+      console.log(`[cost-check ${id}] ${_svc.name} ${sessions}| calcTrackerCost=`,trackerVal.toFixed(2),'| calcSvcCost=',uiVal!=null?uiVal.toFixed(2):'n/a','| match=',match);
+    });
   } catch(e) {
     console.error('pushServicesToPOS error:', e);
   }
