@@ -153,25 +153,42 @@ window.pushServicesToPOS = async function(){
     await set(ref(db, 'gb/serviceNames'), serviceNames);
 
     console.log('GlowBar Tracker: pushed', updated.length, 'services to gb/products & gb/serviceNames');
+    // Sanity-check: calcTrackerCost should match calcSvcCost for s1
+    const _s1cat = cats.find(c=>(c.services||[]).some(s=>s.id==='s1'));
+    const _s1svc = _s1cat?.services.find(s=>s.id==='s1');
+    if(_s1svc){
+      const _s1st = state['s1']||{};
+      const trackerTotal = calcTrackerCost(_s1svc, _s1st);
+      const uiResult = (typeof calcSvcCost==='function') ? calcSvcCost(_s1svc) : null;
+      console.log('[cost-check s1] calcTrackerCost=', trackerTotal, ' | calcSvcCost totalCost=', uiResult?.totalCost, ' | match=', uiResult ? Math.abs(trackerTotal - uiResult.totalCost) < 0.01 : 'calcSvcCost not available here');
+    }
   } catch(e) {
     console.error('pushServicesToPOS error:', e);
   }
 };
 
 // ── HELPER: calculate raw cost from tracker state ─────────────────
+// Must stay identical in formula to calcSvcCost() so POS cost field matches UI.
 function calcTrackerCost(svc, st){
-  const elec = parseFloat(document.getElementById('elec-rate')?.value || 15);
-  const water = parseFloat(document.getElementById('water-rate')?.value || 9);
   const durationMins = parseFloat(st.durationMins || svc.durationMins || 30);
+  const roleId = st.staffRole || svc.staffRole || '';
+  const hourly = getHourlyRate(roleId);
+  const laborCost = (durationMins / 60) * hourly;
+  const elecRate = parseFloat(document.getElementById('elec-rate')?.value || 15);
+  const waterRate = parseFloat(document.getElementById('water-rate')?.value || 9);
+  const elec = st.noElec ? 0 : elecRate;
+  const water = st.noWater ? 0 : waterRate;
   let consCost = 0;
   const cons = Array.isArray(st.consumables)?st.consumables:(svc.consumables||[]);
   cons.forEach(c => {
-    const r=resolveConsItem(c); if(!r) return;
-    if(typeof getConsUnitCost === 'function'){
-      consCost += (parseFloat(c.amt) || 0) * getConsUnitCost(r.groupId, r.iIdx);
-    }
+    const r = resolveConsItem(c); if(!r) return;
+    consCost += (parseFloat(c.amt) || 0) * getConsUnitCost(r.groupId, r.iIdx);
   });
-  return Math.round(elec + water + consCost);
+  let totalCost = laborCost + elec + water + consCost;
+  if(svc.sessions){
+    totalCost = (laborCost + elec + water + consCost) * (svc.sessions + (svc.freeSessions || 0));
+  }
+  return totalCost;
 }
 
 // ── PUSH PACKAGES → gb/packages (POS sync) ───────────────────────
