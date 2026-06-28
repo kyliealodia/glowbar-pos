@@ -580,6 +580,7 @@ html{height:-webkit-fill-available;}
         <div class="nav-item" onclick="goPage('clients')" id="nav-clients"><span class="ni">👤</span>Clients</div>
         <div class="nav-item" onclick="goPage('products')" id="nav-products"><span class="ni">🧴</span>Products</div>
         <div class="nav-item" onclick="goPage('packages')" id="nav-packages"><span class="ni">✨</span>Packages</div>
+        <div class="nav-item" onclick="goPage('activepkg')" id="nav-activepkg"><span class="ni">🗂️</span>Active Packages</div>
         <div class="nav-item" onclick="goPage('messaging')" id="nav-messaging"><span class="ni">💬</span>Messaging</div>
         <div class="nav-lbl">Admin</div>
         <div class="nav-item" onclick="goPage('users')" id="nav-users" data-role="owner admin"><span class="ni">🔐</span>Users & Roles</div>
@@ -848,6 +849,32 @@ html{height:-webkit-fill-available;}
       <div class="page" id="page-packages">
         <div class="sec-hdr"><h2 class="sec-title">Service Packages</h2><button class="btn btn-gold btn-sm" onclick="openAddPkg()">+ Add Package</button></div>
         <div class="pkg-grid" id="pkgGrid"></div>
+      </div>
+
+      <!-- ACTIVE PACKAGES -->
+      <div class="page" id="page-activepkg">
+        <div style="padding:14px 16px;border-bottom:1px solid var(--border2);display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <input id="apkgSearch" type="search" placeholder="Search client or package…" style="flex:1;min-width:160px;padding:8px 12px;border:1px solid var(--border2);border-radius:9px;font-size:13px;background:var(--cream2);font-family:inherit;" oninput="renderActivePkg()">
+          <select id="apkgSort" style="padding:8px 12px;border:1px solid var(--border2);border-radius:9px;font-size:13px;background:var(--cream2);font-family:inherit;" onchange="renderActivePkg()">
+            <option value="remaining">Fewest Sessions First</option>
+            <option value="overdue">Overdue First</option>
+            <option value="client">Client Name</option>
+          </select>
+          <button class="btn btn-outline btn-sm" onclick="renderActivePkg()">↻ Refresh</button>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="inv-table" style="width:100%;min-width:560px;">
+            <thead><tr>
+              <th>Client</th>
+              <th>Package</th>
+              <th style="text-align:center;">Sessions Left</th>
+              <th>Last Session</th>
+              <th>Next Suggested</th>
+              <th>Actions</th>
+            </tr></thead>
+            <tbody id="apkgBody"><tr><td colspan="6" style="text-align:center;padding:24px;color:var(--ink3);">Loading…</td></tr></tbody>
+          </table>
+        </div>
       </div>
 
       <!-- MESSAGING -->
@@ -4461,7 +4488,7 @@ function snapSelfie(){
 }
 
 // ══ NAV ══
-const pageTitles={dashboard:'Dashboard',pos:'Point of Sale',rooms:'Treatment Rooms',calendar:'Calendar',bookings:'Appointments',clients:'Clients',products:'Products',packages:'Packages',messaging:'Messaging',users:'Users & Roles',attendance:'Attendance Log',payslip:'Payroll & Commission',kiosk:'Client Intake Form',capital:'Capital Recovery',kpidash:'KPI Dashboard',machinroi:'Machine ROI',reports:'Reports',sop:'📖 SOPs',manual:'📘 POS Manual',clinsettings:'⚙ Clinic Settings'};
+const pageTitles={dashboard:'Dashboard',pos:'Point of Sale',rooms:'Treatment Rooms',calendar:'Calendar',bookings:'Appointments',clients:'Clients',products:'Products',packages:'Packages',activepkg:'Active Packages',messaging:'Messaging',users:'Users & Roles',attendance:'Attendance Log',payslip:'Payroll & Commission',kiosk:'Client Intake Form',capital:'Capital Recovery',kpidash:'KPI Dashboard',machinroi:'Machine ROI',reports:'Reports',sop:'📖 SOPs',manual:'📘 POS Manual',clinsettings:'⚙ Clinic Settings'};
 function goPage(name){
   const perms=currentUser?.perms||[];
   const isOwner=currentUser?.role==='owner';
@@ -4494,6 +4521,7 @@ function goPage(name){
   if(name==='clinsettings')loadClinicSettingsPage();
   if(name==='kpidash')renderKPI();
   if(name==='machinroi')renderMachineROI();
+  if(name==='activepkg')renderActivePkg();
   if(window.innerWidth<=768) closeSidebarMobile();
   updateReceiptFab();
 }
@@ -5423,15 +5451,19 @@ function confirmPay(){
         }
       }
     }
-    // Session use — deduct 1 and record last used timestamp
+    // Session use — deduct 1, record last used timestamp, and push history entry
     if(ci.type==='session_use' && selClient){
       const cl=S.clients.find(c=>c.id===selClient.id);
       if(cl){
         cl.packageSessions=cl.packageSessions||{};
         const key=ci.pkgKey||('pkg_'+ci.id);
         if(cl.packageSessions[key]){
-          cl.packageSessions[key].remaining=Math.max(0,(cl.packageSessions[key].remaining||0)-ci.qty);
-          cl.packageSessions[key].lastUsed=now.toISOString();
+          const _ps=cl.packageSessions[key];
+          const _sessionNumber=(_ps.total||0)-(_ps.remaining||0)+1;
+          _ps.remaining=Math.max(0,(_ps.remaining||0)-ci.qty);
+          _ps.lastUsed=now.toISOString();
+          _ps.history=_ps.history||[];
+          _ps.history.push({date:now.toISOString(),staffName:ci.staffName||selStaff?.name||'',sessionNumber:_sessionNumber});
         }
       }
     }
@@ -5591,6 +5623,20 @@ function confirmPay(){
     window._lastReceiptData=_rcptData;
     if(selClient?.email) sendReceiptEmail(_rcptData);
   }
+  // Collect session confirmation messages before cart and selClient are cleared
+  const _sessionToasts=[];
+  if(selClient){
+    cart.filter(ci=>ci.type==='session_use').forEach(ci=>{
+      const _stCl=S.clients.find(c=>c.id===selClient.id);
+      if(!_stCl)return;
+      const _stKey=ci.pkgKey||('pkg_'+ci.id);
+      const _stPs=_stCl.packageSessions?.[_stKey];
+      if(!_stPs)return;
+      const _stLast=(_stPs.history||[]).slice(-1)[0];
+      const _stPkg=S.packages.find(p=>p.id===parseInt(_stKey.replace('pkg_','')))||S.products.find(p=>p.id===parseInt(_stKey.replace('pkg_','')));
+      if(_stLast&&_stPkg) _sessionToasts.push('Session '+_stLast.sessionNumber+' of '+(_stPs.total||_stPkg.sessions||'?')+' used for '+(_stCl.name||_stCl.firstName||'Client')+' — '+(_stPkg.name||ci.name));
+    });
+  }
   // Reset cart
   cart=[]; selClient=null; selStaff=null; tipAmount=0; tipMode='none';
   document.getElementById('selClientTxt').textContent='Select client…';
@@ -5600,6 +5646,7 @@ function confirmPay(){
   document.getElementById('tip0')?.classList.add('active');
   renderCart(); renderSvcs(); renderDashboard();
   showToast('Payment confirmed! '+fmtPrice(finalTotal),'ok');
+  _sessionToasts.forEach((msg,i)=>setTimeout(()=>showToast(msg,'ok'),3200+(i*3200)));
 }
 function clearCart(){
   cart=[]; selClient=null; selStaff=null; tipAmount=0; tipMode='none'; discType='pct';
@@ -10651,6 +10698,76 @@ function renderCapInsight(recovered,invested,avgMonthly,remaining,pct){
   el.textContent=txt;
 }
 
+function renderActivePkg(){
+  const rows=[];
+  (S.clients||[]).forEach(function(c){
+    if(!c.packageSessions)return;
+    Object.entries(c.packageSessions).forEach(function([key,ps]){
+      if((ps.remaining||0)<=0)return;
+      const pkgId=parseInt(key.replace('pkg_',''));
+      const pkg=(S.packages||[]).find(function(p){return p.id===pkgId;})||
+                (S.products||[]).find(function(p){return p.id===pkgId;});
+      if(!pkg)return;
+      const lastUsedDate=ps.lastUsed?new Date(ps.lastUsed):null;
+      const nextDate=lastUsedDate?new Date(lastUsedDate.getTime()+14*86400000):null;
+      const now=new Date();
+      const isOverdue=!!(nextDate&&nextDate<now);
+      const isLowSessions=ps.remaining===1;
+      rows.push({c,key,ps,pkg,lastUsedDate,nextDate,isOverdue,isLowSessions});
+    });
+  });
+  const sortBy=(document.getElementById('apkgSort')||{}).value||'remaining';
+  rows.sort(function(a,b){
+    if(sortBy==='client') return (a.c.name||'').localeCompare(b.c.name||'');
+    if(sortBy==='overdue'){
+      const at=a.nextDate?a.nextDate.getTime():Infinity;
+      const bt=b.nextDate?b.nextDate.getTime():Infinity;
+      return at-bt;
+    }
+    return a.ps.remaining-b.ps.remaining;
+  });
+  const q=((document.getElementById('apkgSearch')||{}).value||'').toLowerCase().trim();
+  const filtered=q?rows.filter(function(r){
+    return (r.c.name||'').toLowerCase().includes(q)||(r.pkg.name||'').toLowerCase().includes(q);
+  }):rows;
+  const fmt=function(d){return d?d.toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'numeric'}):'—';};
+  const body=document.getElementById('apkgBody');
+  if(!body)return;
+  if(!filtered.length){body.innerHTML='<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--ink3);">No active packages</td></tr>';return;}
+  body.innerHTML=filtered.map(function(r){
+    const rowBg=r.isOverdue?'background:#fff5f5;':r.isLowSessions?'background:#fffbe6;':'';
+    const badge=r.isOverdue
+      ?'<span style="font-size:10px;background:var(--danger);color:#fff;border-radius:4px;padding:1px 5px;margin-left:4px;">Overdue</span>'
+      :r.isLowSessions
+      ?'<span style="font-size:10px;background:var(--warn,#f59e0b);color:#fff;border-radius:4px;padding:1px 5px;margin-left:4px;">Last session</span>'
+      :'';
+    return '<tr style="'+rowBg+'">'
+      +'<td style="font-weight:500;">'+(r.c.name||'')+badge+'</td>'
+      +'<td style="font-size:12px;">'+r.pkg.name+'</td>'
+      +'<td style="text-align:center;font-weight:700;font-size:15px;">'+r.ps.remaining+'<span style="color:var(--ink3);font-size:10px;font-weight:400;"> / '+(r.ps.total||'?')+'</span></td>'
+      +'<td style="font-size:12px;color:var(--ink3);">'+fmt(r.lastUsedDate)+'</td>'
+      +'<td style="font-size:12px;color:'+(r.isOverdue?'var(--danger)':'var(--ink3)')+';">'+fmt(r.nextDate)+'</td>'
+      +'<td style="white-space:nowrap;">'
+        +'<button class="btn btn-outline btn-sm" style="font-size:10px;" onclick="sendPkgReminder(\''+r.c.id+'\',\''+r.key+'\')">📱 SMS</button>'
+        +(r.c.messenger?'<button class="btn btn-outline btn-sm" style="font-size:10px;margin-left:4px;" onclick="sendPkgReminderMessenger(\''+r.c.id+'\',\''+r.key+'\')">💬</button>':'')
+        +' <button class="btn btn-outline btn-sm" style="font-size:10px;margin-left:4px;" onclick="viewClientProfile(\''+r.c.id+'\')">👤 Profile</button>'
+      +'</td>'
+      +'</tr>';
+  }).join('');
+}
+
+function _buildPkgHistory(ps){
+  const hist=(ps.history||[]).slice().reverse();
+  if(!hist.length) return '<div style="font-size:11px;color:var(--ink3);padding:4px 0;">No session history recorded yet.</div>';
+  return hist.map(function(h){
+    const d=h.date?new Date(h.date).toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'numeric'}):'—';
+    return '<div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;padding:4px 0;border-bottom:0.5px solid var(--border-l);">'
+      +'<span style="color:var(--gold-dk);font-weight:600;min-width:64px;">Session '+h.sessionNumber+'</span>'
+      +'<span style="color:var(--ink3);flex:1;padding:0 6px;">'+d+'</span>'
+      +'<span style="min-width:80px;text-align:right;">'+(h.staffName||'—')+'</span></div>';
+  }).join('');
+}
+
 function viewClientProfile(id){
   const c=S.clients.find(x=>x.id===id);if(!c)return;
 
@@ -10741,6 +10858,10 @@ function viewClientProfile(id){
           ${c.messenger?`<button class="btn btn-outline btn-sm" style="flex:1;font-size:11px;" ontouchstart="event.preventDefault();sendPkgReminderMessenger('${c.id}','${key}')" onclick="sendPkgReminderMessenger('${c.id}','${key}')">💬 Messenger</button>`:''}
           <button class="btn btn-outline btn-sm" style="flex:1;font-size:11px;" ontouchstart="event.preventDefault();copyPkgReminder('${c.id}','${key}')" onclick="copyPkgReminder('${c.id}','${key}')">📋 Copy</button>
         </div>`:`<div style="font-size:11px;color:var(--danger);text-align:center;padding:4px 0;">📦 All sessions used — consider renewing</div>`}
+        <div style="margin-top:10px;border-top:0.5px solid var(--border2);padding-top:8px;">
+          <button id="pkghistbtn_${key}" onclick="(function(){var h=document.getElementById('pkghist_${key}');var b=document.getElementById('pkghistbtn_${key}');var open=h.style.display!=='none';h.style.display=open?'none':'block';b.textContent=(open?'▶ ':'▼ ')+'Session history';})()" style="background:none;border:none;color:var(--gold-dk);font-size:11px;cursor:pointer;padding:0;font-family:inherit;font-weight:500;">▶ Session history</button>
+          <div id="pkghist_${key}" style="display:none;margin-top:6px;">${_buildPkgHistory(ps)}</div>
+        </div>
       </div>`;
     }).join('');
   } else pkgWrap.style.display='none';
