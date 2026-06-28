@@ -5866,12 +5866,16 @@ function openEOD(){
 
   // Per staff breakdown
   const staffTotals={};
+  const _ensEOD=s=>{if(!staffTotals[s])staffTotals[s]={rev:0,txns:0,tips:0,_txSet:new Set()};};
   txns.forEach(t=>{
-    const s=t.staff||'Unassigned';
-    if(!staffTotals[s]) staffTotals[s]={rev:0,txns:0,tips:0};
-    staffTotals[s].rev+=t.total;
-    staffTotals[s].txns++;
-    staffTotals[s].tips+=t.tip||0;
+    const txStaffs=new Set();
+    (t.items||[]).forEach(i=>{
+      const s=i.staffName||t.staff||'Unassigned';
+      _ensEOD(s);staffTotals[s].rev+=i.price*(i.qty||1);txStaffs.add(s);
+    });
+    if(!txStaffs.size){const s=t.staff||'Unassigned';_ensEOD(s);staffTotals[s].rev+=t.total;txStaffs.add(s);}
+    txStaffs.forEach(s=>{if(!staffTotals[s]._txSet.has(t.id)){staffTotals[s]._txSet.add(t.id);staffTotals[s].txns++;}});
+    if(t.tip>0){const s=t.staff||'Unassigned';_ensEOD(s);staffTotals[s].tips+=t.tip||0;}
   });
 
   // Top services
@@ -8829,7 +8833,8 @@ function renderRptSales(txns){
     (t.client||'').toLowerCase().includes(txQ)||
     (t.id||'').toLowerCase().includes(txQ)||
     (t.staff||'').toLowerCase().includes(txQ)||
-    (t.items||[]).some(i=>(i.name||'').toLowerCase().includes(txQ))
+    (t.items||[]).some(i=>(i.name||'').toLowerCase().includes(txQ))||
+    (t.items||[]).some(i=>(i.staffName||'').toLowerCase().includes(txQ))
   ):sorted;
   const TX_PAGE=20;
   const txTotalPages=Math.ceil(filteredTx.length/TX_PAGE)||1;
@@ -8865,7 +8870,7 @@ function renderRptSales(txns){
         <td style="font-size:12px;font-weight:500;">${t.client}${isRefund?'<br><span style="font-size:10px;color:var(--danger);">↩ REFUND</span>':''}</td>
         <td style="font-size:11px;color:var(--ink3);max-width:160px;">${isRefund?`<em>Refund: ${t.refundReason||''}</em>${t.originalTxId?`<br><span style="font-size:10px;color:var(--ink4);">Orig: ${t.originalTxId}</span>`:''}`:(t.items||[]).map(i=>i.name).join(', ')}${!isRefund&&t.depositApplied>0?`<br><span style="font-size:10px;color:var(--success);">💰 Dep -${fmtPrice(t.depositApplied)}</span>`:''}</td>
         <td style="font-size:11px;text-transform:capitalize;">${methodLabel}</td>
-        <td style="font-size:11px;">${t.staff||'—'}</td>
+        <td style="font-size:11px;">${(()=>{const _s=[...new Set((t.items||[]).map(i=>i.staffName||t.staff||'').filter(Boolean))];return _s.length?_s.join(', '):(t.staff||'—');})()}</td>
         <td style="font-size:12px;color:var(--danger);">${t.disc>0?'-'+fmtPrice(t.disc):'—'}</td>
         <td style="font-size:12px;">${hasFee?fmtPrice(t.originalAmount||t.total-t.payFee):'—'}</td>
         <td style="font-size:12px;color:var(--warn);">${hasFee?'+'+fmtPrice(t.payFee):'—'}</td>
@@ -9081,15 +9086,19 @@ function renderRptRevenue(txns, rev, totalCost, profit){
 
 function renderRptStaff(txns){
   const staffData={};
+  const _ens=s=>{if(!staffData[s])staffData[s]={rev:0,txns:0,tips:0,services:{},_txSet:new Set()};};
   txns.forEach(t=>{
-    const s=t.staff||'Unassigned';
-    if(!staffData[s]) staffData[s]={rev:0,txns:0,tips:0,services:{}};
-    staffData[s].rev+=t.total;
-    staffData[s].txns++;
-    staffData[s].tips+=t.tip||0;
+    const txStaffs=new Set();
     (t.items||[]).forEach(i=>{
-      staffData[s].services[i.name]=(staffData[s].services[i.name]||0)+i.qty;
+      const s=i.staffName||t.staff||'Unassigned';
+      _ens(s);
+      staffData[s].rev+=i.price*(i.qty||1);
+      staffData[s].services[i.name]=(staffData[s].services[i.name]||0)+(i.qty||1);
+      txStaffs.add(s);
     });
+    if(!txStaffs.size){const s=t.staff||'Unassigned';_ens(s);staffData[s].rev+=t.total;txStaffs.add(s);}
+    txStaffs.forEach(s=>{if(!staffData[s]._txSet.has(t.id)){staffData[s]._txSet.add(t.id);staffData[s].txns++;}});
+    if(t.tip>0){const s=t.staff||'Unassigned';_ens(s);staffData[s].tips+=t.tip||0;}
   });
   const staffArr=Object.entries(staffData).sort((a,b)=>b[1].rev-a[1].rev);
   document.getElementById('rptStaffPerf').innerHTML=staffArr.length?`
@@ -9208,7 +9217,8 @@ function exportReport(){
   let csv='Date,Time,Ref,Client,Items,Subtotal,Discount,Total,Method,Staff\n';
   txns.forEach(t=>{
     const d=new Date(t.time);
-    csv+=`${d.toLocaleDateString('en-PH')},${d.toLocaleTimeString('en-PH')},${t.ref||t.id},"${t.client}","${t.items.map(i=>i.name+' x'+i.qty).join('; ')}",${t.sub||t.total},${t.disc||0},${t.total},${t.method},"${t.staff}"\n`;
+    const _csvStaff=[...new Set((t.items||[]).map(i=>i.staffName||t.staff||'').filter(Boolean))];
+    csv+=`${d.toLocaleDateString('en-PH')},${d.toLocaleTimeString('en-PH')},${t.ref||t.id},"${t.client}","${t.items.map(i=>i.name+' x'+i.qty).join('; ')}",${t.sub||t.total},${t.disc||0},${t.total},${t.method},"${_csvStaff.length?_csvStaff.join(', '):(t.staff||'')}"\n`;
   });
   const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);a.download='GlowBar_Report_'+td()+'.csv';a.click();
 }
@@ -10310,8 +10320,8 @@ function exportPayslip(){
   const txns=S.transactions.filter(t=>{const d=toPHDate(t.time);return d.getFullYear()===py&&d.getMonth()+1===pm;});
   let csv='Staff,Role,Basic Salary,Commission %,Sales Handled,Commission Earned,Allowances,SSS,PhilHealth,PagIBIG,Tax,Other Deductions,Total Deductions,Net Pay\n';
   S.users.filter(u=>u.role!=='owner').forEach(u=>{
-    const myTxns=txns.filter(t=>t.staff===u.name);
-    const sales=myTxns.reduce((s,t)=>s+t.total,0);
+    const myItems=[];txns.forEach(t=>{(t.items||[]).forEach(ci=>{if((ci.staffName||t.staff||'')===u.name)myItems.push(ci);});});
+    const sales=myItems.reduce((s,ci)=>s+ci.price*(ci.qty||1),0);
     const comm=Math.round(sales*(u.commission||0)/100);
     const gross=(u.basicSalary||u.salary||0)+comm;
     const d=computeDeductions(u,gross);
@@ -11750,9 +11760,13 @@ function renderKPI(){
   const repeatClients=S.clients.filter(c=>c.visits>1).length;
   const retentionRate=S.clients.length?((repeatClients/S.clients.length)*100).toFixed(1):0;
 
-  // Revenue per staff
+  // Revenue per staff (attributed per item)
   const staffRev={};
-  txns.forEach(t=>{staffRev[t.staff]=(staffRev[t.staff]||0)+t.total;});
+  txns.forEach(t=>{
+    let hasItems=false;
+    (t.items||[]).forEach(i=>{const s=i.staffName||t.staff||'';if(s){staffRev[s]=(staffRev[s]||0)+i.price*(i.qty||1);hasItems=true;}});
+    if(!hasItems&&t.staff)staffRev[t.staff]=(staffRev[t.staff]||0)+t.total;
+  });
   const topStaff=Object.entries(staffRev).sort((a,b)=>b[1]-a[1])[0];
 
   // CLV
