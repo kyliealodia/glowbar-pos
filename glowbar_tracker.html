@@ -116,7 +116,7 @@ window.pushServicesToPOS = async function(){
           subcat: cat.name.includes(' — ') ? cat.name.split(' — ')[1] : '',
           price: price,
           cost: calcTrackerCost(svc, st),
-          durationMins: parseFloat(st.durationMins || svc.durationMins || 30),
+          durationMins: svc.isRetail ? 0 : parseFloat(st.durationMins || svc.durationMins || 30),
           unit: 'sessions',
           stock: existing ? (existing.stock || 0) : 0,
           lowAt: existing ? (existing.lowAt || 5) : 5,
@@ -173,6 +173,7 @@ window.pushServicesToPOS = async function(){
 // ── HELPER: calculate raw cost from tracker state ─────────────────
 // Must stay identical in formula to calcSvcCost() so POS cost field matches UI.
 function calcTrackerCost(svc, st){
+  if(svc.isRetail){ return parseFloat(st.cost!==undefined?st.cost:svc.cost)||0; }
   const durationMins = parseFloat(st.durationMins || svc.durationMins || 30);
   const roleId = st.staffRole || svc.staffRole || '';
   const hourly = getHourlyRate(roleId);
@@ -2119,6 +2120,16 @@ let SVC_CATS = [
     {id:'sp2',name:'Skin Pack',price:0,durationMins:0,staffRole:'',consumables:[],packageServices:[],discount:0},
     {id:'sp3',name:'All-In',price:0,durationMins:0,staffRole:'',consumables:[],packageServices:[],discount:0},
   ]},
+  // ── RETAIL PRODUCTS ──────────────────────────────────────────────
+  {id:'retail', name:'Retail Products', group:'Retail Products', type:'standard', canAddServices:true, services:[
+    {id:'rt1',name:'Rejuvenating Body Set',price:370,cost:231,durationMins:0,staffRole:'',isRetail:true,consumables:[]},
+    {id:'rt2',name:'Glass Skin Set Premium',price:400,cost:233,durationMins:0,staffRole:'',isRetail:true,consumables:[]},
+    {id:'rt3',name:'Longevity with Retinol Set',price:450,cost:273,durationMins:0,staffRole:'',isRetail:true,consumables:[]},
+    {id:'rt4',name:'Instant Whitening Set',price:350,cost:210,durationMins:0,staffRole:'',isRetail:true,consumables:[]},
+    {id:'rt5',name:'Acne Control Set',price:400,cost:233,durationMins:0,staffRole:'',isRetail:true,consumables:[]},
+    {id:'rt6',name:'Hydrocortisone 1% Cream (10g)',price:200,cost:62,durationMins:0,staffRole:'',isRetail:true,consumables:[]},
+    {id:'rt7',name:'Clindamycin 1% Cream (10g)',price:200,cost:60,durationMins:0,staffRole:'',isRetail:true,consumables:[]},
+  ]},
 ];
 
 // keep SVCS as alias for backward compat but we won't use it for rendering
@@ -2929,6 +2940,15 @@ function setSvcStateField(svcId,f,v){ if(!svcCatState[svcId])svcCatState[svcId]=
 // ── COST CALC ─────────────────────────────────────────────────────
 function calcSvcCost(svc){
   const st=getSvcState(svc.id);
+  if(svc.isRetail){
+    const price=parseFloat(st.price||svc.price||0);
+    const cost=parseFloat(st.cost!==undefined?st.cost:svc.cost)||0;
+    const commPct=parseFloat(document.getElementById('comm-pct')?.value||10)/100;
+    const commission=price*commPct;
+    const profit=price-cost-commission;
+    const margin=price>0?Math.round(profit/price*100):0;
+    return {laborCost:0,elec:0,water:0,consCost:0,totalCost:cost,price,commission,discount:0,profit,margin,durationMins:0,roleId:''};
+  }
   const durationMins=parseFloat(st.durationMins||svc.durationMins||30);
   const price=parseFloat(st.price||svc.price||0);
   const roleId=st.staffRole||svc.staffRole||'';
@@ -3205,8 +3225,43 @@ function buildComboSvcCardInner(svc, catId){
   </div>`;
 }
 
+function buildRetailCardInner(svc, catId){
+  const st=getSvcState(svc.id);
+  const price=parseFloat(st.price||svc.price||0);
+  const cost=parseFloat(st.cost!==undefined?st.cost:svc.cost)||0;
+  const commPct=parseFloat(document.getElementById('comm-pct')?.value||10)/100;
+  const commission=price*commPct;
+  const profit=price-cost-commission;
+  const margin=price>0?Math.round(profit/price*100):0;
+  const pColor=profit>=0?'var(--green)':'var(--red)';
+  const commPctDisplay=document.getElementById('comm-pct')?.value||10;
+  return `<div class="svc-drag-handle" draggable="true" ondragstart="onSvcDragStart(event,'${catId}','${svc.id}')" ondragover="event.preventDefault()" ondrop="onSvcDrop(event,'${catId}','${svc.id}')" style="cursor:grab;padding:2px 0 4px;font-size:16px;color:var(--border);text-align:center;letter-spacing:4px">&#8942;&#8942;</div>
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px;margin-bottom:8px;padding-bottom:8px;border-bottom:0.5px solid var(--border-l)">
+    <input class="ni" type="text" value="${svc.name.replace(/"/g,'&quot;')}" style="font-size:13px;font-weight:600;color:var(--gold-d);border:none;background:transparent;padding:0;font-family:inherit;flex:1" oninput="debounce('n_${svc.id}',()=>updSvcName('${catId}','${svc.id}',this.value),400)">
+    <button class="del-row" onclick="delSvc('${catId}','${svc.id}')" style="font-size:14px;flex-shrink:0" title="Remove">&#10005;</button>
+  </div>
+  <div style="margin-bottom:8px"><div style="font-size:10px;color:var(--muted);margin-bottom:2px">Description</div>
+    <textarea class="ii" style="width:100%;min-height:40px;resize:vertical;font-size:12px;line-height:1.4;padding:4px 6px" placeholder="Optional description" oninput="debounce('desc_${svc.id}',()=>updSvcDesc('${catId}','${svc.id}',this.value),400)">${(st.desc||svc.desc||'').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</textarea>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+    <div><div style="font-size:10px;color:var(--muted);margin-bottom:2px">Selling price (&#8369;)</div>
+      <input class="ii" type="number" style="width:100%" value="${price||''}" placeholder="0" oninput="debounce('p_${svc.id}',()=>{setSvcStateField('${svc.id}','price',+this.value);refreshSvcCard('${svc.id}');},400)">
+    </div>
+    <div><div style="font-size:10px;color:var(--muted);margin-bottom:2px">Purchase cost (&#8369;)</div>
+      <input class="ii" type="number" style="width:100%" value="${cost||''}" placeholder="0" oninput="debounce('c_${svc.id}',()=>{setSvcStateField('${svc.id}','cost',+this.value);refreshSvcCard('${svc.id}');},400)">
+    </div>
+  </div>
+  <div style="font-size:11px;border-top:0.5px solid var(--border-l);padding-top:6px">
+    <div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:var(--muted)">Commission (${commPctDisplay}%)</span><span style="color:var(--warn)">&#8722;&#8369;${commission.toFixed(2)}</span></div>
+    <div style="display:flex;justify-content:space-between;padding:4px 0;font-weight:600;font-size:12px;border-top:0.5px solid var(--border-l);margin-top:2px">
+      <span>Net profit</span><span style="color:${pColor}">&#8369;${profit.toFixed(2)} <span style="font-weight:400;font-size:10px">(${margin}%)</span></span>
+    </div>
+  </div>`;
+}
+
 function buildSvcCardInner(svc, catId){
   if(svc.isCombo) return buildComboSvcCardInner(svc, catId);
+  if(svc.isRetail) return buildRetailCardInner(svc, catId);
   const st=getSvcState(svc.id);
   const {laborCost,elec,water,consCost,totalCost,price,commission,discount,profit,margin,durationMins,roleId}=calcSvcCost(svc);
   const pColor=profit>=0?'var(--green)':'var(--red)';
