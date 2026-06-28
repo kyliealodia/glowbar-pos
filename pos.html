@@ -5412,11 +5412,16 @@ function confirmPay(){
           const key='pkg_'+ci.id;
           const totalSessions=((_sp.sessions||0)+(_sp.freeSessions||0))*ci.qty;
           if(cl.packageSessions[key]){
-            cl.packageSessions[key].remaining=(cl.packageSessions[key].remaining||0)+totalSessions;
-            cl.packageSessions[key].total=(cl.packageSessions[key].total||0)+totalSessions;
-            cl.packageSessions[key].used=cl.packageSessions[key].used||0;
+            const _ep=cl.packageSessions[key];
+            const _sn=(_ep.total||0)-(_ep.remaining||0)+1;
+            _ep.remaining=(_ep.remaining||0)+totalSessions-1;
+            _ep.total=(_ep.total||0)+totalSessions;
+            _ep.used=(_ep.used||0)+1;
+            _ep.lastUsed=now.toISOString();
+            _ep.history=_ep.history||[];
+            _ep.history.push({date:now.toISOString(),staffName:ci.staffName||selStaff?.name||'',sessionNumber:_sn});
           } else {
-            cl.packageSessions[key]={name:ci.name,total:totalSessions,remaining:totalSessions,used:0,purchased:now.toISOString(),lastUsed:null};
+            cl.packageSessions[key]={name:ci.name,total:totalSessions,remaining:totalSessions-1,used:1,purchased:now.toISOString(),lastUsed:now.toISOString(),history:[{date:now.toISOString(),staffName:ci.staffName||selStaff?.name||'',sessionNumber:1}]};
           }
         }
       }
@@ -5444,10 +5449,16 @@ function confirmPay(){
         const pkg=S.packages.find(x=>x.id===ci.id);
         const sessions=(pkg?.sessions||0)*ci.qty;
         if(cl.packageSessions[key]){
-          cl.packageSessions[key].remaining=(cl.packageSessions[key].remaining||0)+sessions;
-          cl.packageSessions[key].total=(cl.packageSessions[key].total||0)+sessions;
+          const _ep=cl.packageSessions[key];
+          const _sn=(_ep.total||0)-(_ep.remaining||0)+1;
+          _ep.remaining=(_ep.remaining||0)+sessions-1;
+          _ep.total=(_ep.total||0)+sessions;
+          _ep.used=(_ep.used||0)+1;
+          _ep.lastUsed=now.toISOString();
+          _ep.history=_ep.history||[];
+          _ep.history.push({date:now.toISOString(),staffName:ci.staffName||selStaff?.name||'',sessionNumber:_sn});
         } else {
-          cl.packageSessions[key]={remaining:sessions,total:sessions,purchased:now.toISOString()};
+          cl.packageSessions[key]={name:ci.name,total:sessions,remaining:Math.max(0,sessions-1),used:1,purchased:now.toISOString(),lastUsed:now.toISOString(),history:[{date:now.toISOString(),staffName:ci.staffName||selStaff?.name||'',sessionNumber:1}]};
         }
       }
     }
