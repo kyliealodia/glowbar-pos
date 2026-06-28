@@ -5644,7 +5644,7 @@ function confirmPay(){
       const _stPs=_stCl.packageSessions?.[_stKey];
       if(!_stPs)return;
       const _stLast=(_stPs.history||[]).slice(-1)[0];
-      const _stPkg=S.packages.find(p=>p.id===parseInt(_stKey.replace('pkg_','')))||S.products.find(p=>p.id===parseInt(_stKey.replace('pkg_','')));
+      const _stPkgId=_stKey.replace('pkg_','');const _stPkg=S.packages.find(p=>String(p.id)===_stPkgId)||S.products.find(p=>String(p.id)===_stPkgId);
       if(_stLast&&_stPkg) _sessionToasts.push('Session '+_stLast.sessionNumber+' of '+(_stPs.total||_stPkg.sessions||'?')+' used for '+(_stCl.name||_stCl.firstName||'Client')+' — '+(_stPkg.name||ci.name));
     });
   }
@@ -6096,8 +6096,8 @@ function openEmailSummary(){
   const pkgLines=[];
   if(cl.packageSessions){
     Object.entries(cl.packageSessions).forEach(([key,ps])=>{
-      const pkgId=parseInt(key.replace('pkg_',''));
-      const pkg=S.packages.find(p=>p.id===pkgId);
+      const pkgId=key.replace('pkg_','');
+      const pkg=S.packages.find(p=>String(p.id)===pkgId)||S.products.find(p=>String(p.id)===pkgId);
       if(pkg) pkgLines.push(`  • ${pkg.name}: ${ps.remaining} session${ps.remaining!==1?'s':''} remaining`);
     });
   }
@@ -6178,8 +6178,8 @@ function _getPkgReminderMsg(clientId,pkgKey){
   if(!c)return'';
   const ps=c.packageSessions?.[pkgKey];
   if(!ps)return'';
-  const pkgId=parseInt(pkgKey.replace('pkg_',''));
-  const pkg=S.packages.find(p=>p.id===pkgId);
+  const pkgId=pkgKey.replace('pkg_','');
+  const pkg=S.packages.find(p=>String(p.id)===pkgId)||S.products.find(p=>String(p.id)===pkgId);
   if(!pkg)return'';
   const lastUsedDate=ps.lastUsed?new Date(ps.lastUsed):null;
   const nextDate=lastUsedDate?new Date(lastUsedDate.getTime()+14*86400000):null;
@@ -6279,8 +6279,8 @@ function sendClientSummary(id){
   const pkgLines=[];
   if(cl.packageSessions){
     Object.entries(cl.packageSessions).forEach(([key,ps])=>{
-      const pkgId=parseInt(key.replace('pkg_',''));
-      const pkg=S.packages.find(p=>p.id===pkgId);
+      const pkgId=key.replace('pkg_','');
+      const pkg=S.packages.find(p=>String(p.id)===pkgId)||S.products.find(p=>String(p.id)===pkgId);
       if(pkg) pkgLines.push(`  • ${pkg.name}: ${ps.remaining} session${ps.remaining!==1?'s':''} remaining`);
     });
   }
@@ -10715,9 +10715,9 @@ function renderActivePkg(){
     if(!c.packageSessions)return;
     Object.entries(c.packageSessions).forEach(function([key,ps]){
       if((ps.remaining||0)<=0)return;
-      const pkgId=parseInt(key.replace('pkg_',''));
-      const pkg=(S.packages||[]).find(function(p){return p.id===pkgId;})||
-                (S.products||[]).find(function(p){return p.id===pkgId;});
+      const pkgId=key.replace('pkg_','');
+      const pkg=(S.packages||[]).find(function(p){return String(p.id)===pkgId;})||
+                (S.products||[]).find(function(p){return String(p.id)===pkgId;});
       if(!pkg)return;
       const lastUsedDate=ps.lastUsed?new Date(ps.lastUsed):null;
       const nextDate=lastUsedDate?new Date(lastUsedDate.getTime()+14*86400000):null;
@@ -10830,8 +10830,8 @@ function viewClientProfile(id){
   if(c.packageSessions&&Object.keys(c.packageSessions).length){
     pkgWrap.style.display='block';
     pkgEl.innerHTML=Object.entries(c.packageSessions).map(([key,ps])=>{
-      const pkgId=parseInt(key.replace('pkg_',''));
-      const pkg=S.packages.find(p=>p.id===pkgId);
+      const pkgId=key.replace('pkg_','');
+      const pkg=S.packages.find(p=>String(p.id)===pkgId)||S.products.find(p=>String(p.id)===pkgId);
       if(!pkg)return'';
       const total=ps.total||pkg.sessions;
       const used=total-ps.remaining;
