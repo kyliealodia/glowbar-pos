@@ -6239,7 +6239,7 @@ function sendActivePkgEmail(clientId,pkgKey){
   const lastUsedStr=ps.lastUsed?new Date(ps.lastUsed).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}):'—';
   const subject=encodeURIComponent('Time for Your Next GlowBar Session, '+name+'! ✨');
   const body=encodeURIComponent('Hi '+name+',\n\nIt\'s been 2 weeks since your last session — which means it\'s the perfect time to come back for your next treatment! 🌟\n\nYour Package: '+pkg.name+'\nSessions Remaining: '+ps.remaining+' of '+(ps.total||'?')+'\nLast Session: '+lastUsedStr+'\n\nDon\'t let your sessions go to waste — consistent treatments give you the best results! Book your next appointment at GlowBar Beauty Clinic today.\n\n📞 Call or message us to schedule\n📍 GlowBar Beauty Clinic\n\nSee you soon and keep glowing! 💛\n\n— The GlowBar Team');
-  window.open('mailto:'+c.email+'?subject='+subject+'&body='+body,'_blank');
+  window.open('https://mail.google.com/mail/?view=cm&fs=1&to='+encodeURIComponent(c.email)+'&su='+subject+'&body='+body,'_blank');
 }
 
 // ── Client Deposits ───────────────────────────────────────────────────────────
