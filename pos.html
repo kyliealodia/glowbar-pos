@@ -6175,7 +6175,7 @@ function sendClientEmail(){
 }
 
 function _getPkgReminderMsg(clientId,pkgKey){
-  const c=S.clients.find(x=>x.id===clientId);
+  const c=S.clients.find(x=>String(x.id)===String(clientId));
   if(!c)return'';
   const ps=c.packageSessions?.[pkgKey];
   if(!ps)return'';
@@ -6189,7 +6189,7 @@ function _getPkgReminderMsg(clientId,pkgKey){
   return `Hi ${name}! This is a reminder that you have ${ps.remaining} session${ps.remaining!==1?'s':''} remaining for your ${pkg.name} package. Your next recommended session is ${nextDate?'on '+nextStr:'coming up soon'}. Reply to book your appointment! — GlowBar Beauty Clinic`;
 }
 function sendPkgReminder(clientId,pkgKey){
-  const c=S.clients.find(x=>x.id===clientId);
+  const c=S.clients.find(x=>String(x.id)===String(clientId));
   if(!c)return;
   const msg=_getPkgReminderMsg(clientId,pkgKey);
   if(!msg)return;
@@ -6200,7 +6200,7 @@ function sendPkgReminder(clientId,pkgKey){
   }
 }
 function sendPkgReminderMessenger(clientId,pkgKey){
-  const c=S.clients.find(x=>x.id===clientId);
+  const c=S.clients.find(x=>String(x.id)===String(clientId));
   if(!c||!c.messenger)return;
   const msg=_getPkgReminderMsg(clientId,pkgKey);
   navigator.clipboard.writeText(msg).catch(()=>{});
@@ -6213,7 +6213,7 @@ function copyPkgReminder(clientId,pkgKey){
   navigator.clipboard.writeText(msg).then(()=>showToast('Reminder message copied to clipboard')).catch(()=>showToast('Copy failed — try selecting and copying manually','err'));
 }
 function sendActivePkgSms(clientId,pkgKey){
-  const c=S.clients.find(x=>x.id===clientId);
+  const c=S.clients.find(x=>String(x.id)===String(clientId));
   if(!c)return;
   const ps=c.packageSessions?.[pkgKey];
   if(!ps)return;
@@ -6228,7 +6228,7 @@ function sendActivePkgSms(clientId,pkgKey){
   }
 }
 function sendActivePkgEmail(clientId,pkgKey){
-  const c=S.clients.find(x=>x.id===clientId);
+  const c=S.clients.find(x=>String(x.id)===String(clientId));
   if(!c)return;
   if(!c.email){showToast('No email on file for '+(c.name||'this client'),'err');return;}
   const ps=c.packageSessions?.[pkgKey];
@@ -10811,7 +10811,7 @@ function _buildPkgHistory(ps){
 }
 
 function viewClientProfile(id){
-  const c=S.clients.find(x=>x.id===id);if(!c)return;
+  const c=S.clients.find(x=>String(x.id)===String(id));if(!c)return;
 
   // Header
   const av=document.getElementById('cpAvatar');
