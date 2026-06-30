@@ -3782,6 +3782,7 @@ window.addEventListener('DOMContentLoaded',()=>{
       renderClientsTable();
       populateForms();
       if(document.getElementById('page-dashboard')?.classList.contains('active')) renderDashboard();
+      if(document.getElementById('page-activepkg')?.classList.contains('active')) renderActivePkg();
     });
 
     db.ref('gb/bookings').on('value', snap=>{
@@ -6210,6 +6211,35 @@ function copyPkgReminder(clientId,pkgKey){
   const msg=_getPkgReminderMsg(clientId,pkgKey);
   if(!msg)return;
   navigator.clipboard.writeText(msg).then(()=>showToast('Reminder message copied to clipboard')).catch(()=>showToast('Copy failed — try selecting and copying manually','err'));
+}
+function sendActivePkgSms(clientId,pkgKey){
+  const c=S.clients.find(x=>x.id===clientId);
+  if(!c)return;
+  const ps=c.packageSessions?.[pkgKey];
+  if(!ps)return;
+  const pkgId=pkgKey.replace('pkg_','');
+  const pkg=(S.packages||[]).find(p=>String(p.id)===pkgId)||(S.products||[]).find(p=>String(p.id)===pkgId)||{name:ps.name||'your package'};
+  const name=(c.name||c.firstName||'there').split(' ')[0];
+  const msg=`Hi ${name}! 😊 Just a friendly reminder that it's time for your next session at GlowBar Beauty Clinic! You have ${ps.remaining} session${ps.remaining!==1?'s':''} remaining on your ${pkg.name}. Book your next appointment now and keep that glow going! 💛 Reply to this message or call us to schedule. See you soon! ✨`;
+  if(c.phone){
+    window.open('sms:'+c.phone+'?body='+encodeURIComponent(msg),'_blank');
+  } else {
+    navigator.clipboard.writeText(msg).then(()=>showToast('Message copied — no phone number on file')).catch(()=>showToast('No phone number on file','err'));
+  }
+}
+function sendActivePkgEmail(clientId,pkgKey){
+  const c=S.clients.find(x=>x.id===clientId);
+  if(!c)return;
+  if(!c.email){showToast('No email on file for '+(c.name||'this client'),'err');return;}
+  const ps=c.packageSessions?.[pkgKey];
+  if(!ps)return;
+  const pkgId=pkgKey.replace('pkg_','');
+  const pkg=(S.packages||[]).find(p=>String(p.id)===pkgId)||(S.products||[]).find(p=>String(p.id)===pkgId)||{name:ps.name||'your package'};
+  const name=(c.name||c.firstName||'there').split(' ')[0];
+  const lastUsedStr=ps.lastUsed?new Date(ps.lastUsed).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}):'—';
+  const subject=encodeURIComponent('Time for Your Next GlowBar Session, '+name+'! ✨');
+  const body=encodeURIComponent('Hi '+name+',\n\nIt\'s been 2 weeks since your last session — which means it\'s the perfect time to come back for your next treatment! 🌟\n\nYour Package: '+pkg.name+'\nSessions Remaining: '+ps.remaining+' of '+(ps.total||'?')+'\nLast Session: '+lastUsedStr+'\n\nDon\'t let your sessions go to waste — consistent treatments give you the best results! Book your next appointment at GlowBar Beauty Clinic today.\n\n📞 Call or message us to schedule\n📍 GlowBar Beauty Clinic\n\nSee you soon and keep glowing! 💛\n\n— The GlowBar Team');
+  window.open('mailto:'+c.email+'?subject='+subject+'&body='+body,'_blank');
 }
 
 // ── Client Deposits ───────────────────────────────────────────────────────────
@@ -10717,8 +10747,8 @@ function renderActivePkg(){
       if((ps.remaining||0)<=0)return;
       const pkgId=key.replace('pkg_','');
       const pkg=(S.packages||[]).find(function(p){return String(p.id)===pkgId;})||
-                (S.products||[]).find(function(p){return String(p.id)===pkgId;});
-      if(!pkg)return;
+                (S.products||[]).find(function(p){return String(p.id)===pkgId;})||
+                {name:ps.name||'Package',id:pkgId};
       const lastUsedDate=ps.lastUsed?new Date(ps.lastUsed):null;
       const nextDate=lastUsedDate?new Date(lastUsedDate.getTime()+14*86400000):null;
       const now=new Date();
@@ -10759,7 +10789,8 @@ function renderActivePkg(){
       +'<td style="font-size:12px;color:var(--ink3);">'+fmt(r.lastUsedDate)+'</td>'
       +'<td style="font-size:12px;color:'+(r.isOverdue?'var(--danger)':'var(--ink3)')+';">'+fmt(r.nextDate)+'</td>'
       +'<td style="white-space:nowrap;">'
-        +'<button class="btn btn-outline btn-sm" style="font-size:10px;" onclick="sendPkgReminder(\''+r.c.id+'\',\''+r.key+'\')">📱 SMS</button>'
+        +'<button class="btn btn-outline btn-sm" style="font-size:10px;" onclick="sendActivePkgSms(\''+r.c.id+'\',\''+r.key+'\')">📱 SMS Reminder</button>'
+        +' <button class="btn btn-outline btn-sm" style="font-size:10px;margin-left:4px;" onclick="sendActivePkgEmail(\''+r.c.id+'\',\''+r.key+'\')">✉️ Email</button>'
         +(r.c.messenger?'<button class="btn btn-outline btn-sm" style="font-size:10px;margin-left:4px;" onclick="sendPkgReminderMessenger(\''+r.c.id+'\',\''+r.key+'\')">💬</button>':'')
         +' <button class="btn btn-outline btn-sm" style="font-size:10px;margin-left:4px;" onclick="viewClientProfile(\''+r.c.id+'\')">👤 Profile</button>'
       +'</td>'
