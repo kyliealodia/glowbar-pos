@@ -1720,17 +1720,17 @@ function renderCutoff(){
   const _moSSS=computeSSS(estMonthlyGross);
   const _moPH=computePhilHealth(estMonthlyGross);
   const _moPagibig=computePagibig();
-  const sss=_moSSS/2;
-  const philhealth=_moPH/2;
-  const pagibig=_moPagibig/2;
-  const govTotal=sss+philhealth+pagibig;
   const _moTaxable=Math.max(0,estMonthlyGross-_moSSS-_moPH-_moPagibig);
-  const taxForCO=computeWithholdingTax(_moTaxable)/2;
-  const otherDed=otherDeductions/2;
-  const totalDed=govTotal+taxForCO+otherDed+caDeductCO;
-  const netPay=grossPay-totalDed;
 
-  el.innerHTML=`
+  function _doRender(sss,philhealth,pagibig,taxForCO,snapshotSavedAt){
+    const govTotal=sss+philhealth+pagibig;
+    const otherDed=otherDeductions/2;
+    const totalDed=govTotal+taxForCO+otherDed+caDeductCO;
+    const netPay=grossPay-totalDed;
+    const frozenNote=snapshotSavedAt&&currentUser?.role==='owner'
+      ?`<div style="font-size:9px;color:#8C7B65;margin-top:6px;padding-top:6px;border-top:1px solid #E8DFD0;">🔒 Frozen ${new Date(snapshotSavedAt).toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'numeric'})} · <a href="javascript:void(0)" onclick="recalcPayslipSnapshot('${userId}','${period}',${n})" style="color:#B8935A;text-decoration:underline;cursor:pointer;">Recalculate</a></div>`
+      :'';
+    el.innerHTML=`
     <div style="background:#fff;border:1px solid #E8DFD0;border-radius:14px;overflow:hidden;margin-bottom:16px;">
       <div style="background:linear-gradient(135deg,#2C2318,#5C4F3D);color:#fff;padding:14px 20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
         <div>
@@ -1818,6 +1818,7 @@ function renderCutoff(){
           <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;padding-top:8px;margin-top:4px;border-top:1px solid #E8DFD0;color:#c0392b;">
             <span>Total Deductions</span><span>−${f(totalDed)}</span>
           </div>
+          ${frozenNote}
         </div>
         <div style="background:linear-gradient(135deg,#2C2318,#5C4F3D);border-radius:10px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;">
           <span style="color:rgba(255,255,255,0.75);font-size:13px;font-weight:500;">Net Take-Home</span>
@@ -1825,6 +1826,24 @@ function renderCutoff(){
         </div>
       </div>
     </div>`;
+  }
+
+  const userId=viewUser?.id;
+  el.innerHTML='<div style="text-align:center;padding:20px;color:#8C7B65;font-size:12px;">Loading payslip…</div>';
+
+  if(isPayslipUnlocked(period,n)&&userId){
+    getPayslipSnapshot(userId,period,n,snap=>{
+      if(snap){
+        _doRender(snap.sss,snap.philhealth,snap.pagibig,snap.taxForCO,snap.savedAt);
+      } else {
+        const _sss=_moSSS/2,_ph=_moPH/2,_pi=_moPagibig/2,_tax=computeWithholdingTax(_moTaxable)/2;
+        _doRender(_sss,_ph,_pi,_tax,null);
+        savePayslipSnapshot(userId,period,n,{sss:_sss,philhealth:_ph,pagibig:_pi,taxForCO:_tax});
+      }
+    });
+  } else {
+    _doRender(_moSSS/2,_moPH/2,_moPagibig/2,computeWithholdingTax(_moTaxable)/2,null);
+  }
 }
 
 // ══ PAYSLIP ══
@@ -1869,6 +1888,27 @@ function computeWithholdingTax(t){
   if(t<=166666) return 8667+(t-66667)*0.25;
   if(t<=666666) return 33667+(t-166667)*0.30;
   return 183667+(t-666667)*0.35;
+}
+
+function _snapKey(userId,period,cutoff){
+  return 'gb/payslipSnapshots/'+userId+'/'+period.replace('-','_')+'/co'+cutoff;
+}
+function savePayslipSnapshot(userId,period,cutoff,data){
+  if(!db) return;
+  db.ref(_snapKey(userId,period,cutoff)).set({...data,savedAt:new Date().toISOString()});
+}
+function getPayslipSnapshot(userId,period,cutoff,cb){
+  if(!db){cb(null);return;}
+  db.ref(_snapKey(userId,period,cutoff)).once('value',snap=>cb(snap.exists()?snap.val():null));
+}
+function deletePayslipSnapshot(userId,period,cutoff){
+  if(!db) return;
+  db.ref(_snapKey(userId,period,cutoff)).remove();
+}
+function recalcPayslipSnapshot(userId,period,cutoff){
+  deletePayslipSnapshot(userId,period,cutoff);
+  showToast('Snapshot cleared — payslip will recalculate and re-freeze on next view');
+  setTimeout(()=>renderCutoff(),500);
 }
 
 function getOpeningDate(){
