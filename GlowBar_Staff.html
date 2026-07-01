@@ -1884,18 +1884,9 @@ function populateMonthSelects(){
 
 // ══ PH STATUTORY DEDUCTIONS ══
 function computeSSS(m){
-  const table=[
-    [4249.99,180],[4749.99,202.5],[5249.99,225],[5749.99,247.5],[6249.99,270],
-    [6749.99,292.5],[7249.99,315],[7749.99,337.5],[8249.99,360],[8749.99,382.5],
-    [9249.99,405],[9749.99,427.5],[10249.99,450],[10749.99,472.5],[11249.99,495],
-    [11749.99,517.5],[12249.99,540],[12749.99,562.5],[13249.99,585],[13749.99,607.5],
-    [14249.99,630],[14749.99,652.5],[15249.99,675],[15749.99,697.5],[16249.99,720],
-    [16749.99,742.5],[17249.99,765],[17749.99,787.5],[18249.99,810],[18749.99,832.5],
-    [19249.99,855],[19749.99,877.5],[20249.99,900]
-  ];
-  if(m<4250) return 180;
-  for(const [max,c] of table){ if(m<=max) return c; }
-  return 900;
+  // 2025 SSS (Circular 2024-006): EE share = 5% of MSC, MSC in ₱500 brackets ₱5,000–₱35,000
+  const msc=Math.min(35000,Math.max(5000,Math.round(m/500)*500));
+  return msc*0.05;
 }
 function computePhilHealth(m){
   return Math.round(Math.min(Math.max(m*0.05,500),5000)/2);
@@ -2135,7 +2126,7 @@ const paidDays=daysPresent+leaveDays;
   const netPay=grossPay-totalDeductions;
 
   // Employer shares (informational)
-  const sssER=Math.round(computeSSS(grossPay)*2.2);
+  const sssER=Math.round(computeSSS(grossPay)*2); // 2025 SSS: ER = 10% of MSC = 2× EE share
   const phER=computePhilHealth(grossPay);
   const pagibigER=100;
 
