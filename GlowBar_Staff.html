@@ -1835,14 +1835,34 @@ function renderCutoff(){
     getPayslipSnapshot(userId,period,n,snap=>{
       if(snap){
         _doRender(snap.sss,snap.philhealth,snap.pagibig,snap.taxForCO,snap.savedAt);
-      } else {
-        const _sss=_moSSS/2,_ph=_moPH/2,_pi=_moPagibig/2,_tax=computeWithholdingTax(_moTaxable)/2;
+      } else if(n===1){
+        // CO1: deductions based on CO1 gross (grossPay), halved
+        const _sss=computeSSS(grossPay)/2,_ph=computePhilHealth(grossPay)/2,_pi=computePagibig()/2,_tax=computeWithholdingTax(_moTaxable)/2;
         _doRender(_sss,_ph,_pi,_tax,null);
         savePayslipSnapshot(userId,period,n,{sss:_sss,philhealth:_ph,pagibig:_pi,taxForCO:_tax});
+      } else {
+        // CO2: deductions = full-month statutory minus whatever CO1 was frozen at
+        getPayslipSnapshot(userId,period,1,co1Snap=>{
+          let _sss,_ph,_pi;
+          if(co1Snap){
+            _sss=computeSSS(estMonthlyGross)-co1Snap.sss;
+            _ph=computePhilHealth(estMonthlyGross)-co1Snap.philhealth;
+            _pi=computePagibig()-co1Snap.pagibig;
+          } else {
+            // CO1 not yet frozen — fall back to half-monthly estimate
+            _sss=_moSSS/2;_ph=_moPH/2;_pi=_moPagibig/2;
+          }
+          const _tax=computeWithholdingTax(_moTaxable)/2;
+          _doRender(_sss,_ph,_pi,_tax,null);
+          savePayslipSnapshot(userId,period,n,{sss:_sss,philhealth:_ph,pagibig:_pi,taxForCO:_tax});
+        });
       }
     });
   } else {
-    _doRender(_moSSS/2,_moPH/2,_moPagibig/2,computeWithholdingTax(_moTaxable)/2,null);
+    // No userId — live preview, no freeze
+    const _sss=n===1?computeSSS(grossPay)/2:_moSSS/2;
+    const _ph=n===1?computePhilHealth(grossPay)/2:_moPH/2;
+    _doRender(_sss,_ph,computePagibig()/2,computeWithholdingTax(_moTaxable)/2,null);
   }
 }
 
