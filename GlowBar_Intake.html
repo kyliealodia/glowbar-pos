@@ -1290,12 +1290,13 @@ async function submitForm(){
       const cSnap=await db.ref('gb/clients').once('value');
       const rawClients=cSnap.val()||{};
 
-      // Find existing client by phone — works whether stored as array or object
+      // Find existing client by phone AND name — works whether stored as array or object
+      // Same phone but a different name means a different person (e.g. shared household phone)
       let existingKey=null, existingClient=null;
       if(data.phone){
         const cleanPhone=data.phone.replace(/\D/g,'');
         Object.entries(rawClients).forEach(([key,c])=>{
-          if(c&&c.phone&&c.phone.replace(/\D/g,'')===cleanPhone){
+          if(c&&c.phone&&c.phone.replace(/\D/g,'')===cleanPhone&&c.name?.trim().toLowerCase()===data.name?.trim().toLowerCase()){
             existingKey=key; existingClient=c;
           }
         });
