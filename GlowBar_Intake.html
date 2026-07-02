@@ -1210,12 +1210,18 @@ function clearSig(){
 }
 
 // ── SUBMIT ──
+let _activeSubmitTimeout=null;
 async function submitForm(){
   const btn=document.getElementById('submitBtn');
   btn.disabled=true; btn.textContent='Saving…';
 
+  // Clear any stale safety timeout left over from a previous submission
+  // so it can't fire mid-way through this one and show the wrong success screen
+  if(_activeSubmitTimeout){clearTimeout(_activeSubmitTimeout);_activeSubmitTimeout=null;}
+
   // Safety — show success after 10 seconds no matter what
   const submitTimeout=setTimeout(()=>showSuccess('CL'+Date.now().toString().slice(-8), 'Client'), 10000);
+  _activeSubmitTimeout=submitTimeout;
 
   // Compress signature immediately — PNG is too large for Firebase
   const sigCanvas=document.getElementById('sigCanvas');
@@ -1233,6 +1239,9 @@ async function submitForm(){
   }
 
   const ref='CL'+Date.now().toString().slice(-8);
+  const _submitName=document.getElementById('s1FirstName').value.trim()+' '+document.getElementById('s1LastName').value.trim();
+  const _submitPhone=document.getElementById('s1Phone').value.trim();
+  console.log('[Intake] Submitting for:',_submitName,_submitPhone);
   const data={
     id:Date.now(),
     ref,
@@ -1293,12 +1302,27 @@ async function submitForm(){
       }
 
       if(existingKey!==null){
-        // Update existing client at their exact Firebase key
-        const updated={...existingClient,...data,
-          id:existingClient.id||data.id,
-          visits:existingClient.visits||0,
-          totalSpent:existingClient.totalSpent||0,
-          signature:compressedSig
+        // Update existing client — only merge intake-form fields, never touch POS-managed fields
+        // (visits, totalSpent, vip, packageSessions, photos, transactions, color, etc.)
+        const updated={
+          ...existingClient,
+          name:data.name||existingClient.name,
+          email:data.email||existingClient.email,
+          bday:data.bday||existingClient.bday,
+          gender:data.gender||existingClient.gender,
+          address:data.address||existingClient.address,
+          emergency:data.emergency||existingClient.emergency,
+          skinType:data.skinType||existingClient.skinType,
+          fitz:data.fitz||existingClient.fitz,
+          skinConcerns:data.skinConcerns||existingClient.skinConcerns,
+          medConditions:data.medConditions||existingClient.medConditions,
+          allergies:data.allergies||existingClient.allergies,
+          medications:data.medications||existingClient.medications,
+          source:data.source||existingClient.source,
+          skinAnalysis:data.skinAnalysis||existingClient.skinAnalysis,
+          intakeForms:[...(existingClient.intakeForms||[]),...(data.intakeForms||[])],
+          signature:compressedSig||existingClient.signature,
+          id:existingClient.id||data.id
         };
         await db.ref('gb/clients/'+existingKey).set(updated);
       } else {
@@ -1308,6 +1332,7 @@ async function submitForm(){
     }
     // Always show success even if offline
     clearTimeout(submitTimeout);
+    _activeSubmitTimeout=null;
     showSuccess(ref, data.name);
   } catch(e){
     console.error('Submit error:',e);
@@ -1317,9 +1342,11 @@ async function submitForm(){
         await db.ref('gb/clients').push({...data,signature:null});
       }
       clearTimeout(submitTimeout);
+      _activeSubmitTimeout=null;
       showSuccess(ref, data.name);
     } catch(e2){
       clearTimeout(submitTimeout);
+      _activeSubmitTimeout=null;
       showSuccess(ref, data.name);
     }
   }
@@ -1351,6 +1378,7 @@ function resetForm(){
   clearSig();
   sigInitialized=false;
   currentWaiver=null;
+  window._skinAnalysis=null;
   document.getElementById('successScreen').classList.remove('active');
   goSec(1);
   document.getElementById('submitBtn').disabled=true;
