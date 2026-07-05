@@ -1116,6 +1116,7 @@ html{height:-webkit-fill-available;}
                 <div style="font-family:'Cormorant Garamond',serif;font-size:42px;font-weight:500;color:#E8C97A;" id="capPctDisplay">0%</div>
                 <div style="font-size:10px;color:rgba(255,255,255,0.35);letter-spacing:1px;">RECOVERED</div>
                 <button onclick="openCapSettings()" style="margin-top:8px;background:rgba(201,168,76,0.15);border:1px solid rgba(201,168,76,0.3);color:rgba(201,168,76,0.8);padding:6px 14px;border-radius:8px;font-size:11px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .2s;">⚙ Edit Capital</button>
+                <button onclick="openCapitalSync()" data-role="owner" style="margin-top:8px;margin-left:6px;background:rgba(201,168,76,0.15);border:1px solid rgba(201,168,76,0.3);color:rgba(201,168,76,0.8);padding:6px 14px;border-radius:8px;font-size:11px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .2s;">↻ Sync from Reports &amp; Tracker</button>
               </div>
             </div>
 
@@ -3391,6 +3392,25 @@ html{height:-webkit-fill-available;}
       <div class="form-group"><label class="form-label">Notes (optional)</label><input class="form-input" id="mNotes" placeholder="e.g. Good month — Valentine's promos performed well"></div>
     </div>
     <div class="modal-footer"><button class="btn btn-outline" onclick="closeM('addMonthlyModal')">Cancel</button><button class="btn btn-gold" onclick="saveMonthlyRecord()">Save Record</button></div>
+  </div>
+</div>
+
+<!-- Capital Sync Modal -->
+<div class="overlay hidden" id="capitalSyncModal">
+  <div class="modal modal-lg" style="max-width:920px;max-height:90vh;overflow-y:auto;">
+    <div class="modal-hdr"><div class="modal-title">↻ Sync from Reports &amp; Tracker</div><div class="modal-x" onclick="closeM('capitalSyncModal')">✕</div></div>
+    <div class="modal-body">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap;">
+        <div style="font-size:11px;color:var(--ink4);max-width:520px;">Revenue is computed from POS transactions; expenses are pulled from what the Tracker last synced. Review before applying.</div>
+        <button class="btn btn-gold btn-sm" onclick="applyAllCapSync()">Apply All Auto</button>
+      </div>
+      <table class="inv-table" style="width:100%;">
+        <thead><tr><th>Month</th><th>Current Revenue</th><th>Auto Revenue</th><th>Current Expenses</th><th>Auto Expenses</th><th>Action</th></tr></thead>
+        <tbody id="capSyncBody"></tbody>
+      </table>
+      <div id="capSyncEmpty" style="display:none;padding:24px;text-align:center;color:var(--ink4);font-size:12px;">No transaction or tracker data found to compare.</div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-outline" onclick="closeM('capitalSyncModal')">Cancel</button></div>
   </div>
 </div>
 
@@ -11850,6 +11870,110 @@ function saveMonthlyRecord(){
   closeM('addMonthlyModal');sync('capital');renderCapital();
   const d=new Date(month+'-01');
   showToast(d.toLocaleDateString('en-PH',{month:'long',year:'numeric'})+' saved · Net: '+fp(net),'ok');
+}
+
+// ── Capital Sync (Reports transactions + Tracker expenses) ──
+let _capSyncRows=[];
+function _computeCapSyncRows(){
+  initCapital();
+  const revByMonth={};
+  (S.transactions||[]).forEach(t=>{
+    if(!t.time) return;
+    const m=t.time.slice(0,7);
+    revByMonth[m]=(revByMonth[m]||0)+(t.total||0);
+  });
+  const records=S.capital.monthlyRecords||[];
+  const expByMonth={};
+  records.forEach(r=>{expByMonth[r.month]=r.expenses||0;});
+  const months=[...new Set([...Object.keys(revByMonth),...Object.keys(expByMonth)])].sort();
+  return months.map(month=>{
+    const existing=records.find(r=>r.month===month);
+    const autoRevenue=Math.round(revByMonth[month]||0);
+    const autoExpenses=Math.round(expByMonth[month]||0);
+    const hasCurrent=!!existing;
+    const curRevenue=hasCurrent?Math.round(existing.revenue||0):null;
+    const curExpenses=hasCurrent?Math.round(existing.expenses||0):null;
+    const matches=hasCurrent&&curRevenue===autoRevenue&&curExpenses===autoExpenses;
+    return{month,hasCurrent,curRevenue,curExpenses,autoRevenue,autoExpenses,matches};
+  });
+}
+function _applyCapSyncMonth(row){
+  initCapital();
+  const idx=S.capital.monthlyRecords.findIndex(r=>r.month===row.month);
+  if(idx>=0){
+    const rec=S.capital.monthlyRecords[idx];
+    S.capital.monthlyRecords[idx]={...rec,revenue:row.autoRevenue,expenses:row.autoExpenses,net:row.autoRevenue-row.autoExpenses};
+  } else {
+    S.capital.monthlyRecords.push({id:'CAP'+row.month,month:row.month,revenue:row.autoRevenue,expenses:row.autoExpenses,net:row.autoRevenue-row.autoExpenses,notes:''});
+  }
+}
+function openCapitalSync(){
+  _capSyncRows=_computeCapSyncRows();
+  renderCapSyncTable();
+  openM('capitalSyncModal');
+}
+function renderCapSyncTable(){
+  const tbody=document.getElementById('capSyncBody');
+  const empty=document.getElementById('capSyncEmpty');
+  if(!tbody)return;
+  if(!_capSyncRows.length){tbody.innerHTML='';if(empty)empty.style.display='block';return;}
+  if(empty)empty.style.display='none';
+  tbody.innerHTML=_capSyncRows.map(r=>{
+    const d=new Date(r.month+'-01');
+    const label=d.toLocaleDateString('en-PH',{month:'short',year:'numeric'});
+    if(!r.hasCurrent){
+      return `<tr>
+        <td style="font-weight:500;">${label}</td>
+        <td style="color:var(--ink4);">— (none)</td><td>${fp(r.autoRevenue)}</td>
+        <td style="color:var(--ink4);">— (none)</td><td>${fp(r.autoExpenses)}</td>
+        <td><button class="btn btn-gold btn-sm" onclick="applyCapSyncRow('${r.month}')">+ Add</button></td>
+      </tr>`;
+    }
+    if(r.matches){
+      return `<tr>
+        <td style="font-weight:500;">${label}</td>
+        <td>${fp(r.curRevenue)}</td><td>${fp(r.autoRevenue)}</td>
+        <td>${fp(r.curExpenses)}</td><td>${fp(r.autoExpenses)}</td>
+        <td style="color:var(--success);font-weight:600;">✓</td>
+      </tr>`;
+    }
+    const revDiff=r.curRevenue!==r.autoRevenue;
+    const expDiff=r.curExpenses!==r.autoExpenses;
+    return `<tr>
+      <td style="font-weight:500;">${label}</td>
+      <td style="${revDiff?'color:var(--danger);font-weight:600;':''}">${fp(r.curRevenue)}</td>
+      <td style="${revDiff?'color:var(--success);font-weight:600;':''}">${fp(r.autoRevenue)}</td>
+      <td style="${expDiff?'color:var(--danger);font-weight:600;':''}">${fp(r.curExpenses)}</td>
+      <td style="${expDiff?'color:var(--success);font-weight:600;':''}">${fp(r.autoExpenses)}</td>
+      <td style="white-space:nowrap;">
+        <button class="btn btn-gold btn-sm" onclick="applyCapSyncRow('${r.month}')">Use Auto</button>
+        <button class="btn btn-outline btn-sm" onclick="keepManualCapSyncRow('${r.month}')" style="margin-left:4px;">Keep Manual</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+function applyCapSyncRow(month){
+  const row=_capSyncRows.find(r=>r.month===month);
+  if(!row)return;
+  _applyCapSyncMonth(row);
+  sync('capital');renderCapital();
+  _capSyncRows=_capSyncRows.filter(r=>r.month!==month);
+  renderCapSyncTable();
+  showToast('1 month updated from auto-sync','ok');
+}
+function keepManualCapSyncRow(month){
+  _capSyncRows=_capSyncRows.filter(r=>r.month!==month);
+  renderCapSyncTable();
+}
+function applyAllCapSync(){
+  const toApply=_capSyncRows.filter(r=>!r.matches);
+  if(!toApply.length){showToast('Nothing to sync — all months already match','ok');return;}
+  toApply.forEach(r=>_applyCapSyncMonth(r));
+  sync('capital');renderCapital();
+  _capSyncRows=_capSyncRows.filter(r=>r.matches);
+  renderCapSyncTable();
+  showToast(toApply.length+' month'+(toApply.length>1?'s':'')+' updated from auto-sync','ok');
+  closeM('capitalSyncModal');
 }
 let editExpenseId=null;
 function openAddExpense(){
