@@ -11879,7 +11879,9 @@ function _computeCapSyncRows(){
   const revByMonth={};
   (S.transactions||[]).forEach(t=>{
     if(!t.time) return;
-    const m=t.time.slice(0,7);
+    // Group by Philippine local month, not UTC — a transaction just before midnight UTC
+    // can already be the next day/month in Asia/Manila (UTC+8)
+    const m=new Date(t.time).toLocaleDateString('en-CA',{timeZone:'Asia/Manila',year:'numeric',month:'2-digit'}).slice(0,7);
     revByMonth[m]=(revByMonth[m]||0)+(t.total||0);
   });
   const records=S.capital.monthlyRecords||[];
