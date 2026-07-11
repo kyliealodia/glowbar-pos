@@ -108,6 +108,7 @@ window.pushServicesToPOS = async function(){
 
         // Find existing POS product by name to preserve stock/other fields
         const existing = existingArr.find(p => p && p.name === svc.name);
+        console.log(`[pushServicesToPOS] ${existing ? 'updated' : 'created new'}: ${svc.name}`);
 
         updated.push({
           id: existing ? existing.id : svc.id,
