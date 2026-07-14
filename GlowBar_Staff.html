@@ -1716,9 +1716,15 @@ function renderCutoff(){
     o.userId===viewUser.id&&o.status==='approved'&&(o.date||'').startsWith(_moPeriod)
   ).reduce((s,o)=>s+(o.amount||0),0);
   const estMonthlyGross=_moEarnedBasic+_moCommEarned+allowances+_moHolPay+_moOTPay;
+
+  // Monthly working days (schedule-based, 1st–last day, CO1+CO2 combined) — used ONLY as
+  // the SSS/PhilHealth base so those contributions stay flat regardless of commission swings.
+  const totalWorkingDaysInMonth=getWorkingDaysSP(yr,mo,staffStart,today,shiftDays);
+  const estMonthlyBasic=Math.round(dailyRate*totalWorkingDaysInMonth);
+
   // Compute monthly statutory amounts first, then halve — no rounding before halving
-  const _moSSS=computeSSS(estMonthlyGross);
-  const _moPH=computePhilHealth(estMonthlyGross);
+  const _moSSS=computeSSS(estMonthlyBasic);
+  const _moPH=computePhilHealth(estMonthlyBasic);
   const _moPagibig=computePagibig();
   const _moTaxable=Math.max(0,estMonthlyGross-_moSSS-_moPH-_moPagibig);
 
@@ -1836,17 +1842,17 @@ function renderCutoff(){
       if(snap){
         _doRender(snap.sss,snap.philhealth,snap.pagibig,snap.taxForCO,snap.savedAt);
       } else if(n===1){
-        // CO1: deductions based on CO1 gross (grossPay), halved
-        const _sss=computeSSS(grossPay)/2,_ph=computePhilHealth(grossPay)/2,_pi=computePagibig()/2,_tax=computeWithholdingTax(_moTaxable)/2;
+        // CO1: deductions based on estMonthlyBasic (schedule-based basic, not gross), halved
+        const _sss=computeSSS(estMonthlyBasic)/2,_ph=computePhilHealth(estMonthlyBasic)/2,_pi=computePagibig()/2,_tax=computeWithholdingTax(_moTaxable)/2;
         _doRender(_sss,_ph,_pi,_tax,null);
         savePayslipSnapshot(userId,period,n,{sss:_sss,philhealth:_ph,pagibig:_pi,taxForCO:_tax});
       } else {
-        // CO2: deductions = full-month statutory minus whatever CO1 was frozen at
+        // CO2: deductions = full-month statutory (on estMonthlyBasic) minus whatever CO1 was frozen at
         getPayslipSnapshot(userId,period,1,co1Snap=>{
           let _sss,_ph,_pi;
           if(co1Snap){
-            _sss=computeSSS(estMonthlyGross)-co1Snap.sss;
-            _ph=computePhilHealth(estMonthlyGross)-co1Snap.philhealth;
+            _sss=computeSSS(estMonthlyBasic)-co1Snap.sss;
+            _ph=computePhilHealth(estMonthlyBasic)-co1Snap.philhealth;
             _pi=computePagibig()-co1Snap.pagibig;
           } else {
             // CO1 not yet frozen — fall back to half-monthly estimate
@@ -1860,8 +1866,8 @@ function renderCutoff(){
     });
   } else {
     // No userId — live preview, no freeze
-    const _sss=n===1?computeSSS(grossPay)/2:_moSSS/2;
-    const _ph=n===1?computePhilHealth(grossPay)/2:_moPH/2;
+    const _sss=n===1?computeSSS(estMonthlyBasic)/2:_moSSS/2;
+    const _ph=n===1?computePhilHealth(estMonthlyBasic)/2:_moPH/2;
     _doRender(_sss,_ph,computePagibig()/2,computeWithholdingTax(_moTaxable)/2,null);
   }
 }
@@ -2115,9 +2121,11 @@ const paidDays=daysPresent+leaveDays;
   }).reduce((s,ca)=>s+(ca.amount||0),0);
   console.log('[caDeductM] total deduction:',caDeductM);
 
-  // Statutory deductions
-  const sss=computeSSS(grossPay);
-  const philhealth=computePhilHealth(grossPay);
+  // Statutory deductions — SSS/PhilHealth base is schedule-based basic (dailyRate ×
+  // total working days for the month), not gross, so it stays flat regardless of commission.
+  const estMonthlyBasic=Math.round(dailyRate*workingDays);
+  const sss=computeSSS(estMonthlyBasic);
+  const philhealth=computePhilHealth(estMonthlyBasic);
   const pagibig=computePagibig();
   const govTotal=sss+philhealth+pagibig;
   const taxable=Math.max(0,grossPay-govTotal);
@@ -2125,9 +2133,9 @@ const paidDays=daysPresent+leaveDays;
   const totalDeductions=govTotal+withholdingTax+otherDeductions+caDeductM;
   const netPay=grossPay-totalDeductions;
 
-  // Employer shares (informational)
-  const sssER=Math.round(computeSSS(grossPay)*2); // 2025 SSS: ER = 10% of MSC = 2× EE share
-  const phER=computePhilHealth(grossPay);
+  // Employer shares (informational) — same estMonthlyBasic base as the EE share
+  const sssER=Math.round(computeSSS(estMonthlyBasic)*2); // 2025 SSS: ER = 10% of MSC = 2× EE share
+  const phER=computePhilHealth(estMonthlyBasic);
   const pagibigER=100;
 
   const clinic=S.settings?.clinicName||'GlowBar Beauty Clinic';
@@ -3077,11 +3085,15 @@ function renderAdminPayroll(){
 
     const grossPay=baseEarned+commEarned+coAllowances+otPay;
     const estMonthlyGross=grossPay*2;
-    const sss=Math.round(computeSSS(estMonthlyGross)/2);
-    const philhealth=Math.round(computePhilHealth(estMonthlyGross)/2);
+    // SSS/PhilHealth base = schedule-based basic (dailyRate × total working days for the
+    // month), not gross, so contributions stay flat regardless of commission swings.
+    const totalWorkingDaysInMonth=getWorkingDaysSP(yr,mo,staffStart,today,shiftDays);
+    const estMonthlyBasic=Math.round(dailyRate*totalWorkingDaysInMonth);
+    const sss=Math.round(computeSSS(estMonthlyBasic)/2);
+    const philhealth=Math.round(computePhilHealth(estMonthlyBasic)/2);
     const pagibig=Math.round(computePagibig()/2);
     const govTotal=sss+philhealth+pagibig;
-    const taxable=Math.max(0,estMonthlyGross-computeSSS(estMonthlyGross)-computePhilHealth(estMonthlyGross)-computePagibig());
+    const taxable=Math.max(0,estMonthlyGross-computeSSS(estMonthlyBasic)-computePhilHealth(estMonthlyBasic)-computePagibig());
     const taxForCO=Math.round(computeWithholdingTax(taxable)/2);
     const otherDed=Math.round(otherDeductions/2);
     const totalDed2=govTotal+taxForCO+otherDed;
