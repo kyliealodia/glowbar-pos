@@ -1194,7 +1194,7 @@ function computeCurrentCutoffEarnings(){
     const mu=l.userId===currentUser?.id||l.user===currentUser?.name||l.name===currentUser?.name;
     if(!mu) return;
     let ds='';
-    if(!l.action&&l.in) ds=l.date||toPHDateStr(l.in);
+    if(!l.action&&(l.in||l.inTime)) ds=l.date||toPHDateStr(l.in||l.inTime);
     else if(l.action==='clockin'||l.action==='in') ds=toPHDateStr(l.time||'');
     if(ds&&ds>=coStartStr&&ds<=effectiveEnd) presentDates.add(ds);
   });
@@ -1617,8 +1617,8 @@ function renderCutoff(){
       const matchUser=l.userId===viewUser.id||l.user===viewUser.name||l.name===viewUser.name;
       if(!matchUser) return;
       let dateStr='';
-      if(!l.action&&l.in){
-        dateStr=l.date||toPHDateStr(l.in);
+      if(!l.action&&(l.in||l.inTime)){
+        dateStr=l.date||toPHDateStr(l.in||l.inTime);
       } else if(l.action==='clockin'||l.action==='in'){
         dateStr=toPHDateStr(l.time||'');
       }
@@ -1630,7 +1630,7 @@ function renderCutoff(){
   let _ocCO={days:[],totalPay:0,totalHours:0};
   if(_isCOOnCall&&dailyRate>0){
     const _ocCOMap={};
-    (S.loginLogs||[]).filter(l=>{const mu=l.userId===viewUser.id||l.user===viewUser.name||l.name===viewUser.name;const dt=l.date||(l.in?toPHDateStr(l.in):'');return mu&&dt&&dt>=coStartStr&&dt<=coEndStr&&!l.action;}).forEach(l=>{const dt=l.date||(l.in?toPHDateStr(l.in):'');if(!dt)return;if(!_ocCOMap[dt])_ocCOMap[dt]={inTime:null,outTime:null};if(l.in&&!_ocCOMap[dt].inTime)_ocCOMap[dt].inTime=new Date(l.in);if(l.out)_ocCOMap[dt].outTime=new Date(l.out);});
+    (S.loginLogs||[]).filter(l=>{const mu=l.userId===viewUser.id||l.user===viewUser.name||l.name===viewUser.name;const dt=l.date||((l.in||l.inTime)?toPHDateStr(l.in||l.inTime):'');return mu&&dt&&dt>=coStartStr&&dt<=coEndStr&&!l.action;}).forEach(l=>{const dt=l.date||((l.in||l.inTime)?toPHDateStr(l.in||l.inTime):'');if(!dt)return;if(!_ocCOMap[dt])_ocCOMap[dt]={inTime:null,outTime:null};if((l.in||l.inTime)&&!_ocCOMap[dt].inTime)_ocCOMap[dt].inTime=new Date(l.in||l.inTime);if(l.out||l.outTime)_ocCOMap[dt].outTime=new Date(l.out||l.outTime);});
     (S.loginLogs||[]).filter(l=>{const mu=l.userId===viewUser.id||l.user===viewUser.name||l.name===viewUser.name;const dt=(l.time||'').slice(0,10);return mu&&dt&&dt>=coStartStr&&dt<=coEndStr&&(l.action==='clockin'||l.action==='in');}).forEach(l=>{const dt=(l.time||'').slice(0,10);if(!_ocCOMap[dt])_ocCOMap[dt]={inTime:null,outTime:null};if(!_ocCOMap[dt].inTime)_ocCOMap[dt].inTime=new Date(l.time);});
     (S.loginLogs||[]).filter(l=>{const mu=l.userId===viewUser.id||l.user===viewUser.name||l.name===viewUser.name;const dt=(l.time||'').slice(0,10);return mu&&dt&&dt>=coStartStr&&dt<=coEndStr&&(l.action==='clockout'||l.action==='out');}).forEach(l=>{const dt=(l.time||'').slice(0,10);if(!_ocCOMap[dt])_ocCOMap[dt]={inTime:null,outTime:null};_ocCOMap[dt].outTime=new Date(l.time);});
     let _tp=0,_th=0;
@@ -1689,7 +1689,7 @@ function renderCutoff(){
       const mu=l.userId===viewUser.id||l.user===viewUser.name||l.name===viewUser.name;
       if(!mu) return;
       let ds='';
-      if(!l.action&&l.in) ds=l.date||toPHDateStr(l.in);
+      if(!l.action&&(l.in||l.inTime)) ds=l.date||toPHDateStr(l.in||l.inTime);
       else if(l.action==='clockin'||l.action==='in') ds=toPHDateStr(l.time||'');
       if(ds&&ds.startsWith(_moPeriod)) _moPresent.add(ds);
     });
@@ -2032,8 +2032,8 @@ const _schedLabel=_shiftDays.join(', ')||'No days';
       const matchUser=l.userId===viewUser.id||l.user===viewUser.name||l.name===viewUser.name;
       if(!matchUser) return;
       let dateStr='';
-      if(!l.action&&l.in){
-        dateStr=l.date||toPHDateStr(l.in);
+      if(!l.action&&(l.in||l.inTime)){
+        dateStr=l.date||toPHDateStr(l.in||l.inTime);
       } else if(l.action==='clockin'||l.action==='in'){
         dateStr=toPHDateStr(l.time||'');
       }
@@ -2059,7 +2059,7 @@ const _isOnCallM=userRecord.onCall===true;
 let _ocDailyM={days:[],totalPay:0,totalHours:0};
 if(_isOnCallM&&dailyRate>0){
   const _ocDMap={};
-  (S.loginLogs||[]).filter(l=>{const mu=l.userId===viewUser.id||l.user===viewUser.name||l.name===viewUser.name;const dt=l.date||(l.in?toPHDateStr(l.in):'');return mu&&dt&&dt.startsWith(period)&&!l.action;}).forEach(l=>{const dt=l.date||(l.in?toPHDateStr(l.in):'');if(!dt)return;if(!_ocDMap[dt])_ocDMap[dt]={inTime:null,outTime:null};if(l.in&&!_ocDMap[dt].inTime)_ocDMap[dt].inTime=new Date(l.in);if(l.out)_ocDMap[dt].outTime=new Date(l.out);});
+  (S.loginLogs||[]).filter(l=>{const mu=l.userId===viewUser.id||l.user===viewUser.name||l.name===viewUser.name;const dt=l.date||((l.in||l.inTime)?toPHDateStr(l.in||l.inTime):'');return mu&&dt&&dt.startsWith(period)&&!l.action;}).forEach(l=>{const dt=l.date||((l.in||l.inTime)?toPHDateStr(l.in||l.inTime):'');if(!dt)return;if(!_ocDMap[dt])_ocDMap[dt]={inTime:null,outTime:null};if((l.in||l.inTime)&&!_ocDMap[dt].inTime)_ocDMap[dt].inTime=new Date(l.in||l.inTime);if(l.out||l.outTime)_ocDMap[dt].outTime=new Date(l.out||l.outTime);});
   (S.loginLogs||[]).filter(l=>{const mu=l.userId===viewUser.id||l.user===viewUser.name||l.name===viewUser.name;const ph=l.time?toPHDateStr(String(l.time)):'';return mu&&ph&&ph.startsWith(period)&&(l.action==='clockin'||l.action==='in');}).forEach(l=>{const dt=toPHDateStr(String(l.time));if(!_ocDMap[dt])_ocDMap[dt]={inTime:null,outTime:null};if(!_ocDMap[dt].inTime)_ocDMap[dt].inTime=new Date(l.time);});
   (S.loginLogs||[]).filter(l=>{const mu=l.userId===viewUser.id||l.user===viewUser.name||l.name===viewUser.name;const ph=l.time?toPHDateStr(String(l.time)):'';return mu&&ph&&ph.startsWith(period)&&(l.action==='clockout'||l.action==='out');}).forEach(l=>{const dt=toPHDateStr(String(l.time));if(!_ocDMap[dt])_ocDMap[dt]={inTime:null,outTime:null};_ocDMap[dt].outTime=new Date(l.time);});
   let _tp=0,_th=0;
@@ -2305,7 +2305,7 @@ function countDaysPresent(period){
   const logs=S.loginLogs.filter(l=>{
     const d=new Date(l.time||l.date);
     const matchUser=l.userId===currentUser.id||l.user===currentUser.name||l.name===currentUser.name;
-    return matchUser&&d.getFullYear()===yr&&d.getMonth()===mo-1&&(l.action==='in'||l.action==='clockin');
+    return matchUser&&d.getFullYear()===yr&&d.getMonth()===mo-1&&((l.action==='in'||l.action==='clockin')||(!l.action&&(l.in||l.inTime)));
   });
   return new Set(logs.map(l=>new Date(l.time||l.date).toDateString())).size;
 }
@@ -2352,6 +2352,8 @@ function renderAttendance(){
     if(!byDate[key]) byDate[key]={date:d,in:null,out:null};
     if((l.action==='in'||l.action==='clockin')&&!byDate[key].in) byDate[key].in=d;
     if(l.action==='out'||l.action==='clockout') byDate[key].out=d;
+    if(!l.action&&(l.in||l.inTime)&&!byDate[key].in) byDate[key].in=new Date(l.in||l.inTime);
+    if(!l.action&&(l.out||l.outTime)) byDate[key].out=new Date(l.out||l.outTime);
   });
 
   const days=Object.values(byDate).sort((a,b)=>b.date-a.date);
@@ -2966,6 +2968,8 @@ function renderAdmin(){
       if(!byDate[key]) byDate[key]={in:null,out:null,date:d};
       if((l.action==='in'||l.action==='clockin')&&!byDate[key].in) byDate[key].in=d;
       if(l.action==='out'||l.action==='clockout') byDate[key].out=d;
+      if(!l.action&&(l.in||l.inTime)&&!byDate[key].in) byDate[key].in=new Date(l.in||l.inTime);
+      if(!l.action&&(l.out||l.outTime)) byDate[key].out=new Date(l.out||l.outTime);
     });
     const days=Object.keys(byDate).length;
     let hrs=0;
@@ -3045,21 +3049,15 @@ function renderAdminPayroll(){
       if(shiftDays.includes(dayNames[new Date(d).getDay()])) workingDaysInCO++;
     }
 
-    // Days present
-    const inLogs=(S.loginLogs||[]).filter(l=>{
-      const matchU=l.userId===u.id||l.user===u.name||l.name===u.name;
-      if(!matchU)return false;
-      if(!(l.action==='clockin'||l.action==='in'))return false;
-      const d=(l.time||'').slice(0,10);
-      return d>=coStartStr&&d<=coEndStr;
-    });
-    const daysPresent=new Set(inLogs.map(l=>l.time.slice(0,10))).size;
+    // Days present — legacy clockin/clockout rows AND unified {date,inTime,outTime} rows
+    const _smMap={};
+    (S.loginLogs||[]).filter(l=>{const mu=l.userId===u.id||l.user===u.name||l.name===u.name;const dt=l.date||((l.in||l.inTime)?toPHDateStr(l.in||l.inTime):'');return mu&&dt&&dt>=coStartStr&&dt<=coEndStr&&!l.action;}).forEach(l=>{const dt=l.date||((l.in||l.inTime)?toPHDateStr(l.in||l.inTime):'');if(!dt)return;if(!_smMap[dt])_smMap[dt]={inTime:null,outTime:null};if((l.in||l.inTime)&&!_smMap[dt].inTime)_smMap[dt].inTime=new Date(l.in||l.inTime);if(l.out||l.outTime)_smMap[dt].outTime=new Date(l.out||l.outTime);});
+    (S.loginLogs||[]).filter(l=>{const mu=l.userId===u.id||l.user===u.name||l.name===u.name;const dt=(l.time||'').slice(0,10);return mu&&dt&&dt>=coStartStr&&dt<=coEndStr&&(l.action==='clockin'||l.action==='in');}).forEach(l=>{const dt=(l.time||'').slice(0,10);if(!_smMap[dt])_smMap[dt]={inTime:null,outTime:null};if(!_smMap[dt].inTime)_smMap[dt].inTime=new Date(l.time);});
+    (S.loginLogs||[]).filter(l=>{const mu=l.userId===u.id||l.user===u.name||l.name===u.name;const dt=(l.time||'').slice(0,10);return mu&&dt&&dt>=coStartStr&&dt<=coEndStr&&(l.action==='clockout'||l.action==='out');}).forEach(l=>{const dt=(l.time||'').slice(0,10);if(!_smMap[dt])_smMap[dt]={inTime:null,outTime:null};_smMap[dt].outTime=new Date(l.time);});
+    const daysPresent=Object.keys(_smMap).length;
     const _sumOnCall=u.onCall===true;
     let _sumOCPay=0;
     if(_sumOnCall&&dailyRate>0){
-      const _smMap={};
-      inLogs.forEach(l=>{const dt=(l.time||'').slice(0,10);if(!_smMap[dt])_smMap[dt]={inTime:new Date(l.time),outTime:null};});
-      (S.loginLogs||[]).filter(l=>{const mu=l.userId===u.id||l.user===u.name||l.name===u.name;const dt=(l.time||'').slice(0,10);return mu&&dt&&dt>=coStartStr&&dt<=coEndStr&&(l.action==='clockout'||l.action==='out');}).forEach(l=>{const dt=(l.time||'').slice(0,10);if(_smMap[dt])_smMap[dt].outTime=new Date(l.time);});
       Object.values(_smMap).forEach(({inTime,outTime})=>{let mins=0;if(inTime&&outTime&&outTime>inTime)mins=Math.round((outTime-inTime)/60000);_sumOCPay+=Math.round((Math.min(mins,480)/480)*dailyRate);});
     }
     const baseEarned=_sumOnCall?_sumOCPay:Math.round(dailyRate*daysPresent);
