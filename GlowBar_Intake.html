@@ -590,7 +590,9 @@ const SERVICE_TO_WAIVER={
   'Waxing':'waxing',
   'Facial / Skin Treatment':'facial',
   'Laser Treatment':'laser',
-  'Exilis / Body Contouring':'rf'
+  'Exilis / Body Contouring':'rf',
+  'Nail Services':'nail',
+  'Tattoo / Wart Removal':'laser'
 };
 
 const WAIVERS={
@@ -1323,6 +1325,9 @@ async function submitForm(){
           skinAnalysis:data.skinAnalysis||existingClient.skinAnalysis,
           intakeForms:[...(existingClient.intakeForms||[]),...(data.intakeForms||[])],
           signature:compressedSig||existingClient.signature,
+          consents:{...(existingClient.consents||{}), ...(data.consents||{})},
+          todayService:data.todayService||existingClient.todayService,
+          prevTreatments:data.prevTreatments||existingClient.prevTreatments,
           id:existingClient.id||data.id
         };
         await db.ref('gb/clients/'+existingKey).set(updated);
