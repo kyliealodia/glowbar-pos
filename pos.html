@@ -3673,6 +3673,7 @@ let S = {
   bookings:[],
   walkInQueue:[],
   cashAdvances:[],
+  payAdjustments:[], // {id, userId, userName, amount, reason, payPeriod, recordedBy, recordedAt} — synced from Staff Portal, amount always deducted
   rooms:[
     {id:1,name:'Bed 1',occupied:false,session:null},
     {id:2,name:'Bed 2',occupied:false,session:null},
@@ -3755,7 +3756,7 @@ async function pushAllToFirebase(){
   document.getElementById('syncLbl').textContent='Syncing…';
 
   // Push small keys first
-  const smallKeys=['settings','users','rooms','clients','bookings','transactions','deletedTransactions','loginLogs','walkInQueue','cashAdvances'];
+  const smallKeys=['settings','users','rooms','clients','bookings','transactions','deletedTransactions','loginLogs','walkInQueue','cashAdvances','payAdjustments'];
   for(const key of smallKeys){
     try{ await db.ref('gb/'+key).set(S[key]||[]); }
     catch(e){ console.warn('Failed:',key,e); }
@@ -3878,6 +3879,22 @@ window.addEventListener('DOMContentLoaded',()=>{
     db.ref('gb/shifts').on('value', snap=>{
       S.shifts=snap.exists()?Object.values(snap.val()):[];
       if(document.getElementById('page-dashboard')?.classList.contains('active')) renderCashDrawer();
+    });
+
+    // Cash advances — recorded from either app, so needs a live listener. This file
+    // previously only ever wrote/read its own in-session pushes and never actually
+    // loaded this collection from Firebase, so advances recorded via the Staff Portal
+    // never showed up here.
+    db.ref('gb/cashAdvances').on('value', snap=>{
+      S.cashAdvances=fbVal(snap.exists()?snap.val():null,[]);
+      if(document.getElementById('page-payslip')?.classList.contains('active')) renderPayslip();
+      if(document.getElementById('cashAdvanceAdminList')) renderCashAdvanceAdmin();
+    });
+
+    // Pay adjustments — recorded from either app, so needs a live listener (same reason).
+    db.ref('gb/payAdjustments').on('value', snap=>{
+      S.payAdjustments=fbVal(snap.exists()?snap.val():null,[]);
+      if(document.getElementById('page-payslip')?.classList.contains('active')) renderPayslip();
     });
 
     // Fallback — if Firebase takes more than 5s, load with whatever we have
@@ -10257,7 +10274,18 @@ const daysAbsent=(u.role!=='owner'&&!u.onCall&&hasClockData)?Math.max(0,elapsedW
     const _ocPayS=u.onCall?_getOnCallDailyBreakdown(u.id,u.name,period,dailyRate).totalPay:0;
     const earnedBasic=u.onCall?_ocPayS:salary-Math.round(dailyRate*daysAbsent);
     const grossPay=Math.max(0,earnedBasic)+commAmt+holidayResult.totalHolidayPay;
-    const d=computeDeductions(u, grossPay);
+    // Cash advances + pay adjustments for this period — same match pattern (userId
+    // string-cast, period-prefix) as the per-staff payslip cards below, so this
+    // summary's totals agree with those cards.
+    const caDeductS=(S.cashAdvances||[]).filter(ca=>
+      String(ca.userId)===String(u.id)&&ca.status==='approved'&&
+      ca.approvedAt&&ca.approvedAt.startsWith(period)
+    ).reduce((s,ca)=>s+(ca.amount||0),0);
+    const payAdjDeductS=(S.payAdjustments||[]).filter(pa=>
+      String(pa.userId)===String(u.id)&&(pa.payPeriod||'').startsWith(period)
+    ).reduce((s,pa)=>s+(pa.amount||0),0);
+    const uWithDeductsS={...u,otherDeductions:(u.otherDeductions||0)+caDeductS+payAdjDeductS};
+    const d=computeDeductions(uWithDeductsS, grossPay);
 
     // Employer shares
     const sssER = u.sssVoluntary!==false ? Math.round(computeSSS(grossPay)*2.2) : 0; // approx ER ~2.2x EE
@@ -10452,14 +10480,20 @@ const daysAbsent=(u.role!=='owner'&&!u.onCall&&hasClockData)?Math.max(0,elapsedW
     const absenceDeduction=Math.round(dailyRate*daysAbsent);
     const earnedBasic=u.onCall?_ocBreak.totalPay:salary-absenceDeduction;
 
-    // Cash advance deductions for this pay period
+    // Cash advance deductions for this pay period.
+    // String-cast comparison — userId is stored as the <select> value (a string) when
+    // recorded from the Staff Portal, but u.id here is often a number.
     const caDeduct=(S.cashAdvances||[]).filter(ca=>
-      ca.userId===u.id&&ca.status==='approved'&&
+      String(ca.userId)===String(u.id)&&ca.status==='approved'&&
       ca.approvedAt&&ca.approvedAt.startsWith(period)
     ).reduce((s,ca)=>s+ca.amount,0);
+    // Pay adjustments (one-time payroll corrections) recorded against either cut-off this month.
+    // Same string-cast comparison, for the same reason.
+    const payAdjRows=(S.payAdjustments||[]).filter(pa=>String(pa.userId)===String(u.id)&&(pa.payPeriod||'').startsWith(period));
+    const payAdjDeduct=payAdjRows.reduce((s,pa)=>s+(pa.amount||0),0);
     // Gross = earned basic + commission + holiday pay
     const grossPay=Math.max(0,earnedBasic)+commissionAmt+holidayInfo.totalHolidayPay;
-    const uWithCA={...u,otherDeductions:(u.otherDeductions||0)+caDeduct};
+    const uWithCA={...u,otherDeductions:(u.otherDeductions||0)+caDeduct+payAdjDeduct};
     const d=computeDeductions(uWithCA, grossPay);
     const netPay=d.netPay;
     const fp2=n=>'₱'+Math.round(n).toLocaleString('en-PH');
@@ -10539,8 +10573,9 @@ const daysAbsent=(u.role!=='owner'&&!u.onCall&&hasClockData)?Math.max(0,elapsedW
         ${u.philhealthVoluntary!==false?`<div class="payslip-row"><span>PhilHealth (2.5%)</span><span style="color:var(--danger);">-${fp2(d.ph)}</span></div>`:''}
         ${u.pagibigVoluntary!==false?`<div class="payslip-row"><span>Pag-IBIG</span><span style="color:var(--danger);">-${fp2(d.pagibig)}</span></div>`:''}
         ${u.withholdingTax!==false&&d.tax>0?`<div class="payslip-row"><span>Withholding Tax</span><span style="color:var(--danger);">-${fp2(d.tax)}</span></div>`:''}
-        ${(d.otherDeduct-caDeduct)>0?`<div class="payslip-row"><span>Other Deductions</span><span style="color:var(--danger);">-${fp2(d.otherDeduct-caDeduct)}</span></div>`:''}
+        ${(d.otherDeduct-caDeduct-payAdjDeduct)>0?`<div class="payslip-row"><span>Other Deductions</span><span style="color:var(--danger);">-${fp2(d.otherDeduct-caDeduct-payAdjDeduct)}</span></div>`:''}
         ${caDeduct>0?`<div class="payslip-row"><span>Cash Advance Deduction</span><span style="color:var(--danger);">-${fp2(caDeduct)}</span></div>`:''}
+        ${payAdjRows.map(pa=>`<div class="payslip-row"><span>Prior Period Adjustment: ${pa.reason||'Adjustment'}</span><span style="color:var(--danger);">-${fp2(pa.amount)}</span></div>`).join('')}
         <div class="payslip-row"><span style="font-weight:600;">Total Deductions</span><span style="font-weight:600;color:var(--danger);">-${fp2(d.totalDeductions)}</span></div>
 
         <div style="font-size:10px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:0.8px;margin:10px 0 6px;">Activity</div>
