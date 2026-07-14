@@ -516,6 +516,19 @@ nav{flex:1;padding:12px 0;overflow-y:auto;}
             </table>
           </div>
         </div>
+        <!-- Pay Adjustments — one-time payroll corrections, applied immediately (no approval step) -->
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-hdr" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+            <h3>🧾 Pay Adjustments</h3>
+            <button class="btn btn-gold btn-sm" onclick="openOwnerAdjustmentModal()">+ Add Adjustment</button>
+          </div>
+          <div class="card-body" style="padding:0;">
+            <table class="tbl">
+              <thead><tr><th>Staff</th><th>Amount</th><th>Pay Period</th><th>Reason</th><th>Recorded</th></tr></thead>
+              <tbody id="adminAdjBody"></tbody>
+            </table>
+          </div>
+        </div>
         <!-- Overtime requests pending -->
         <div class="card" style="margin-bottom:16px;">
           <div class="card-hdr"><h3>⏱ Pending Overtime Requests</h3></div>
@@ -1053,6 +1066,41 @@ const zSal=salaries[0]||0,rSal=salaries[1]||0;
   </div>
 </div>
 
+<!-- Owner Pay Adjustment Modal (Staff Portal) -->
+<div class="overlay hidden" id="ownerAdjustmentModal">
+  <div class="modal">
+    <div class="modal-hdr">
+      <div class="modal-title">🧾 Add Pay Adjustment</div>
+      <div class="modal-x" onclick="closeModal('ownerAdjustmentModal')">✕</div>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:11px;color:var(--ink3);background:var(--cream2);border-radius:8px;padding:10px 12px;margin-bottom:12px;">
+        Record a one-time payroll correction that deducts from a staff member's specific cutoff (e.g. a prior-period commission correction).
+      </div>
+      <div class="form-group">
+        <label class="form-label">Staff Member</label>
+        <select class="form-select" id="oadjStaff"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Amount to Deduct (₱)</label>
+        <input class="form-input" type="number" id="oadjAmount" placeholder="e.g. 1567.58" min="0.01" step="0.01">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Pay Period</label>
+        <input class="form-input" type="text" id="oadjPayPeriod" placeholder="e.g. 2026-07-CO1" style="font-size:12px;">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Reason</label>
+        <textarea class="form-textarea" id="oadjReason" placeholder="e.g. June commission correction" style="min-height:70px;"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('ownerAdjustmentModal')">Cancel</button>
+      <button class="btn btn-gold" onclick="saveOwnerAdjustment()">Save Adjustment</button>
+    </div>
+  </div>
+</div>
+
 <div class="overlay hidden" id="leaveModal">
   <div class="modal">
     <div class="modal-hdr"><div class="modal-title">🌿 Request Leave</div><div class="modal-x" onclick="closeModal('leaveModal')">✕</div></div>
@@ -1112,6 +1160,7 @@ let S={
   leaveRequests:[], // {id, userId, type, from, to, days, reason, status, createdAt}
   overtimeRequests:[], // {id, userId, userName, date, hours, rate, amount, reason, status, createdAt}
   cashAdvances:[], // {id, userId, userName, amount, reason, status, requestedAt, approvedBy, approvedAt}
+  payAdjustments:[], // {id, userId, userName, amount, reason, payPeriod, recordedBy, recordedAt} — amount always deducted
   transactions:[],
   settings:{}
 };
@@ -1177,6 +1226,12 @@ function loadFromCloud(){
     } else { S.cashAdvances=[]; }
     if(document.getElementById('cashAdvanceHistory')) renderCashAdvanceHistory();
   });
+  db.ref('gb/payAdjustments').on('value',snap=>{
+    if(snap.exists()){
+      const val=snap.val();
+      S.payAdjustments=Array.isArray(val)?val:Object.values(val);
+    } else { S.payAdjustments=[]; }
+  });
 }
 
 function syncLeave(){
@@ -1198,6 +1253,13 @@ function syncCashAdvances(){
   const obj={};
   (S.cashAdvances||[]).forEach((ca,i)=>{ obj[ca.id||i]=ca; });
   db.ref('gb/cashAdvances').set(obj);
+}
+
+function syncPayAdjustments(){
+  if(!db) return;
+  const obj={};
+  (S.payAdjustments||[]).forEach((pa,i)=>{ obj[pa.id||i]=pa; });
+  db.ref('gb/payAdjustments').set(obj);
 }
 
 function computeCurrentCutoffEarnings(){
@@ -1740,6 +1802,10 @@ function renderCutoff(){
   }).reduce((s,ca)=>s+(ca.amount||0),0);
   console.log('[caDeductCO] total deduction:',caDeductCO);
 
+  // Pay adjustments (one-time payroll corrections) for this cut-off period
+  const payAdjRowsCO=(S.payAdjustments||[]).filter(pa=>String(pa.userId)===_caUidCO&&pa.payPeriod===_coPeriodKey);
+  const payAdjDeductCO=payAdjRowsCO.reduce((s,pa)=>s+(pa.amount||0),0);
+
   // Deductions: half of the MONTHLY statutory amounts.
   // Compute full monthly gross exactly like renderPayslip() — scan entire month.
   const _moPeriod=`${yr}-${String(mo).padStart(2,'0')}`;
@@ -1790,7 +1856,7 @@ function renderCutoff(){
   function _doRender(sss,philhealth,pagibig,taxForCO,snapshotSavedAt){
     const govTotal=sss+philhealth+pagibig;
     const otherDed=otherDeductions/2;
-    const totalDed=govTotal+taxForCO+otherDed+caDeductCO;
+    const totalDed=govTotal+taxForCO+otherDed+caDeductCO+payAdjDeductCO;
     const netPay=grossPay-totalDed;
     const frozenNote=snapshotSavedAt&&currentUser?.role==='owner'
       ?`<div style="font-size:9px;color:#8C7B65;margin-top:6px;padding-top:6px;border-top:1px solid #E8DFD0;">🔒 Frozen ${new Date(snapshotSavedAt).toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'numeric'})} · <a href="javascript:void(0)" onclick="recalcPayslipSnapshot('${userId}','${period}',${n})" style="color:#B8935A;text-decoration:underline;cursor:pointer;">Recalculate</a></div>`
@@ -1880,6 +1946,7 @@ function renderCutoff(){
           ${taxForCO>0?coRow('Withholding Tax','−'+f(taxForCO)):''}
           ${otherDed>0?coRow('Other Deductions','−'+f(otherDed)):''}
           ${caDeductCO>0?coRow('Cash Advance Deduction','<span style="color:#C44A4A;">−'+f(caDeductCO)+'</span>'):''}
+          ${payAdjRowsCO.map(pa=>coRow('Prior Period Adjustment: '+(pa.reason||'Adjustment'),'<span style="color:#C44A4A;">−'+f(pa.amount)+'</span>')).join('')}
           <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;padding-top:8px;margin-top:4px;border-top:1px solid #E8DFD0;color:#c0392b;">
             <span>Total Deductions</span><span>−${f(totalDed)}</span>
           </div>
@@ -2265,6 +2332,10 @@ const paidDays=daysPresent+leaveDays;
   }).reduce((s,ca)=>s+(ca.amount||0),0);
   console.log('[caDeductM] total deduction:',caDeductM);
 
+  // Pay adjustments (one-time payroll corrections) recorded against either cut-off this month
+  const payAdjRowsM=(S.payAdjustments||[]).filter(pa=>String(pa.userId)===_caUidM&&(pa.payPeriod||'').startsWith(period));
+  const payAdjDeductM=payAdjRowsM.reduce((s,pa)=>s+(pa.amount||0),0);
+
   // Statutory deductions — SSS/PhilHealth base is contracted monthly basic (dailyRate ×
   // contractedDays, defaults 26), not gross or actual days worked, so it stays flat
   // regardless of commission, absences, or half days.
@@ -2275,7 +2346,7 @@ const paidDays=daysPresent+leaveDays;
   const govTotal=sss+philhealth+pagibig;
   const taxable=Math.max(0,grossPay-govTotal);
   const withholdingTax=Math.round(computeWithholdingTax(taxable));
-  const totalDeductions=govTotal+withholdingTax+otherDeductions+caDeductM;
+  const totalDeductions=govTotal+withholdingTax+otherDeductions+caDeductM+payAdjDeductM;
   const netPay=grossPay-totalDeductions;
 
   // Employer shares (informational) — same estMonthlyBasic base as the EE share
@@ -2406,6 +2477,7 @@ const paidDays=daysPresent+leaveDays;
             ${row('Withholding Tax',fmtPrice(withholdingTax),'#5C4F3D')}
             ${otherDeductions>0?`<div style="font-size:10px;color:#8C7B65;font-weight:600;margin:8px 0 4px;text-transform:uppercase;">Other</div>${row('Other Deductions',fmtPrice(otherDeductions),'#5C4F3D')}`:''}
             ${caDeductM>0?`${!otherDeductions?'<div style="font-size:10px;color:#8C7B65;font-weight:600;margin:8px 0 4px;text-transform:uppercase;">Other</div>':''}${row('Cash Advance Deduction','-'+fmtPrice(caDeductM),'#C44A4A')}`:''}
+            ${payAdjRowsM.map((pa,i)=>`${(i===0&&!otherDeductions&&!caDeductM)?'<div style="font-size:10px;color:#8C7B65;font-weight:600;margin:8px 0 4px;text-transform:uppercase;">Other</div>':''}${row('Prior Period Adjustment: '+(pa.reason||'Adjustment'),'-'+fmtPrice(pa.amount),'#C44A4A')}`).join('')}
             <div style="display:flex;justify-content:space-between;padding:8px 0;border-top:1.5px solid #2C2318;margin-top:6px;font-weight:700;font-size:13px;">
               <span>Total Deductions</span><span style="color:#C44A4A;">-${fmtPrice(totalDeductions)}</span>
             </div>
@@ -3025,6 +3097,45 @@ function saveOwnerCaRecord(){
   showToast('Cash advance recorded for '+staffName,'ok');
 }
 
+// ══ OWNER PAY ADJUSTMENT (one-time payroll correction) ══
+function openOwnerAdjustmentModal(){
+  const sel=document.getElementById('oadjStaff');
+  const staff=S.users.filter(u=>u.role==='staff'||u.role==='owner');
+  sel.innerHTML=staff.map(u=>`<option value="${u.id}" data-name="${u.name}">${u.name}</option>`).join('');
+  document.getElementById('oadjAmount').value='';
+  document.getElementById('oadjPayPeriod').value=_ocrDateToPayPeriod(toPHDateStr(new Date().toISOString()));
+  document.getElementById('oadjReason').value='';
+  openModal('ownerAdjustmentModal');
+}
+function saveOwnerAdjustment(){
+  const staffSel=document.getElementById('oadjStaff');
+  const staffId=staffSel.value;
+  const staffName=staffSel.options[staffSel.selectedIndex]?.dataset.name||staffSel.options[staffSel.selectedIndex]?.text||'';
+  const amount=parseFloat(document.getElementById('oadjAmount').value)||0;
+  const payPeriod=(document.getElementById('oadjPayPeriod').value||'').trim();
+  const reason=(document.getElementById('oadjReason').value||'').trim();
+  if(!staffId){showToast('Please select a staff member','err');return;}
+  if(amount<=0){showToast('Please enter a valid amount','err');return;}
+  if(!payPeriod){showToast('Please enter a pay period','err');return;}
+  if(!reason){showToast('Please enter a reason','err');return;}
+  if(!S.payAdjustments) S.payAdjustments=[];
+  const rec={
+    id:'ADJ'+Date.now(),
+    userId:staffId,
+    userName:staffName,
+    amount,
+    reason,
+    payPeriod,
+    recordedBy:currentUser.name,
+    recordedAt:new Date().toISOString()
+  };
+  S.payAdjustments.push(rec);
+  syncPayAdjustments();
+  closeModal('ownerAdjustmentModal');
+  renderAdmin();
+  showToast('Pay adjustment recorded for '+staffName,'ok');
+}
+
 // ══ ADMIN ══
 function renderAdmin(){
   if(currentUser.role!=='owner'&&currentUser.role!=='admin') return;
@@ -3075,6 +3186,23 @@ function renderAdmin(){
             <button class="btn btn-sm" style="background:var(--danger);color:#fff;border:none;border-radius:7px;padding:5px 10px;font-size:11px;font-family:'Jost',sans-serif;cursor:pointer;" onclick="adminRejectCa('${ca.id}')">✕ Reject</button>
           </div>
         </td>
+      </tr>`).join('');
+    }
+  }
+
+  // Pay adjustments — no approval workflow, so show all recorded (most recent first)
+  const adjTbody=document.getElementById('adminAdjBody');
+  if(adjTbody){
+    const adjRows=[...(S.payAdjustments||[])].sort((a,b)=>(b.recordedAt||'').localeCompare(a.recordedAt||''));
+    if(!adjRows.length){
+      adjTbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--ink3);padding:24px;">No pay adjustments recorded</td></tr>';
+    } else {
+      adjTbody.innerHTML=adjRows.map(pa=>`<tr>
+        <td style="font-weight:500;">${pa.userName||'Unknown'}</td>
+        <td style="font-weight:600;color:#C44A4A;">−${fmtPrice(pa.amount)}</td>
+        <td style="font-size:12px;">${pa.payPeriod||'—'}</td>
+        <td style="font-size:12px;color:var(--ink3);">${pa.reason||'—'}</td>
+        <td style="font-size:12px;">${pa.recordedAt?new Date(pa.recordedAt).toLocaleDateString('en-PH'):''}</td>
       </tr>`).join('');
     }
   }
