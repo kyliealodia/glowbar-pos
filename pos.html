@@ -1066,7 +1066,7 @@ html{height:-webkit-fill-available;}
             <select class="form-select" id="attFilterStaff" style="width:140px;font-size:12px;" onchange="renderAttendance()"><option value="">All Staff</option></select>
             <input type="date" class="form-input" id="attFilterDate" style="width:160px;font-size:12px;" onchange="renderAttendance()">
             <button class="btn btn-outline btn-sm" onclick="exportAttendance()">⬇ Export CSV</button>
-            <button class="btn btn-outline btn-sm" onclick="addAttLog()">+ Add Record</button>
+            <button class="btn btn-outline btn-sm" id="attAddBtn" onclick="addAttLog()" style="display:none;">+ Add Record</button>
           </div>
         </div>
         <div class="card" style="overflow:hidden;">
@@ -1995,6 +1995,39 @@ html{height:-webkit-fill-available;}
       <div class="form-group"><label class="form-label">Machine Notes / Settings History</label><textarea class="form-textarea" id="acMachineNotes" placeholder="e.g. Exilis: 40W face, 3 sessions done. Pico: 1064nm, pigmentation tx bilateral cheeks…" style="min-height:55px;"></textarea></div>
     </div>
     <div class="modal-footer"><button class="btn btn-outline" onclick="closeM('addClientModal')">Cancel</button><button class="btn btn-gold" onclick="saveClient()">Save Client</button></div>
+  </div>
+</div>
+
+<!-- Edit Attendance Record -->
+<div class="overlay hidden" id="editAttModal">
+  <div class="modal">
+    <div class="modal-hdr"><div class="modal-title">Edit Attendance Record</div><div class="modal-x" onclick="closeM('editAttModal')">✕</div></div>
+    <div class="modal-body">
+      <input type="hidden" id="editAttId">
+      <div class="form-group"><label class="form-label">Staff</label><div id="editAttName" style="padding:9px 12px;background:var(--cream2);border-radius:8px;font-size:13px;font-weight:600;"></div></div>
+      <div class="form-group"><label class="form-label">Date</label><input class="form-input" type="date" id="editAttDate"></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Clock In</label><input class="form-input" type="time" id="editAttIn"></div>
+        <div class="form-group"><label class="form-label">Clock Out</label><input class="form-input" type="time" id="editAttOut"></div>
+      </div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-outline" onclick="closeM('editAttModal')">Cancel</button><button class="btn btn-gold" onclick="saveEditAttLog()">Save</button></div>
+  </div>
+</div>
+
+<!-- Add Attendance Record -->
+<div class="overlay hidden" id="addAttModal">
+  <div class="modal">
+    <div class="modal-hdr"><div class="modal-title">Add Attendance Record</div><div class="modal-x" onclick="closeM('addAttModal')">✕</div></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Staff</label><select class="form-select" id="addAttStaff"></select></div>
+      <div class="form-group"><label class="form-label">Date</label><input class="form-input" type="date" id="addAttDate"></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Clock In</label><input class="form-input" type="time" id="addAttIn"></div>
+        <div class="form-group"><label class="form-label">Clock Out</label><input class="form-input" type="time" id="addAttOut"></div>
+      </div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-outline" onclick="closeM('addAttModal')">Cancel</button><button class="btn btn-gold" onclick="saveAddAttLog()">Save</button></div>
   </div>
 </div>
 
@@ -9430,6 +9463,8 @@ function setAttRange(range){
 function renderAttendance(){
   const filterDate = document.getElementById('attFilterDate')?.value||'';
   const filterStaff = document.getElementById('attFilterStaff')?.value||'';
+  const addBtn=document.getElementById('attAddBtn');
+  if(addBtn) addBtn.style.display=(currentUser&&currentUser.role==='owner')?'':'none';
 
   // Populate staff filter dropdown — exclude owner role users
   const staffSel=document.getElementById('attFilterStaff');
@@ -9511,7 +9546,7 @@ function renderAttendance(){
       <td style="font-size:13px;font-weight:500;color:var(--success);">${inStr}</td>
       <td style="font-size:13px;font-weight:500;color:var(--danger);">${outStr}</td>
       <td style="font-size:12px;font-weight:600;color:var(--ink);">${hours}</td>
-      <td><button onclick="event.stopPropagation();deleteAttLog('${r.id}')" style="font-size:11px;padding:3px 8px;border:1px solid var(--danger);border-radius:6px;background:var(--cream);color:var(--danger);cursor:pointer;">🗑 Delete</button></td>
+      <td>${currentUser&&currentUser.role==='owner'?`<button onclick="event.stopPropagation();editAttLog('${r.id}')" style="font-size:11px;padding:3px 8px;border:1px solid var(--gold);border-radius:6px;background:var(--cream);color:var(--gold);cursor:pointer;margin-right:6px;">✏️ Edit</button><button onclick="event.stopPropagation();deleteAttLog('${r.id}')" style="font-size:11px;padding:3px 8px;border:1px solid var(--danger);border-radius:6px;background:var(--cream);color:var(--danger);cursor:pointer;">🗑 Delete</button>`:'—'}</td>
     </tr>`;
   }).join('');
 }
@@ -9522,22 +9557,47 @@ function viewSelfie(src, label){
   openM('selfieViewModal');
 }
 
+function _attTimeToInput(iso){
+  if(!iso)return'';
+  const d=new Date(iso);
+  if(isNaN(d))return'';
+  return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(11,16);
+}
+function _attCombineDateTime(date,hhmm){
+  if(!date||!hhmm)return null;
+  return new Date(`${date}T${hhmm}:00`).toISOString();
+}
 function editAttLog(id){
+  if(!(currentUser&&currentUser.role==='owner'))return;
   const log=S.loginLogs.find(l=>String(l.id)===String(id));
   if(!log) return;
-  const rawTime=new Date(log.time);
-  const localTime=new Date(rawTime.getTime()-rawTime.getTimezoneOffset()*60000).toISOString().slice(0,19);
-  const newTime=prompt('Edit date & time (YYYY-MM-DDTHH:MM:SS):',localTime);
-  if(!newTime) return;
-  const newAction=prompt('Action (clockin or clockout):',log.action);
-  if(!newAction) return;
-  log.time=newTime;
-  log.action=newAction;
+  document.getElementById('editAttId').value=log.id;
+  document.getElementById('editAttName').textContent=log.name||log.user||'Unknown';
+  document.getElementById('editAttDate').value=log.date||(log.inTime?log.inTime.slice(0,10):(log.time?log.time.slice(0,10):''));
+  document.getElementById('editAttIn').value=_attTimeToInput(log.inTime||(log.action==='clockin'?log.time:''));
+  document.getElementById('editAttOut').value=_attTimeToInput(log.outTime||(log.action==='clockout'?log.time:''));
+  openM('editAttModal');
+}
+function saveEditAttLog(){
+  const id=document.getElementById('editAttId').value;
+  const log=S.loginLogs.find(l=>String(l.id)===String(id));
+  if(!log) return;
+  const date=document.getElementById('editAttDate').value;
+  if(!date){showToast('Date is required','err');return;}
+  const inHM=document.getElementById('editAttIn').value;
+  const outHM=document.getElementById('editAttOut').value;
+  log.date=date;
+  log.inTime=_attCombineDateTime(date,inHM);
+  log.outTime=_attCombineDateTime(date,outHM);
+  delete log.time;
+  delete log.action;
   sync('loginLogs');
-  setTimeout(()=>renderAttendance(),500);
-  alert('Updated!');
+  closeM('editAttModal');
+  renderAttendance();
+  showToast('Attendance updated');
 }
 function deleteAttLog(id){
+  if(!(currentUser&&currentUser.role==='owner'))return;
   if(!confirm('Delete this attendance record?')) return;
   S.loginLogs=S.loginLogs.filter(l=>String(l.id)!==String(id));
   sync('loginLogs');
@@ -9545,17 +9605,28 @@ function deleteAttLog(id){
   alert('Deleted!');
 }
 function addAttLog(){
-  const name=prompt('Staff name:');if(!name)return;
-  const action=prompt('Action (clockin or clockout):');if(!action)return;
-  const now=new Date();
-  const localISO=new Date(now.getTime()-now.getTimezoneOffset()*60000).toISOString().slice(0,19);
-  const time=prompt('Date & time (YYYY-MM-DDTHH:MM:SS):',localISO);if(!time)return;
-  const user=S.users.find(u=>u.name===name);
-  const entry={id:Date.now(),name,user:name,action,time,userId:user?user.id:'manual',role:user?user.role:'Staff'};
+  if(!(currentUser&&currentUser.role==='owner'))return;
+  const sel=document.getElementById('addAttStaff');
+  if(sel) sel.innerHTML=S.users.map(u=>`<option value="${u.id}">${esc(u.name)}</option>`).join('');
+  document.getElementById('addAttDate').value=td();
+  document.getElementById('addAttIn').value='';
+  document.getElementById('addAttOut').value='';
+  openM('addAttModal');
+}
+function saveAddAttLog(){
+  const userId=document.getElementById('addAttStaff').value;
+  const user=S.users.find(u=>String(u.id)===String(userId));
+  if(!user){showToast('Select a staff member','err');return;}
+  const date=document.getElementById('addAttDate').value;
+  if(!date){showToast('Date is required','err');return;}
+  const inHM=document.getElementById('addAttIn').value;
+  const outHM=document.getElementById('addAttOut').value;
+  const entry={id:Date.now(),name:user.name,userId:user.id,role:user.role||'Staff',date,inTime:_attCombineDateTime(date,inHM),outTime:_attCombineDateTime(date,outHM)};
   S.loginLogs.push(entry);
   sync('loginLogs');
-  alert('Added!');
+  closeM('addAttModal');
   renderAttendance();
+  showToast('Attendance record added');
 }
 
 function exportAttendance(){
