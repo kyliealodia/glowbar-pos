@@ -313,6 +313,7 @@ nav{flex:1;padding:12px 0;overflow-y:auto;}
       <nav>
         <div class="nav-item active" onclick="goPage('home')"><span class="nav-icon">🏠</span>Home</div>
         <div class="nav-item" onclick="goPage('payslip')"><span class="nav-icon">💰</span>My Payslip</div>
+        <div class="nav-item" onclick="goPage('commissions')"><span class="nav-icon">💵</span>My Commissions</div>
         <div class="nav-item" onclick="goPage('attendance')"><span class="nav-icon">🕐</span>Attendance</div>
         <div class="nav-item" onclick="goPage('leave')"><span class="nav-icon">🌿</span>Leave</div>
         <div class="nav-item" onclick="goPage('schedule')"><span class="nav-icon">📅</span>My Schedule</div>
@@ -363,6 +364,31 @@ nav{flex:1;padding:12px 0;overflow-y:auto;}
           <div id="cutoffContent"></div>
         </div>
         <div id="payslipContent"></div>
+      </div>
+
+      <!-- MY COMMISSIONS (own data only — always renders for currentUser, never another staff) -->
+      <div id="page-commissions" class="page" style="display:none;">
+        <div class="page-hdr">
+          <div class="page-title">💵 My Commissions</div>
+          <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center;">
+            <select class="form-select" id="commPeriodSel" onchange="renderMyCommissions()" style="width:180px;font-size:12px;"></select>
+          </div>
+        </div>
+        <div class="metrics" id="commMetrics"></div>
+        <div class="card">
+          <div class="card-hdr">
+            <h3>Line Items</h3>
+            <button class="btn btn-outline btn-sm" onclick="toggleCommDrilldown()" id="commDrilldownBtn">Show Details ▾</button>
+          </div>
+          <div class="card-body" style="padding:0;display:none;" id="commDrilldownWrap">
+            <div class="tbl-wrap">
+              <table class="tbl">
+                <thead><tr><th>Date</th><th>Client</th><th>Service</th><th>Qty</th><th>Paid Amount</th><th>Commission</th></tr></thead>
+                <tbody id="commBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- ATTENDANCE -->
@@ -1254,6 +1280,38 @@ function toPHDateStr(isoString){
   if(isNaN(d.getTime())) return '';
   return d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0')+'-'+d.getDate().toString().padStart(2,'0');
 }
+// Ratio of what the client actually paid (cash collected in THIS transaction)
+// vs the listed subtotal. Commission is earned only on money actually collected —
+// for an installment/package sale where only a deposit or first installment
+// has come in, commission is based on that partial amount, not the full
+// discounted contract value the client ultimately owes.
+function _txDiscRatio(t){
+  const _tSub=t.sub||0;
+  return _tSub?Math.max(0,(t.total||0)/_tSub):1;
+}
+// Builds one row per commission-earning line item for a given staff member across a
+// set of transactions — shared by the Commissions tab so it doesn't grow a 4th inline
+// copy of the item-level staff attribution + ratio logic.
+function _staffCommissionLines(staffName,commRate,txns){
+  const lines=[];
+  (txns||[]).forEach(t=>{
+    const ratio=_txDiscRatio(t);
+    if((t.items||[]).length){
+      t.items.forEach(ci=>{
+        if((ci.staffName||t.staff||'')!==staffName) return;
+        const paidAmt=Math.round((ci.price||0)*(ci.qty||1)*ratio*100)/100;
+        const commAmt=Math.round(paidAmt*(commRate/100)*100)/100;
+        lines.push({date:toPHDateStr(t.time||''),client:t.client||'Walk-in',service:ci.name||'',qty:ci.qty||1,paidAmt,commAmt});
+      });
+    } else if(t.staff===staffName){
+      const paidAmt=Math.round((t.total||0)*100)/100;
+      const commAmt=Math.round(paidAmt*(commRate/100)*100)/100;
+      lines.push({date:toPHDateStr(t.time||''),client:t.client||'Walk-in',service:'(transaction)',qty:1,paidAmt,commAmt});
+    }
+  });
+  lines.sort((a,b)=>a.date.localeCompare(b.date));
+  return lines;
+}
 function fmtDate(d){return new Date(d+'T12:00').toLocaleDateString('en-PH',{weekday:'short',month:'short',day:'numeric'});}
 function cap(s){return s?s.charAt(0).toUpperCase()+s.slice(1):'';}
 function openModal(id){document.getElementById(id)?.classList.remove('hidden');}
@@ -1426,6 +1484,7 @@ function goPage(name){
   closeSidebar();
   if(name==='home') renderHome();
   else if(name==='payslip') renderPayslip();
+  else if(name==='commissions') renderMyCommissions();
   else if(name==='attendance'){renderAttendance();renderOTHistory();updateClockBtn();}
   else if(name==='leave') renderLeave();
   else if(name==='schedule') renderSchedule();
@@ -1636,8 +1695,7 @@ function renderCutoff(){
   (S.transactions||[]).forEach(t=>{
     const d=toPHDateStr(t.time||'');
     if(d<coStartStr||d>coEndStr) return;
-    const _tSub=t.sub||0;
-    const _tRatio=_tSub?Math.max(0,(t.total||0)/_tSub):1; // cash actually collected, not discounted contract price
+    const _tRatio=_txDiscRatio(t);
     (t.items||[]).length
       ?(t.items||[]).forEach(ci=>{if((ci.staffName||t.staff||'')===viewUser.name)_coCommItems.push({price:ci.price,qty:ci.qty,ratio:_tRatio});})
       :(t.staff===viewUser.name&&_coCommItems.push({price:t.total||0,qty:1,ratio:1}));
@@ -1874,7 +1932,7 @@ function populateMonthSelects(){
     const lbl=d.toLocaleDateString('en-PH',{month:'long',year:'numeric'});
     opts.push(`<option value="${val}">${lbl}</option>`);
   }
-  ['payPeriodSel','attMonth','adminMonth','adminPayrollMonth'].forEach(id=>{
+  ['payPeriodSel','commPeriodSel','attMonth','adminMonth','adminPayrollMonth'].forEach(id=>{
     const el=document.getElementById(id);
     if(el) el.innerHTML=opts.join('');
   });
@@ -2001,6 +2059,51 @@ function savePaydaySettings(){
   showToast('Payday settings saved','ok');
 }
 
+// ══ MY COMMISSIONS — always the logged-in user's own data. ══
+// Deliberately does NOT use getPayslipUser()/payStaffSel — that dropdown lets an
+// admin view another staff member's payslip elsewhere in this app, but this tab
+// must never expose another staff member's commission, so it always reads
+// currentUser directly regardless of role or any selector on the page.
+function toggleCommDrilldown(){
+  const wrap=document.getElementById('commDrilldownWrap');
+  const btn=document.getElementById('commDrilldownBtn');
+  if(!wrap||!btn) return;
+  const showing=wrap.style.display!=='none';
+  wrap.style.display=showing?'none':'block';
+  btn.textContent=showing?'Show Details ▾':'Hide Details ▴';
+}
+function renderMyCommissions(){
+  const period=document.getElementById('commPeriodSel')?.value||td().slice(0,7);
+  const [yr,mo]=period.split('-').map(Number);
+  if(!yr||!mo) return;
+  const u=S.users.find(x=>x.id===currentUser.id)||currentUser;
+  const commRate=u.commission||0;
+  const txns=(S.transactions||[]).filter(t=>{
+    const d=toPHDate(t.time);
+    return d.getFullYear()===yr&&d.getMonth()===mo-1;
+  });
+  const lines=_staffCommissionLines(currentUser.name,commRate,txns);
+  const totalCommission=lines.reduce((s,l)=>s+l.commAmt,0);
+  const totalPaid=lines.reduce((s,l)=>s+l.paidAmt,0);
+  const f=fmtPrice;
+
+  const metricsEl=document.getElementById('commMetrics');
+  if(metricsEl) metricsEl.innerHTML=`
+    <div class="metric"><div class="metric-lbl">Total Commission</div><div class="metric-val" style="color:var(--success)">${f(totalCommission)}</div><div class="metric-sub">${commRate}% rate</div></div>
+    <div class="metric"><div class="metric-lbl">Services Rendered</div><div class="metric-val">${lines.length}</div><div class="metric-sub">line items</div></div>
+    <div class="metric"><div class="metric-lbl">Sales Handled</div><div class="metric-val">${f(totalPaid)}</div><div class="metric-sub">paid amount</div></div>`;
+
+  const body=document.getElementById('commBody');
+  if(!body) return;
+  if(!lines.length){
+    body.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--ink3);padding:16px;">No commission-earning transactions this period.</td></tr>';
+    return;
+  }
+  body.innerHTML=lines.map(l=>`
+    <tr><td>${fmtDate(l.date)}</td><td>${l.client}</td><td>${l.service}</td><td>${l.qty}</td><td>${f(l.paidAmt)}</td><td>${f(l.commAmt)}</td></tr>`).join('')
+    +`<tr style="font-weight:700;border-top:2px solid var(--border2);"><td colspan="4">Subtotal</td><td>${f(totalPaid)}</td><td>${f(totalCommission)}</td></tr>`;
+}
+
 function getPayslipUser(){
   const sel=document.getElementById('payStaffSel');
   if(sel&&sel.style.display!=='none'&&sel.value){
@@ -2102,8 +2205,7 @@ const paidDays=daysPresent+leaveDays;
   (S.transactions||[]).forEach(t=>{
     const d=toPHDate(t.time);
     if(d.getFullYear()!==yr||d.getMonth()!==mo-1) return;
-    const _tSub=t.sub||0;
-    const _tRatio=_tSub?Math.max(0,(t.total||0)/_tSub):1; // cash actually collected, not discounted contract price
+    const _tRatio=_txDiscRatio(t);
     (t.items||[]).length
       ?(t.items||[]).forEach(ci=>{if((ci.staffName||t.staff||'')===viewUser.name)_mCommItems.push({price:ci.price,qty:ci.qty,ratio:_tRatio});})
       :(t.staff===viewUser.name&&_mCommItems.push({price:t.total||0,qty:1,ratio:1}));
@@ -3103,8 +3205,7 @@ function renderAdminPayroll(){
     (S.transactions||[]).forEach(t=>{
       const d=(t.time||'').slice(0,10);
       if(d<coStartStr||d>coEndStr) return;
-      const _tSub=t.sub||0;
-      const _tRatio=_tSub?Math.max(0,(t.total||0)/_tSub):1; // cash actually collected, not discounted contract price
+      const _tRatio=_txDiscRatio(t);
       (t.items||[]).length
         ?(t.items||[]).forEach(ci=>{if((ci.staffName||t.staff||'')===u.name)_sumCommItems.push({price:ci.price,qty:ci.qty,ratio:_tRatio});})
         :(t.staff===u.name&&_sumCommItems.push({price:t.total||0,qty:1,ratio:1}));

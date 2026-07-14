@@ -587,6 +587,7 @@ html{height:-webkit-fill-available;}
         <div class="nav-item" onclick="goPage('attendance')" id="nav-attendance" data-role="owner admin manager"><span class="ni">🕐</span>Attendance Log</div>
         <div class="nav-item" onclick="goPage('reports')" id="nav-reports" data-role="owner admin manager"><span class="ni">📈</span>Reports</div>
         <div class="nav-item" onclick="goPage('payslip')" id="nav-payslip" data-role="owner"><span class="ni">💰</span>Payroll & Commission</div>
+        <div class="nav-item" onclick="goPage('commissions')" id="nav-commissions" data-role="owner"><span class="ni">💵</span>Commissions</div>
         <div class="nav-item" onclick="goPage('capital')" id="nav-capital" data-role="owner"><span class="ni">🏦</span>Capital Recovery</div>
         <div class="nav-item" onclick="goPage('kpidash')" id="nav-kpidash" data-role="owner"><span class="ni">📊</span>KPI Dashboard</div>
         <div class="nav-item" onclick="goPage('machinroi')" id="nav-machinroi" data-role="owner"><span class="ni">⚡</span>Machine ROI</div>
@@ -1097,6 +1098,34 @@ html{height:-webkit-fill-available;}
 
         <!-- Payslips -->
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;" id="payslipGrid"></div>
+      </div>
+
+      <!-- COMMISSIONS — OWNER ONLY -->
+      <div class="page" id="page-commissions">
+        <div class="sec-hdr">
+          <h2 class="sec-title">Commissions</h2>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+            <select class="form-select" id="commissionsPeriodMonth" style="width:160px;font-size:12px;" onchange="renderCommissionsPage()"></select>
+            <select class="form-select" id="commissionsStaffSel" style="width:160px;font-size:12px;" onchange="renderCommissionsPage()"><option value="">All Staff</option></select>
+          </div>
+        </div>
+
+        <!-- SUMMARY: one row per staff (or the selected staff) -->
+        <div id="commissionsSummaryCard" style="background:linear-gradient(135deg,#2C2318,#5C4F3D);border-radius:16px;padding:22px 24px;margin-bottom:16px;color:#fff;">
+          <div style="font-family:'Cormorant Garamond',serif;font-size:18px;color:var(--gold);margin-bottom:16px;">💵 Commission Summary</div>
+          <div id="commissionsSummaryContent"></div>
+        </div>
+
+        <!-- DRILL-DOWN: line items for the selected/expanded staff -->
+        <div class="card" id="commissionsDrilldownCard" style="display:none;">
+          <div class="sec-hdr" style="padding:14px 18px;">
+            <h2 class="sec-title" style="font-size:15px;" id="commissionsDrilldownTitle">Line Items</h2>
+          </div>
+          <table class="inv-table" style="width:100%;">
+            <thead><tr><th>Date</th><th>Client</th><th>Service</th><th>Qty</th><th>Paid Amount</th><th>Commission</th></tr></thead>
+            <tbody id="commissionsDrilldownBody"></tbody>
+          </table>
+        </div>
       </div>
 
       <!-- CAPITAL RECOVERY TRACKER — OWNER ONLY -->
@@ -4542,11 +4571,11 @@ function snapSelfie(){
 }
 
 // ══ NAV ══
-const pageTitles={dashboard:'Dashboard',pos:'Point of Sale',rooms:'Treatment Rooms',calendar:'Calendar',bookings:'Appointments',clients:'Clients',products:'Products',packages:'Packages',activepkg:'Active Packages',messaging:'Messaging',users:'Users & Roles',attendance:'Attendance Log',payslip:'Payroll & Commission',kiosk:'Client Intake Form',capital:'Capital Recovery',kpidash:'KPI Dashboard',machinroi:'Machine ROI',reports:'Reports',sop:'📖 SOPs',manual:'📘 POS Manual',clinsettings:'⚙ Clinic Settings'};
+const pageTitles={dashboard:'Dashboard',pos:'Point of Sale',rooms:'Treatment Rooms',calendar:'Calendar',bookings:'Appointments',clients:'Clients',products:'Products',packages:'Packages',activepkg:'Active Packages',messaging:'Messaging',users:'Users & Roles',attendance:'Attendance Log',payslip:'Payroll & Commission',kiosk:'Client Intake Form',capital:'Capital Recovery',kpidash:'KPI Dashboard',machinroi:'Machine ROI',reports:'Reports',sop:'📖 SOPs',manual:'📘 POS Manual',clinsettings:'⚙ Clinic Settings',commissions:'Commissions'};
 function goPage(name){
   const perms=currentUser?.perms||[];
   const isOwner=currentUser?.role==='owner';
-  const ownerOnlyPages=['payslip','capital','kpidash','machinroi','clinsettings'];
+  const ownerOnlyPages=['payslip','capital','kpidash','machinroi','clinsettings','commissions'];
   if(ownerOnlyPages.includes(name)&&!isOwner){showToast('Owner access only 🔐','err');return;}
   if(name==='capital'&&!isOwner){showToast('Owner access only 🔐','err');return;}
   const restricted={'users':'users','reports':'reports','products':'products','packages':'packages','attendance':'reports'};
@@ -4566,6 +4595,7 @@ function goPage(name){
   if(name==='products'){setProdView('service');}
   if(name==='attendance'){document.getElementById('attFilterDate').value=td();renderAttendance();updateClockButtons();}
   if(name==='payslip'){initPayPeriods();renderPayslip();}
+  if(name==='commissions'){initCommissionsPeriods();renderCommissionsPage();}
   if(name==='clients'){renderClientsTable();}
   if(name==='users'){renderCashAdvanceAdmin();}
   if(name==='capital'){initCapital();renderCapital();}
@@ -10569,6 +10599,143 @@ function exportPayslip(){
   });
   const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);a.download='GlowBar_Payroll_'+period+'.csv';a.click();
 }
+
+// ══ COMMISSIONS TAB (owner-only, gated via ownerOnlyPages in goPage) ══
+// Builds one row per commission-earning line item for a staff member across a set of
+// transactions, honoring per-category commission overrides. Reuses _txDiscRatio — the
+// single shared ratio function — rather than a new copy of that math.
+function _staffCommissionLines(u,txns){
+  const lines=[];
+  (txns||[]).forEach(t=>{
+    const ratio=_txDiscRatio(t);
+    (t.items||[]).forEach(ci=>{
+      if((ci.staffName||t.staff||'')!==u.name) return;
+      const prod=S.products.find(p=>p.id===ci.id)||S.packages?.find(p=>p.id===ci.id);
+      const cat=prod?.cat||'Other';
+      const rate=u.categoryCommissions?.[cat]!==undefined?u.categoryCommissions[cat]:(u.commission||0);
+      const paidAmt=Math.round(ci.price*(ci.qty||1)*ratio*100)/100;
+      const commAmt=Math.round(paidAmt*(rate/100)*100)/100;
+      lines.push({date:toPHDateStr(t.time),client:t.client||'Walk-in',service:ci.name,qty:ci.qty||1,paidAmt,commAmt});
+    });
+  });
+  lines.sort((a,b)=>a.date.localeCompare(b.date));
+  return lines;
+}
+function initCommissionsPeriods(){
+  const sel=document.getElementById('commissionsPeriodMonth');if(!sel)return;
+  sel.innerHTML='';
+  const now=new Date();
+  for(let i=0;i<12;i++){
+    const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    const val=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    const lbl=d.toLocaleDateString('en-PH',{month:'long',year:'numeric'});
+    sel.innerHTML+=`<option value="${val}">${lbl}</option>`;
+  }
+  const staffSel=document.getElementById('commissionsStaffSel');
+  if(staffSel){
+    const cur=staffSel.value;
+    staffSel.innerHTML='<option value="">All Staff</option>'+S.users.map(u=>`<option value="${u.name}">${u.name}</option>`).join('');
+    staffSel.value=cur||'';
+  }
+}
+let _commissionsDrilldownStaff=null;
+function renderCommissionsPage(){
+  const period=document.getElementById('commissionsPeriodMonth')?.value||td().slice(0,7);
+  if(!period||!period.includes('-')) return;
+  const [py,pm]=period.split('-').map(Number);
+  if(!py||!pm) return;
+  const txns=S.transactions.filter(t=>{
+    const d=toPHDate(t.time);
+    return d.getFullYear()===py && d.getMonth()+1===pm;
+  });
+  const fp=n=>'₱'+Math.round(n).toLocaleString('en-PH');
+  const staffFilter=document.getElementById('commissionsStaffSel')?.value||'';
+  const staffList=staffFilter?S.users.filter(u=>u.name===staffFilter):S.users;
+
+  const rows=staffList.map(u=>{
+    const lines=_staffCommissionLines(u,txns);
+    const totalCommission=lines.reduce((s,l)=>s+l.commAmt,0);
+    const totalPaid=lines.reduce((s,l)=>s+l.paidAmt,0);
+    return {u,lines,totalCommission,totalPaid,sessions:lines.length};
+  });
+  const grandCommission=rows.reduce((s,r)=>s+r.totalCommission,0);
+  const grandPaid=rows.reduce((s,r)=>s+r.totalPaid,0);
+  const grandSessions=rows.reduce((s,r)=>s+r.sessions,0);
+
+  const summaryEl=document.getElementById('commissionsSummaryContent');
+  if(summaryEl){
+    summaryEl.innerHTML=`
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:18px;">
+        <div style="background:rgba(255,255,255,0.1);border-radius:10px;padding:12px 14px;">
+          <div style="font-size:9px;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:1px;">Total Commission</div>
+          <div style="font-size:18px;font-weight:700;color:var(--gold);">${fp(grandCommission)}</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.1);border-radius:10px;padding:12px 14px;">
+          <div style="font-size:9px;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:1px;">Services Rendered</div>
+          <div style="font-size:18px;font-weight:700;color:#fff;">${grandSessions}</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.1);border-radius:10px;padding:12px 14px;">
+          <div style="font-size:9px;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:1px;">Sales Handled</div>
+          <div style="font-size:18px;font-weight:700;color:#fff;">${fp(grandPaid)}</div>
+          <div style="font-size:10px;color:rgba(255,255,255,0.4);">paid amount</div>
+        </div>
+      </div>
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead><tr style="border-bottom:1px solid rgba(255,255,255,0.15);">
+            <th style="text-align:left;padding:6px 8px;color:rgba(255,255,255,0.5);font-weight:600;font-size:10px;text-transform:uppercase;">Staff</th>
+            <th style="text-align:right;padding:6px 8px;color:rgba(255,255,255,0.5);font-weight:600;font-size:10px;">Services</th>
+            <th style="text-align:right;padding:6px 8px;color:rgba(255,255,255,0.5);font-weight:600;font-size:10px;">Sales</th>
+            <th style="text-align:right;padding:6px 8px;color:var(--gold);font-weight:700;font-size:10px;">Commission</th>
+          </tr></thead>
+          <tbody>
+            ${rows.map(r=>`<tr style="border-bottom:1px solid rgba(255,255,255,0.06);cursor:pointer;" onclick="showCommissionsDrilldown('${r.u.name.replace(/'/g,"\\'")}')">
+              <td style="padding:8px;color:#fff;font-weight:500;">${r.u.name}</td>
+              <td style="padding:8px;text-align:right;color:rgba(255,255,255,0.8);">${r.sessions}</td>
+              <td style="padding:8px;text-align:right;color:rgba(255,255,255,0.8);">${fp(r.totalPaid)}</td>
+              <td style="padding:8px;text-align:right;color:var(--gold);font-weight:700;">${fp(r.totalCommission)}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  }
+
+  // Re-render the drill-down if a staff row was already expanded (e.g. after changing period)
+  if(_commissionsDrilldownStaff&&rows.some(r=>r.u.name===_commissionsDrilldownStaff)){
+    showCommissionsDrilldown(_commissionsDrilldownStaff);
+  } else if(staffFilter&&rows.length===1){
+    showCommissionsDrilldown(rows[0].u.name);
+  } else {
+    _commissionsDrilldownStaff=null;
+    const card=document.getElementById('commissionsDrilldownCard');
+    if(card) card.style.display='none';
+  }
+}
+function showCommissionsDrilldown(staffName){
+  _commissionsDrilldownStaff=staffName;
+  const u=S.users.find(x=>x.name===staffName);
+  const card=document.getElementById('commissionsDrilldownCard');
+  const body=document.getElementById('commissionsDrilldownBody');
+  const title=document.getElementById('commissionsDrilldownTitle');
+  if(!u||!card||!body) return;
+  const period=document.getElementById('commissionsPeriodMonth')?.value||td().slice(0,7);
+  const [py,pm]=period.split('-').map(Number);
+  const txns=S.transactions.filter(t=>{
+    const d=toPHDate(t.time);
+    return d.getFullYear()===py && d.getMonth()+1===pm;
+  });
+  const lines=_staffCommissionLines(u,txns);
+  const totalPaid=lines.reduce((s,l)=>s+l.paidAmt,0);
+  const totalCommission=lines.reduce((s,l)=>s+l.commAmt,0);
+  const fp2=n=>'₱'+n.toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2});
+  if(title) title.textContent='Line Items — '+staffName;
+  body.innerHTML=(lines.length?lines.map(l=>`
+    <tr><td>${l.date}</td><td>${l.client}</td><td>${l.service}</td><td>${l.qty}</td><td>${fp2(l.paidAmt)}</td><td>${fp2(l.commAmt)}</td></tr>`).join('')
+    :'<tr><td colspan="6" style="text-align:center;color:var(--ink3);padding:16px;">No commission-earning transactions this period.</td></tr>')
+    +(lines.length?`<tr style="font-weight:700;border-top:2px solid var(--border2);"><td colspan="4">Subtotal</td><td>${fp2(totalPaid)}</td><td>${fp2(totalCommission)}</td></tr>`:'');
+  card.style.display='block';
+}
+
 let sigCtx=null,sigDrawing=false,sigHasMark=false;
 const CONSENT_TEMPLATES={
   default:`GENERAL TREATMENT CONSENT & WAIVER\nGlowBar Beauty Clinic\n\nBy completing and signing this form, I acknowledge that I have been informed about the nature of the aesthetic treatment(s) I am about to receive. I freely and voluntarily agree to the following:\n\n1. INFORMED CONSENT\nI confirm that the procedure, its purpose, expected outcomes, and potential risks have been explained to me in a language I understand. I have been given the opportunity to ask questions and all my questions have been answered to my satisfaction.\n\n2. RISKS & BENEFITS\nI understand that all aesthetic procedures carry inherent risks including but not limited to temporary redness, swelling, bruising, tenderness, and skin sensitivity. Results vary per individual and are not guaranteed.\n\n3. MEDICAL DISCLOSURE\nI confirm that I have accurately disclosed all relevant medical history, current medications, supplements, known allergies, and prior treatments. I understand that withholding information may compromise my safety and treatment outcomes.\n\n4. POST-TREATMENT CARE\nI agree to follow all aftercare instructions provided by the GlowBar team. I understand that failure to follow aftercare guidelines may affect results and recovery.\n\n5. NO GUARANTEE OF RESULTS\nI understand that aesthetic results cannot be guaranteed. Individual responses to treatment vary, and multiple sessions may be required to achieve desired outcomes.\n\n6. PHOTOGRAPHY\nAny before/after photos taken during my visit are for clinical documentation purposes only. They will not be shared publicly or used for marketing without my separate written consent.\n\n7. RIGHT TO REFUSE SERVICE\nGlowBar reserves the right to decline or discontinue any treatment if a safety concern, contraindication, or discomfort arises before or during the procedure.\n\nI have read and understood this consent form in full. I voluntarily consent to the treatment(s) listed above.`,
