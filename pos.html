@@ -10178,12 +10178,15 @@ function _scheduleLabel(restDays){
   return names.filter((_,i)=>!restDays.includes(i)).join(', ')||'No days';
 }
 
-// Ratio of what the client actually paid vs listed price, isolating discount/SC-PWD shrinkage
-// (excludes tip, VAT, deposits, and installment-timing so those don't distort commission)
+// Ratio of what the client actually paid (cash collected in THIS transaction)
+// vs the listed price. Commission is earned only on money actually collected —
+// for an installment/package sale where only a deposit or first installment
+// has come in, commission is based on that partial amount, not the full
+// discounted contract value the client ultimately owes.
 function _txDiscRatio(t){
   const _afterSurge=(t.sub||0)+(t.surgeAmt||0);
   if(_afterSurge<=0) return 1;
-  return (_afterSurge-(t.disc||0)-(t.scpwd?.discAmt||0))/_afterSurge;
+  return Math.max(0,(t.total||0)/_afterSurge);
 }
 function renderPayrollSummary(staffList, txns, period){
   const el=document.getElementById('payrollSummaryContent');

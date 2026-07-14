@@ -1637,7 +1637,7 @@ function renderCutoff(){
     const d=toPHDateStr(t.time||'');
     if(d<coStartStr||d>coEndStr) return;
     const _tSub=t.sub||0;
-    const _tRatio=_tSub?Math.max(0,(_tSub-(t.disc||0))/_tSub):1;
+    const _tRatio=_tSub?Math.max(0,(t.total||0)/_tSub):1; // cash actually collected, not discounted contract price
     (t.items||[]).length
       ?(t.items||[]).forEach(ci=>{if((ci.staffName||t.staff||'')===viewUser.name)_coCommItems.push({price:ci.price,qty:ci.qty,ratio:_tRatio});})
       :(t.staff===viewUser.name&&_coCommItems.push({price:t.total||0,qty:1,ratio:1}));
@@ -2103,7 +2103,7 @@ const paidDays=daysPresent+leaveDays;
     const d=toPHDate(t.time);
     if(d.getFullYear()!==yr||d.getMonth()!==mo-1) return;
     const _tSub=t.sub||0;
-    const _tRatio=_tSub?Math.max(0,(_tSub-(t.disc||0))/_tSub):1;
+    const _tRatio=_tSub?Math.max(0,(t.total||0)/_tSub):1; // cash actually collected, not discounted contract price
     (t.items||[]).length
       ?(t.items||[]).forEach(ci=>{if((ci.staffName||t.staff||'')===viewUser.name)_mCommItems.push({price:ci.price,qty:ci.qty,ratio:_tRatio});})
       :(t.staff===viewUser.name&&_mCommItems.push({price:t.total||0,qty:1,ratio:1}));
@@ -3104,7 +3104,7 @@ function renderAdminPayroll(){
       const d=(t.time||'').slice(0,10);
       if(d<coStartStr||d>coEndStr) return;
       const _tSub=t.sub||0;
-      const _tRatio=_tSub?Math.max(0,(_tSub-(t.disc||0))/_tSub):1;
+      const _tRatio=_tSub?Math.max(0,(t.total||0)/_tSub):1; // cash actually collected, not discounted contract price
       (t.items||[]).length
         ?(t.items||[]).forEach(ci=>{if((ci.staffName||t.staff||'')===u.name)_sumCommItems.push({price:ci.price,qty:ci.qty,ratio:_tRatio});})
         :(t.staff===u.name&&_sumCommItems.push({price:t.total||0,qty:1,ratio:1}));
