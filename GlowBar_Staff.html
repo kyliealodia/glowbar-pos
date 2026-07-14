@@ -1629,16 +1629,20 @@ function renderCutoff(){
   const baseEarned=_isCOOnCall?_ocCO.totalPay:Math.round(dailyRate*daysPresent);
   const coAllowances=Math.round(allowances/2);
 
-  // Commission from transactions in cut-off — item-level staff attribution
+  // Commission from transactions in cut-off — item-level staff attribution,
+  // scaled by each transaction's discount ratio so commission reflects the
+  // amount actually paid, not the pre-discount listed price.
   const _coCommItems=[];
   (S.transactions||[]).forEach(t=>{
     const d=toPHDateStr(t.time||'');
     if(d<coStartStr||d>coEndStr) return;
+    const _tSub=t.sub||0;
+    const _tRatio=_tSub?Math.max(0,(_tSub-(t.disc||0))/_tSub):1;
     (t.items||[]).length
-      ?(t.items||[]).forEach(ci=>{if((ci.staffName||t.staff||'')===viewUser.name)_coCommItems.push(ci);})
-      :(t.staff===viewUser.name&&_coCommItems.push({price:t.subtotal||t.total||0,qty:1}));
+      ?(t.items||[]).forEach(ci=>{if((ci.staffName||t.staff||'')===viewUser.name)_coCommItems.push({price:ci.price,qty:ci.qty,ratio:_tRatio});})
+      :(t.staff===viewUser.name&&_coCommItems.push({price:t.total||0,qty:1,ratio:1}));
   });
-  const commEarned=Math.round(_coCommItems.reduce((s,ci)=>s+(ci.price||0)*(ci.qty||1),0)*(commRate/100));
+  const commEarned=Math.round(_coCommItems.reduce((s,ci)=>s+(ci.price||0)*(ci.qty||1)*(ci.ratio!=null?ci.ratio:1),0)*(commRate/100));
 
   // Holiday pay for cut-off period — same logic as monthly payslip
   let coHolidayRegularDays=0,coHolidaySpecialDays=0;
@@ -2091,16 +2095,20 @@ const paidDays=daysPresent+leaveDays;
   const daysAbsent=notStartedYet||_isOwner||_isOnCallM?0:Math.max(0,workingDays-paidDays);
   const absenceDeduction=Math.round(dailyRate*daysAbsent);
 
-  // Commission from transactions — item-level staff attribution
+  // Commission from transactions — item-level staff attribution, scaled by
+  // each transaction's discount ratio so commission reflects the amount
+  // actually paid, not the pre-discount listed price.
   const _mCommItems=[];
   (S.transactions||[]).forEach(t=>{
     const d=toPHDate(t.time);
     if(d.getFullYear()!==yr||d.getMonth()!==mo-1) return;
+    const _tSub=t.sub||0;
+    const _tRatio=_tSub?Math.max(0,(_tSub-(t.disc||0))/_tSub):1;
     (t.items||[]).length
-      ?(t.items||[]).forEach(ci=>{if((ci.staffName||t.staff||'')===viewUser.name)_mCommItems.push(ci);})
-      :(t.staff===viewUser.name&&_mCommItems.push({price:t.subtotal||t.total||0,qty:1}));
+      ?(t.items||[]).forEach(ci=>{if((ci.staffName||t.staff||'')===viewUser.name)_mCommItems.push({price:ci.price,qty:ci.qty,ratio:_tRatio});})
+      :(t.staff===viewUser.name&&_mCommItems.push({price:t.total||0,qty:1,ratio:1}));
   });
-  const txnRevenue=_mCommItems.reduce((s,ci)=>s+(ci.price||0)*(ci.qty||1),0);
+  const txnRevenue=_mCommItems.reduce((s,ci)=>s+(ci.price||0)*(ci.qty||1)*(ci.ratio!=null?ci.ratio:1),0);
   const commEarned=Math.round(txnRevenue*(commRate/100));
 
   // Holiday pay — check each present date against PH holidays
@@ -3087,12 +3095,21 @@ function renderAdminPayroll(){
     const baseEarned=_sumOnCall?_sumOCPay:Math.round(dailyRate*daysPresent);
     const coAllowances=Math.round(allowances/2);
 
-    // Commission
-    const txns=(S.transactions||[]).filter(t=>{
+    // Commission — item-level staff attribution (not whole-transaction match,
+    // so multi-staff transactions attribute correctly), scaled by each
+    // transaction's discount ratio so commission reflects the amount
+    // actually paid, not the pre-discount listed price.
+    const _sumCommItems=[];
+    (S.transactions||[]).forEach(t=>{
       const d=(t.time||'').slice(0,10);
-      return t.staff===u.name&&d>=coStartStr&&d<=coEndStr;
+      if(d<coStartStr||d>coEndStr) return;
+      const _tSub=t.sub||0;
+      const _tRatio=_tSub?Math.max(0,(_tSub-(t.disc||0))/_tSub):1;
+      (t.items||[]).length
+        ?(t.items||[]).forEach(ci=>{if((ci.staffName||t.staff||'')===u.name)_sumCommItems.push({price:ci.price,qty:ci.qty,ratio:_tRatio});})
+        :(t.staff===u.name&&_sumCommItems.push({price:t.total||0,qty:1,ratio:1}));
     });
-    const commEarned=Math.round(txns.reduce((s,t)=>s+(t.subtotal||t.total||0),0)*(commRate/100));
+    const commEarned=Math.round(_sumCommItems.reduce((s,ci)=>s+(ci.price||0)*(ci.qty||1)*(ci.ratio!=null?ci.ratio:1),0)*(commRate/100));
 
     // OT
     const otPay=(S.overtimeRequests||[]).filter(o=>
