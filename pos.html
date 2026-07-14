@@ -5574,12 +5574,14 @@ function confirmPay(){
   // Commission breakdown per service category (Feature 4)
   const commInfo=[];
   const _commUser=selStaff||currentUser;
+  // Ratio reflects discount/SC-PWD shrinkage only — excludes tip, VAT, deposits, and installment timing
+  const _paidRatio=afterSurge>0?afterScpwd/afterSurge:1;
   if(_commUser){
     cart.forEach(ci=>{
       const prod=S.products.find(p=>p.id===ci.id)||S.packages?.find(p=>p.id===ci.id);
       const cat=prod?.cat||'Other';
       const catRate=_commUser.categoryCommissions?.[cat]??_commUser.commission??0;
-      const commAmt=Math.round(ci.price*ci.qty*(catRate/100)*100)/100;
+      const commAmt=Math.round(ci.price*ci.qty*_paidRatio*(catRate/100)*100)/100;
       if(commAmt>0) commInfo.push({cat,item:ci.name,rate:catRate,amount:commAmt});
     });
   }
@@ -10176,6 +10178,13 @@ function _scheduleLabel(restDays){
   return names.filter((_,i)=>!restDays.includes(i)).join(', ')||'No days';
 }
 
+// Ratio of what the client actually paid vs listed price, isolating discount/SC-PWD shrinkage
+// (excludes tip, VAT, deposits, and installment-timing so those don't distort commission)
+function _txDiscRatio(t){
+  const _afterSurge=(t.sub||0)+(t.surgeAmt||0);
+  if(_afterSurge<=0) return 1;
+  return (_afterSurge-(t.disc||0)-(t.scpwd?.discAmt||0))/_afterSurge;
+}
 function renderPayrollSummary(staffList, txns, period){
   const el=document.getElementById('payrollSummaryContent');
   if(!el||!period||!period.includes('-')) return;
@@ -10191,9 +10200,10 @@ function renderPayrollSummary(staffList, txns, period){
 
   const rows=staffList.map(u=>{
     const _myIt=[];
-    txns.forEach(t=>{(t.items||[]).forEach(ci=>{if((ci.staffName||t.staff||'')===u.name)_myIt.push(ci);});});
-    const totalSales=_myIt.reduce((s,ci)=>s+ci.price*(ci.qty||1),0);
-    const commAmt=Math.round(totalSales*(u.commission||0)/100);
+    txns.forEach(t=>{(t.items||[]).forEach(ci=>{if((ci.staffName||t.staff||'')===u.name)_myIt.push({t,ci});});});
+    const totalSales=_myIt.reduce((s,{ci})=>s+ci.price*(ci.qty||1),0);
+    const commBase=_myIt.reduce((s,{t,ci})=>s+ci.price*(ci.qty||1)*_txDiscRatio(t),0);
+    const commAmt=Math.round(commBase*(u.commission||0)/100);
     const salary=u.basicSalary||u.salary||0;
 
     // Attendance-aware basic pay
@@ -10357,7 +10367,7 @@ function renderPayslip(){
     });
     const totalSales=myItems.reduce((s,{ci})=>s+ci.price*(ci.qty||1),0);
     const sessions=myItems.length;
-    // Calculate commission using per-category rates if available
+    // Calculate commission using per-category rates if available, scaled by what the client actually paid (post-discount)
     let commissionAmt=0;
     const catCommDetails=[];
     if(u.categoryCommissions&&Object.keys(u.categoryCommissions).length){
@@ -10365,13 +10375,14 @@ function renderPayslip(){
         const prod=S.products.find(p=>p.id===ci.id)||S.packages?.find(p=>p.id===ci.id);
         const cat=prod?.cat||'Other';
         const rate=u.categoryCommissions[cat]!==undefined?u.categoryCommissions[cat]:u.commission||0;
-        const amt=Math.round(ci.price*(ci.qty||1)*(rate/100)*100)/100;
+        const amt=Math.round(ci.price*(ci.qty||1)*_txDiscRatio(t)*(rate/100)*100)/100;
         commissionAmt+=amt;
         if(amt>0){const existing=catCommDetails.find(x=>x.cat===cat);if(existing)existing.amount+=amt;else catCommDetails.push({cat,rate,amount:amt});}
       });
       commissionAmt=Math.round(commissionAmt);
     } else {
-      commissionAmt=Math.round(totalSales*(u.commission||0)/100);
+      const commBase=myItems.reduce((s,{t,ci})=>s+ci.price*(ci.qty||1)*_txDiscRatio(t),0);
+      commissionAmt=Math.round(commBase*(u.commission||0)/100);
     }
 
     // Attendance from clock logs (both formats); owners skip clock tracking — always fully present
@@ -10535,9 +10546,20 @@ function exportPayslip(){
   const txns=S.transactions.filter(t=>{const d=toPHDate(t.time);return d.getFullYear()===py&&d.getMonth()+1===pm;});
   let csv='Staff,Role,Basic Salary,Commission %,Sales Handled,Commission Earned,Allowances,SSS,PhilHealth,PagIBIG,Tax,Other Deductions,Total Deductions,Net Pay\n';
   S.users.filter(u=>u.role!=='owner').forEach(u=>{
-    const myItems=[];txns.forEach(t=>{(t.items||[]).forEach(ci=>{if((ci.staffName||t.staff||'')===u.name)myItems.push(ci);});});
-    const sales=myItems.reduce((s,ci)=>s+ci.price*(ci.qty||1),0);
-    const comm=Math.round(sales*(u.commission||0)/100);
+    const myItems=[];txns.forEach(t=>{(t.items||[]).forEach(ci=>{if((ci.staffName||t.staff||'')===u.name)myItems.push({t,ci});});});
+    const sales=myItems.reduce((s,{ci})=>s+ci.price*(ci.qty||1),0);
+    let comm;
+    if(u.categoryCommissions&&Object.keys(u.categoryCommissions).length){
+      comm=Math.round(myItems.reduce((s,{t,ci})=>{
+        const prod=S.products.find(p=>p.id===ci.id)||S.packages?.find(p=>p.id===ci.id);
+        const cat=prod?.cat||'Other';
+        const rate=u.categoryCommissions[cat]!==undefined?u.categoryCommissions[cat]:u.commission||0;
+        return s+Math.round(ci.price*(ci.qty||1)*_txDiscRatio(t)*(rate/100)*100)/100;
+      },0));
+    } else {
+      const commBase=myItems.reduce((s,{t,ci})=>s+ci.price*(ci.qty||1)*_txDiscRatio(t),0);
+      comm=Math.round(commBase*(u.commission||0)/100);
+    }
     const gross=(u.basicSalary||u.salary||0)+comm;
     const d=computeDeductions(u,gross);
     csv+=`"${u.name}","${u.role}",${u.basicSalary||u.salary||0},${u.commission||0},${sales},${comm},${u.allowances||0},${d.sss},${d.ph},${d.pagibig},${d.tax},${d.otherDeduct},${d.totalDeductions},${Math.round(d.netPay)}\n`;
