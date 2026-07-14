@@ -1717,10 +1717,9 @@ function renderCutoff(){
   ).reduce((s,o)=>s+(o.amount||0),0);
   const estMonthlyGross=_moEarnedBasic+_moCommEarned+allowances+_moHolPay+_moOTPay;
 
-  // Monthly working days (schedule-based, 1st–last day, CO1+CO2 combined) — used ONLY as
-  // the SSS/PhilHealth base so those contributions stay flat regardless of commission swings.
-  const totalWorkingDaysInMonth=getWorkingDaysSP(yr,mo,staffStart,today,shiftDays);
-  const estMonthlyBasic=Math.round(dailyRate*totalWorkingDaysInMonth);
+  // Contracted monthly working days (fixed, defaults to 26) — used ONLY as the SSS/PhilHealth
+  // base so those contributions stay flat regardless of commission swings or absences.
+  const estMonthlyBasic=Math.round(dailyRate*(userRecord.contractedDays||26));
 
   // Compute monthly statutory amounts first, then halve — no rounding before halving
   const _moSSS=computeSSS(estMonthlyBasic);
@@ -2121,9 +2120,10 @@ const paidDays=daysPresent+leaveDays;
   }).reduce((s,ca)=>s+(ca.amount||0),0);
   console.log('[caDeductM] total deduction:',caDeductM);
 
-  // Statutory deductions — SSS/PhilHealth base is schedule-based basic (dailyRate ×
-  // total working days for the month), not gross, so it stays flat regardless of commission.
-  const estMonthlyBasic=Math.round(dailyRate*workingDays);
+  // Statutory deductions — SSS/PhilHealth base is contracted monthly basic (dailyRate ×
+  // contractedDays, defaults 26), not gross or actual days worked, so it stays flat
+  // regardless of commission, absences, or half days.
+  const estMonthlyBasic=Math.round(dailyRate*(userRecord.contractedDays||26));
   const sss=computeSSS(estMonthlyBasic);
   const philhealth=computePhilHealth(estMonthlyBasic);
   const pagibig=computePagibig();
@@ -3085,10 +3085,10 @@ function renderAdminPayroll(){
 
     const grossPay=baseEarned+commEarned+coAllowances+otPay;
     const estMonthlyGross=grossPay*2;
-    // SSS/PhilHealth base = schedule-based basic (dailyRate × total working days for the
-    // month), not gross, so contributions stay flat regardless of commission swings.
-    const totalWorkingDaysInMonth=getWorkingDaysSP(yr,mo,staffStart,today,shiftDays);
-    const estMonthlyBasic=Math.round(dailyRate*totalWorkingDaysInMonth);
+    // SSS/PhilHealth base = contracted monthly basic (dailyRate × contractedDays, defaults
+    // 26), not gross or actual days worked, so contributions stay flat regardless of
+    // commission swings or absences.
+    const estMonthlyBasic=Math.round(dailyRate*(u.contractedDays||26));
     const sss=Math.round(computeSSS(estMonthlyBasic)/2);
     const philhealth=Math.round(computePhilHealth(estMonthlyBasic)/2);
     const pagibig=Math.round(computePagibig()/2);
