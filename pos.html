@@ -9482,18 +9482,19 @@ function renderAttendance(){
 
   // ── New format ──
   S.loginLogs.filter(l=>l.date||(l.in&&!l.action)).forEach(l=>{
-    const date=l.date||(l.in?l.in.slice(0,10):'');
+    const date=l.date||_attManilaDate(l.in);
     if(!date)return;
-    records.push({id:l.id,userId:l.userId,name:l.name||l.user||'Unknown',role:l.role||'',date,inTime:l.in||null,outTime:l.out||null,selfie:l.selfie||null});
+    records.push({id:l.id,userId:l.userId,name:l.name||l.user||'Unknown',role:l.role||'',date,inTime:l.in||null,outTime:l.out||null,selfie:l.selfie||null,_ids:[l.id]});
   });
 
-  // ── Old format ── pair clockin / clockout by userId+date
+  // ── Old format ── pair clockin / clockout by userId+date (Manila-local date)
   const oldPairs={};
   S.loginLogs.filter(l=>l.time&&(l.action==='clockin'||l.action==='clockout'||l.action==='in'||l.action==='out')).forEach(l=>{
-    const date=(l.time||'').slice(0,10);
+    const date=_attManilaDate(l.time);
     if(!date)return;
     const key=(l.userId||l.name||'')+'_'+date;
-    if(!oldPairs[key]) oldPairs[key]={id:l.id,userId:l.userId,name:l.name||l.user||'Unknown',role:l.role||'',date,inTime:null,outTime:null,selfie:null};
+    if(!oldPairs[key]) oldPairs[key]={id:l.id,userId:l.userId,name:l.name||l.user||'Unknown',role:l.role||'',date,inTime:null,outTime:null,selfie:null,_ids:[]};
+    oldPairs[key]._ids.push(l.id);
     const isin=l.action==='clockin'||l.action==='in';
     if(isin&&!oldPairs[key].inTime){oldPairs[key].inTime=l.time;if(l.selfie)oldPairs[key].selfie=l.selfie;}
     if(!isin) oldPairs[key].outTime=l.time;
@@ -9502,6 +9503,10 @@ function renderAttendance(){
 
   // Sort newest first
   records.sort((a,b)=>b.date.localeCompare(a.date));
+
+  // Keep a lookup of every synthesised record (not just the filtered/visible ones) for editAttLog
+  _attRecordsById={};
+  records.forEach(r=>{_attRecordsById[r.id]=r;});
 
   // ── Date range filter ──
   let filtered=records;
@@ -9557,6 +9562,13 @@ function viewSelfie(src, label){
   openM('selfieViewModal');
 }
 
+let _attRecordsById={};
+function _attManilaDate(iso){
+  if(!iso)return'';
+  const d=new Date(iso);
+  if(isNaN(d))return'';
+  return d.toLocaleDateString('en-CA',{timeZone:'Asia/Manila'});
+}
 function _attTimeToInput(iso){
   if(!iso)return'';
   const d=new Date(iso);
@@ -9569,28 +9581,28 @@ function _attCombineDateTime(date,hhmm){
 }
 function editAttLog(id){
   if(!(currentUser&&currentUser.role==='owner'))return;
-  const log=S.loginLogs.find(l=>String(l.id)===String(id));
-  if(!log) return;
-  document.getElementById('editAttId').value=log.id;
-  document.getElementById('editAttName').textContent=log.name||log.user||'Unknown';
-  document.getElementById('editAttDate').value=log.date||(log.inTime?log.inTime.slice(0,10):(log.time?log.time.slice(0,10):''));
-  document.getElementById('editAttIn').value=_attTimeToInput(log.inTime||(log.action==='clockin'?log.time:''));
-  document.getElementById('editAttOut').value=_attTimeToInput(log.outTime||(log.action==='clockout'?log.time:''));
+  const rec=_attRecordsById[id];
+  if(!rec) return;
+  document.getElementById('editAttId').value=rec.id;
+  document.getElementById('editAttName').textContent=rec.name||'Unknown';
+  document.getElementById('editAttDate').value=rec.date||'';
+  document.getElementById('editAttIn').value=_attTimeToInput(rec.inTime);
+  document.getElementById('editAttOut').value=_attTimeToInput(rec.outTime);
   openM('editAttModal');
 }
 function saveEditAttLog(){
   const id=document.getElementById('editAttId').value;
-  const log=S.loginLogs.find(l=>String(l.id)===String(id));
-  if(!log) return;
+  const rec=_attRecordsById[id];
+  if(!rec) return;
   const date=document.getElementById('editAttDate').value;
   if(!date){showToast('Date is required','err');return;}
   const inHM=document.getElementById('editAttIn').value;
   const outHM=document.getElementById('editAttOut').value;
-  log.date=date;
-  log.inTime=_attCombineDateTime(date,inHM);
-  log.outTime=_attCombineDateTime(date,outHM);
-  delete log.time;
-  delete log.action;
+  // Remove every raw loginLogs entry that fed this record (old paired clockin/clockout
+  // entries and/or the previous unified entry), then write back a single clean record.
+  const idSet=new Set((rec._ids||[rec.id]).map(String));
+  S.loginLogs=S.loginLogs.filter(l=>!idSet.has(String(l.id)));
+  S.loginLogs.push({id:rec.id,userId:rec.userId,name:rec.name,role:rec.role,date,inTime:_attCombineDateTime(date,inHM),outTime:_attCombineDateTime(date,outHM)});
   sync('loginLogs');
   closeM('editAttModal');
   renderAttendance();
@@ -9599,7 +9611,9 @@ function saveEditAttLog(){
 function deleteAttLog(id){
   if(!(currentUser&&currentUser.role==='owner'))return;
   if(!confirm('Delete this attendance record?')) return;
-  S.loginLogs=S.loginLogs.filter(l=>String(l.id)!==String(id));
+  const rec=_attRecordsById[id];
+  const idSet=new Set((rec&&rec._ids?rec._ids:[id]).map(String));
+  S.loginLogs=S.loginLogs.filter(l=>!idSet.has(String(l.id)));
   sync('loginLogs');
   setTimeout(()=>renderAttendance(),500);
   alert('Deleted!');
