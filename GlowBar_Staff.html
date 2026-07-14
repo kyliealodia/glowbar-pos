@@ -366,11 +366,14 @@ nav{flex:1;padding:12px 0;overflow-y:auto;}
         <div id="payslipContent"></div>
       </div>
 
-      <!-- MY COMMISSIONS (own data only — always renders for currentUser, never another staff) -->
+      <!-- MY COMMISSIONS (own data by default; owner/admin may view another staff member
+           via commStaffSel, which is only ever shown/populated for owner/admin — see
+           renderMyCommissions()) -->
       <div id="page-commissions" class="page" style="display:none;">
         <div class="page-hdr">
           <div class="page-title">💵 My Commissions</div>
           <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center;">
+            <select class="form-select" id="commStaffSel" onchange="renderMyCommissions()" style="width:160px;font-size:12px;display:none;"></select>
             <select class="form-select" id="commPeriodSel" onchange="renderMyCommissions()" style="width:180px;font-size:12px;"></select>
           </div>
         </div>
@@ -1445,6 +1448,12 @@ if(currentUser.role==='owner'||currentUser.role==='admin'){
     const opts=S.users.map(u=>`<option value="${u.id}"${u.id===currentUser.id?' selected':''}>${u.name}</option>`).join('');
     staffSel.innerHTML=opts;
   }
+  const commStaffSel=document.getElementById('commStaffSel');
+  if(commStaffSel){
+    commStaffSel.style.display='block';
+    const opts=S.users.map(u=>`<option value="${u.id}"${u.id===currentUser.id?' selected':''}>${u.name}</option>`).join('');
+    commStaffSel.innerHTML=opts;
+  }
 }
 if(currentUser.role==='owner'){
   document.getElementById('navCompliance').style.display='flex';
@@ -2059,11 +2068,21 @@ function savePaydaySettings(){
   showToast('Payday settings saved','ok');
 }
 
-// ══ MY COMMISSIONS — always the logged-in user's own data. ══
-// Deliberately does NOT use getPayslipUser()/payStaffSel — that dropdown lets an
-// admin view another staff member's payslip elsewhere in this app, but this tab
-// must never expose another staff member's commission, so it always reads
-// currentUser directly regardless of role or any selector on the page.
+// ══ MY COMMISSIONS — own data by default; owner/admin may view another staff
+// member via commStaffSel, same pattern as getPayslipUser()/payStaffSel on the
+// Payslip tab. commStaffSel is only ever unhidden/populated for owner/admin (see
+// startApp()), but getCommissionsUser() also re-checks currentUser.role itself —
+// defense in depth — so even if a non-owner unhides/populates the selector via
+// dev tools, this function still refuses to honor it and falls back to currentUser.
+function getCommissionsUser(){
+  const isAdmin=currentUser.role==='owner'||currentUser.role==='admin';
+  const sel=document.getElementById('commStaffSel');
+  if(isAdmin&&sel&&sel.style.display!=='none'&&sel.value){
+    const found=S.users.find(u=>u.id===Number(sel.value)||u.id===sel.value);
+    if(found) return found;
+  }
+  return currentUser;
+}
 function toggleCommDrilldown(){
   const wrap=document.getElementById('commDrilldownWrap');
   const btn=document.getElementById('commDrilldownBtn');
@@ -2076,13 +2095,14 @@ function renderMyCommissions(){
   const period=document.getElementById('commPeriodSel')?.value||td().slice(0,7);
   const [yr,mo]=period.split('-').map(Number);
   if(!yr||!mo) return;
-  const u=S.users.find(x=>x.id===currentUser.id)||currentUser;
+  const viewUser=getCommissionsUser();
+  const u=S.users.find(x=>x.id===viewUser.id)||viewUser;
   const commRate=u.commission||0;
   const txns=(S.transactions||[]).filter(t=>{
     const d=toPHDate(t.time);
     return d.getFullYear()===yr&&d.getMonth()===mo-1;
   });
-  const lines=_staffCommissionLines(currentUser.name,commRate,txns);
+  const lines=_staffCommissionLines(viewUser.name,commRate,txns);
   const totalCommission=lines.reduce((s,l)=>s+l.commAmt,0);
   const totalPaid=lines.reduce((s,l)=>s+l.paidAmt,0);
   const f=fmtPrice;
