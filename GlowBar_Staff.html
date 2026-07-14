@@ -1611,30 +1611,19 @@ function renderCutoff(){
 
   // Days present in cut-off — owners are always fully present (no attendance clock required)
   const _isCOOwner=userRecord.role==='owner';
-  const presentDatesCO=new Set();
-  if(!_isCOOwner){
-    (S.loginLogs||[]).forEach(l=>{
-      const matchUser=l.userId===viewUser.id||l.user===viewUser.name||l.name===viewUser.name;
-      if(!matchUser) return;
-      let dateStr='';
-      if(!l.action&&(l.in||l.inTime)){
-        dateStr=l.date||toPHDateStr(l.in||l.inTime);
-      } else if(l.action==='clockin'||l.action==='in'){
-        dateStr=toPHDateStr(l.time||'');
-      }
-      if(dateStr&&dateStr>=coStartStr&&dateStr<=coEndStr) presentDatesCO.add(dateStr);
-    });
-  }
-  const daysPresent=_isCOOwner?workingDaysInCO:presentDatesCO.size;
+  const standardHoursCO=userRecord.standardHours||9;
+  const _coAttMap=_isCOOwner?{}:buildAttendanceMap(
+    l=>l.userId===viewUser.id||l.user===viewUser.name||l.name===viewUser.name,
+    dt=>dt>=coStartStr&&dt<=coEndStr
+  );
+  const presentDatesCO=new Set(Object.keys(_coAttMap));
+  // Half-day-aware total: sum of per-date fractions (0/0.5/1) instead of a flat day count
+  const daysPresent=_isCOOwner?workingDaysInCO:Object.values(_coAttMap).reduce((s,{inTime,outTime})=>s+computeDayFraction(inTime,outTime,standardHoursCO),0);
   const _isCOOnCall=userRecord.onCall===true;
   let _ocCO={days:[],totalPay:0,totalHours:0};
   if(_isCOOnCall&&dailyRate>0){
-    const _ocCOMap={};
-    (S.loginLogs||[]).filter(l=>{const mu=l.userId===viewUser.id||l.user===viewUser.name||l.name===viewUser.name;const dt=l.date||((l.in||l.inTime)?toPHDateStr(l.in||l.inTime):'');return mu&&dt&&dt>=coStartStr&&dt<=coEndStr&&!l.action;}).forEach(l=>{const dt=l.date||((l.in||l.inTime)?toPHDateStr(l.in||l.inTime):'');if(!dt)return;if(!_ocCOMap[dt])_ocCOMap[dt]={inTime:null,outTime:null};if((l.in||l.inTime)&&!_ocCOMap[dt].inTime)_ocCOMap[dt].inTime=new Date(l.in||l.inTime);if(l.out||l.outTime)_ocCOMap[dt].outTime=new Date(l.out||l.outTime);});
-    (S.loginLogs||[]).filter(l=>{const mu=l.userId===viewUser.id||l.user===viewUser.name||l.name===viewUser.name;const dt=(l.time||'').slice(0,10);return mu&&dt&&dt>=coStartStr&&dt<=coEndStr&&(l.action==='clockin'||l.action==='in');}).forEach(l=>{const dt=(l.time||'').slice(0,10);if(!_ocCOMap[dt])_ocCOMap[dt]={inTime:null,outTime:null};if(!_ocCOMap[dt].inTime)_ocCOMap[dt].inTime=new Date(l.time);});
-    (S.loginLogs||[]).filter(l=>{const mu=l.userId===viewUser.id||l.user===viewUser.name||l.name===viewUser.name;const dt=(l.time||'').slice(0,10);return mu&&dt&&dt>=coStartStr&&dt<=coEndStr&&(l.action==='clockout'||l.action==='out');}).forEach(l=>{const dt=(l.time||'').slice(0,10);if(!_ocCOMap[dt])_ocCOMap[dt]={inTime:null,outTime:null};_ocCOMap[dt].outTime=new Date(l.time);});
     let _tp=0,_th=0;
-    const _days=Object.entries(_ocCOMap).sort(([a],[b])=>a.localeCompare(b)).map(([date,{inTime,outTime}])=>{let mins=0;if(inTime&&outTime&&outTime>inTime)mins=Math.round((outTime-inTime)/60000);const mP=Math.min(mins,480);const pay=Math.round((mP/480)*dailyRate);_tp+=pay;_th+=mP/60;return {date,inTime,outTime,minsWorked:mins,hoursWorked:mins/60,hoursPayable:mP/60,pay};});
+    const _days=Object.entries(_coAttMap).sort(([a],[b])=>a.localeCompare(b)).map(([date,{inTime,outTime}])=>{let mins=0;if(inTime&&outTime&&outTime>inTime)mins=Math.round((outTime-inTime)/60000);const mP=Math.min(mins,480);const pay=Math.round((mP/480)*dailyRate);_tp+=pay;_th+=mP/60;return {date,inTime,outTime,minsWorked:mins,hoursWorked:mins/60,hoursPayable:mP/60,pay};});
     _ocCO={days:_days,totalPay:_tp,totalHours:_th};
   }
   const baseEarned=_isCOOnCall?_ocCO.totalPay:Math.round(dailyRate*daysPresent);
@@ -1897,6 +1886,43 @@ function computePhilHealth(m){
   return Math.round(Math.min(Math.max(m*0.05,500),5000)/2);
 }
 function computePagibig(){ return 100; }
+
+// ══ HALF-DAY / PARTIAL-DAY ATTENDANCE ══
+// Converts a clock-in/clock-out pair into a day fraction (0, 0.5, or 1), rounded to the
+// nearest half-day. Standard shift = 9 hours (10AM–7PM) unless the user overrides it.
+function computeDayFraction(inTime,outTime,standardHours){
+  if(!inTime||!outTime) return 0;
+  const inD=inTime instanceof Date?inTime:new Date(inTime);
+  const outD=outTime instanceof Date?outTime:new Date(outTime);
+  if(isNaN(inD.getTime())||isNaN(outD.getTime())||outD<=inD) return 0;
+  const hours=(outD-inD)/3600000;
+  const std=standardHours||9;
+  const frac=Math.min(1,hours/std);
+  return Math.round(frac*2)/2;
+}
+// Merges legacy clockin/clockout rows and unified {date,inTime/in,outTime/out} rows into a
+// single per-date {inTime,outTime} map for one staff member, for a given date range.
+function buildAttendanceMap(matchUserFn,dateInRangeFn){
+  const map={};
+  (S.loginLogs||[]).filter(l=>{const dt=l.date||((l.in||l.inTime)?toPHDateStr(l.in||l.inTime):'');return matchUserFn(l)&&dt&&dateInRangeFn(dt)&&!l.action;}).forEach(l=>{
+    const dt=l.date||((l.in||l.inTime)?toPHDateStr(l.in||l.inTime):'');
+    if(!dt)return;
+    if(!map[dt])map[dt]={inTime:null,outTime:null};
+    if((l.in||l.inTime)&&!map[dt].inTime)map[dt].inTime=new Date(l.in||l.inTime);
+    if(l.out||l.outTime)map[dt].outTime=new Date(l.out||l.outTime);
+  });
+  (S.loginLogs||[]).filter(l=>{const dt=l.time?toPHDateStr(String(l.time)):'';return matchUserFn(l)&&dt&&dateInRangeFn(dt)&&(l.action==='clockin'||l.action==='in');}).forEach(l=>{
+    const dt=toPHDateStr(String(l.time));
+    if(!map[dt])map[dt]={inTime:null,outTime:null};
+    if(!map[dt].inTime)map[dt].inTime=new Date(l.time);
+  });
+  (S.loginLogs||[]).filter(l=>{const dt=l.time?toPHDateStr(String(l.time)):'';return matchUserFn(l)&&dt&&dateInRangeFn(dt)&&(l.action==='clockout'||l.action==='out');}).forEach(l=>{
+    const dt=toPHDateStr(String(l.time));
+    if(!map[dt])map[dt]={inTime:null,outTime:null};
+    map[dt].outTime=new Date(l.time);
+  });
+  return map;
+}
 function computeWithholdingTax(t){
   if(t<=20833) return 0;
   if(t<=33332) return (t-20833)*0.15;
@@ -2031,21 +2057,14 @@ const _schedLabel=_shiftDays.join(', ')||'No days';
 
   // Days present — owners are always fully present (no attendance clock required)
   const _isOwner=userRecord.role==='owner';
-  const presentDatesM=new Set();
-  if(!_isOwner){
-    (S.loginLogs||[]).forEach(l=>{
-      const matchUser=l.userId===viewUser.id||l.user===viewUser.name||l.name===viewUser.name;
-      if(!matchUser) return;
-      let dateStr='';
-      if(!l.action&&(l.in||l.inTime)){
-        dateStr=l.date||toPHDateStr(l.in||l.inTime);
-      } else if(l.action==='clockin'||l.action==='in'){
-        dateStr=toPHDateStr(l.time||'');
-      }
-      if(dateStr&&dateStr.startsWith(period)) presentDatesM.add(dateStr);
-    });
-  }
-  const daysPresent=_isOwner?workingDays:presentDatesM.size;
+  const standardHoursM=userRecord.standardHours||9;
+  const _moAttMap=_isOwner?{}:buildAttendanceMap(
+    l=>l.userId===viewUser.id||l.user===viewUser.name||l.name===viewUser.name,
+    dt=>dt.startsWith(period)
+  );
+  const presentDatesM=new Set(Object.keys(_moAttMap));
+  // Half-day-aware total: sum of per-date fractions (0/0.5/1) instead of a flat day count
+  const daysPresent=_isOwner?workingDays:Object.values(_moAttMap).reduce((s,{inTime,outTime})=>s+computeDayFraction(inTime,outTime,standardHoursM),0);
   const inLogs=[...presentDatesM].map(d=>({time:d})); // keep for holiday/presentDates reference below
 
   // Approved leaves this period (count as paid days)
@@ -2063,12 +2082,8 @@ const notStartedYet=staffStart2>today2;
 const _isOnCallM=userRecord.onCall===true;
 let _ocDailyM={days:[],totalPay:0,totalHours:0};
 if(_isOnCallM&&dailyRate>0){
-  const _ocDMap={};
-  (S.loginLogs||[]).filter(l=>{const mu=l.userId===viewUser.id||l.user===viewUser.name||l.name===viewUser.name;const dt=l.date||((l.in||l.inTime)?toPHDateStr(l.in||l.inTime):'');return mu&&dt&&dt.startsWith(period)&&!l.action;}).forEach(l=>{const dt=l.date||((l.in||l.inTime)?toPHDateStr(l.in||l.inTime):'');if(!dt)return;if(!_ocDMap[dt])_ocDMap[dt]={inTime:null,outTime:null};if((l.in||l.inTime)&&!_ocDMap[dt].inTime)_ocDMap[dt].inTime=new Date(l.in||l.inTime);if(l.out||l.outTime)_ocDMap[dt].outTime=new Date(l.out||l.outTime);});
-  (S.loginLogs||[]).filter(l=>{const mu=l.userId===viewUser.id||l.user===viewUser.name||l.name===viewUser.name;const ph=l.time?toPHDateStr(String(l.time)):'';return mu&&ph&&ph.startsWith(period)&&(l.action==='clockin'||l.action==='in');}).forEach(l=>{const dt=toPHDateStr(String(l.time));if(!_ocDMap[dt])_ocDMap[dt]={inTime:null,outTime:null};if(!_ocDMap[dt].inTime)_ocDMap[dt].inTime=new Date(l.time);});
-  (S.loginLogs||[]).filter(l=>{const mu=l.userId===viewUser.id||l.user===viewUser.name||l.name===viewUser.name;const ph=l.time?toPHDateStr(String(l.time)):'';return mu&&ph&&ph.startsWith(period)&&(l.action==='clockout'||l.action==='out');}).forEach(l=>{const dt=toPHDateStr(String(l.time));if(!_ocDMap[dt])_ocDMap[dt]={inTime:null,outTime:null};_ocDMap[dt].outTime=new Date(l.time);});
   let _tp=0,_th=0;
-  const _days=Object.entries(_ocDMap).sort(([a],[b])=>a.localeCompare(b)).map(([date,{inTime,outTime}])=>{let mins=0;if(inTime&&outTime&&outTime>inTime)mins=Math.round((outTime-inTime)/60000);const mP=Math.min(mins,480);const pay=Math.round((mP/480)*dailyRate);_tp+=pay;_th+=mP/60;return {date,inTime,outTime,minsWorked:mins,hoursWorked:mins/60,hoursPayable:mP/60,pay};});
+  const _days=Object.entries(_moAttMap).sort(([a],[b])=>a.localeCompare(b)).map(([date,{inTime,outTime}])=>{let mins=0;if(inTime&&outTime&&outTime>inTime)mins=Math.round((outTime-inTime)/60000);const mP=Math.min(mins,480);const pay=Math.round((mP/480)*dailyRate);_tp+=pay;_th+=mP/60;return {date,inTime,outTime,minsWorked:mins,hoursWorked:mins/60,hoursPayable:mP/60,pay};});
   _ocDailyM={days:_days,totalPay:_tp,totalHours:_th};
 }
 const paidDays=daysPresent+leaveDays;
@@ -2309,13 +2324,12 @@ function row(label, value, color){
 }
 
 function countDaysPresent(period){
-  const [yr,mo]=period.split('-').map(Number);
-  const logs=S.loginLogs.filter(l=>{
-    const d=new Date(l.time||l.date);
-    const matchUser=l.userId===currentUser.id||l.user===currentUser.name||l.name===currentUser.name;
-    return matchUser&&d.getFullYear()===yr&&d.getMonth()===mo-1&&((l.action==='in'||l.action==='clockin')||(!l.action&&(l.in||l.inTime)));
-  });
-  return new Set(logs.map(l=>new Date(l.time||l.date).toDateString())).size;
+  const map=buildAttendanceMap(
+    l=>l.userId===currentUser.id||l.user===currentUser.name||l.name===currentUser.name,
+    dt=>dt.startsWith(period)
+  );
+  const standardHours=(S.users.find(u=>u.id===currentUser.id)||currentUser).standardHours||9;
+  return Object.values(map).reduce((s,{inTime,outTime})=>s+computeDayFraction(inTime,outTime,standardHours),0);
 }
 
 function getLeaveDays(period,type){
@@ -3057,12 +3071,14 @@ function renderAdminPayroll(){
       if(shiftDays.includes(dayNames[new Date(d).getDay()])) workingDaysInCO++;
     }
 
-    // Days present — legacy clockin/clockout rows AND unified {date,inTime,outTime} rows
-    const _smMap={};
-    (S.loginLogs||[]).filter(l=>{const mu=l.userId===u.id||l.user===u.name||l.name===u.name;const dt=l.date||((l.in||l.inTime)?toPHDateStr(l.in||l.inTime):'');return mu&&dt&&dt>=coStartStr&&dt<=coEndStr&&!l.action;}).forEach(l=>{const dt=l.date||((l.in||l.inTime)?toPHDateStr(l.in||l.inTime):'');if(!dt)return;if(!_smMap[dt])_smMap[dt]={inTime:null,outTime:null};if((l.in||l.inTime)&&!_smMap[dt].inTime)_smMap[dt].inTime=new Date(l.in||l.inTime);if(l.out||l.outTime)_smMap[dt].outTime=new Date(l.out||l.outTime);});
-    (S.loginLogs||[]).filter(l=>{const mu=l.userId===u.id||l.user===u.name||l.name===u.name;const dt=(l.time||'').slice(0,10);return mu&&dt&&dt>=coStartStr&&dt<=coEndStr&&(l.action==='clockin'||l.action==='in');}).forEach(l=>{const dt=(l.time||'').slice(0,10);if(!_smMap[dt])_smMap[dt]={inTime:null,outTime:null};if(!_smMap[dt].inTime)_smMap[dt].inTime=new Date(l.time);});
-    (S.loginLogs||[]).filter(l=>{const mu=l.userId===u.id||l.user===u.name||l.name===u.name;const dt=(l.time||'').slice(0,10);return mu&&dt&&dt>=coStartStr&&dt<=coEndStr&&(l.action==='clockout'||l.action==='out');}).forEach(l=>{const dt=(l.time||'').slice(0,10);if(!_smMap[dt])_smMap[dt]={inTime:null,outTime:null};_smMap[dt].outTime=new Date(l.time);});
-    const daysPresent=Object.keys(_smMap).length;
+    // Days present — legacy clockin/clockout rows AND unified {date,inTime,outTime} rows,
+    // half-day-aware: sum of per-date fractions (0/0.5/1) instead of a flat day count
+    const _smMap=buildAttendanceMap(
+      l=>l.userId===u.id||l.user===u.name||l.name===u.name,
+      dt=>dt>=coStartStr&&dt<=coEndStr
+    );
+    const standardHoursSum=u.standardHours||9;
+    const daysPresent=Object.values(_smMap).reduce((s,{inTime,outTime})=>s+computeDayFraction(inTime,outTime,standardHoursSum),0);
     const _sumOnCall=u.onCall===true;
     let _sumOCPay=0;
     if(_sumOnCall&&dailyRate>0){
