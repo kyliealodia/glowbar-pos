@@ -236,14 +236,18 @@ let activeSvcCat = null; // currently active category tab id
 const TIMES = ['09:00','09:30','10:00','10:30','11:00','11:30','12:00','12:30','13:00','13:30','14:00','14:30','15:00','15:30','16:00','16:30','17:00','17:30','18:00'];
 
 // ── CATEGORY TAB DEFINITIONS ──
+// Standalone spa add-ons, matched by exact name (not substring) so combo services like
+// "Classic Mani and Pedi with Hand Spa" stay classified as nails bookings rather than
+// getting pulled into the Spa tab just because their name mentions a spa add-on.
+const SPA_ITEM_NAMES = ['hand spa','foot spa','hand paraffin','foot paraffin','add on foot jelly'];
 const CATEGORY_TABS = [
   {id:'nails',   label:'Nails',                icon:'💅',
     test:p=>{ const c=(p.cat||'').toLowerCase(),s=(p.subcat||'').toLowerCase(),n=(p.name||'').toLowerCase();
       return (c.includes('nail')||s.includes('manicure')||s.includes('pedicure')||s.includes('extension')||s.includes('nail art')||n.includes('mani')||n.includes('pedi')||n.includes('gel mani')||n.includes('nail')||n.includes('polygel')||n.includes('softgel'))
-        && !n.includes('hand spa') && !n.includes('foot spa') && !n.includes('hand paraffin') && !n.includes('foot paraffin') && !n.includes('foot jelly'); }},
+        && !SPA_ITEM_NAMES.includes(n); }},
   {id:'spa',    label:'Spa Treatments',       icon:'🧖',
     test:p=>{ const n=(p.name||'').toLowerCase();
-      return n.includes('hand spa')||n.includes('foot spa')||n.includes('hand paraffin')||n.includes('foot paraffin')||n.includes('foot jelly'); }},
+      return SPA_ITEM_NAMES.includes(n); }},
   {id:'glow_wax', label:'Glow Wax',           icon:'✨',
     test:p=>{ return (p.cat||'').toLowerCase()==='glow wax'; }},
   {id:'facial',  label:'Facial',               icon:'🌸',
@@ -272,10 +276,12 @@ function getCatTabId(p){
 function getPkgTabId(pkg){
   const n=(pkg.name||'').toLowerCase();
   const isPackage = n.includes('package')||n.includes('5+1')||n.includes('10+2')||n.includes('4+1');
-  // Combo packages use ' + ' (spaces) between service types; '10+2' has no spaces
-  if(n.includes(' + ')&&(n.includes('diode')||n.includes('carbon')||n.includes('pico'))) return 'rejuv';
+  // Combo packages use ' + ' (spaces) between service types; '10+2' has no spaces.
+  // Carbon-laser/rejuvenation packages map to 'pico' — matching CATEGORY_TABS (there's no
+  // separate 'rejuv' tab) and DEMO_DATA's own tab:'pico' convention for these packages.
+  if(n.includes(' + ')&&(n.includes('diode')||n.includes('carbon')||n.includes('pico'))) return 'pico';
   if(n.includes('diode')) return 'diode';
-  if(n.includes('rejuven')||n.includes('rejuve')) return 'rejuv';
+  if(n.includes('rejuven')||n.includes('rejuve')) return 'pico';
   if(n.includes('exilis')) return 'exilis';
   if(n.includes('pico')||n.includes('carbon')||n.includes('black doll')||n.includes('melasma')||n.includes('scar')) return 'pico';
   if(isPackage && (n.includes('mani')||n.includes('pedi')||n.includes('nail')||n.includes('hand spa')||n.includes('foot spa')||n.includes('glow hands')||n.includes('glow feet')||n.includes('classic'))) return 'nails';
@@ -587,17 +593,8 @@ async function loadData(){
     const bkgs  = toArray(d.bookings);
 
     const dbProds = prods && prods.length ? prods : null;
-    const nailProducts = DEMO_DATA.products.filter(isNailService);
-    const waxProducts = DEMO_DATA.products.filter(isWaxService);
-    const nonNailNonWaxDbProds = dbProds ? dbProds.filter(p=>{
-      const tid = getCatTabId(p);
-      return tid !== 'nails';
-    }) : [];
-    const nonNailDbPackages = pkgs ? pkgs.filter(p=>getPkgTabId(p)!=='nails') : [];
-    DATA.products = dbProds
-      ? [...nailProducts, ...waxProducts, ...nonNailNonWaxDbProds]
-      : DEMO_DATA.products;
-    DATA.packages = nonNailDbPackages.length ? nonNailDbPackages : DEMO_DATA.packages;
+    DATA.products = dbProds && dbProds.length ? dbProds : DEMO_DATA.products;
+    DATA.packages = pkgs && pkgs.length ? pkgs : DEMO_DATA.packages;
     DATA.users    = users && users.length ? users : DEMO_DATA.users;
     DATA.bookings = bkgs  || [];
     DATA.settings = mergeSettings(DATA.settings, d.settings);
@@ -622,19 +619,15 @@ function showStep1(){
     <div class="card-sub">Select the treatment you'd like to book.</div>`;
 
   {
-    // All tabs are fully hardcoded from DEMO_DATA — Firebase cannot inject services into any tab
-    const SPA_IDS = new Set([105, 106, 130, 131, 132]);
-    const tabMap = {
-      nails:      DEMO_DATA.products.filter(p => p.cat==='Glow Nails' && !SPA_IDS.has(p.id)),
-      spa:        DEMO_DATA.products.filter(p => SPA_IDS.has(p.id)),
-      glow_wax:   DEMO_DATA.products.filter(p => p.cat==='Glow Wax'),
-      facial:     DEMO_DATA.products.filter(p => p.cat==='Glow Facials'),
-      diode:      DEMO_DATA.products.filter(p => p.subcat==='Diode Laser'),
-      pico:       DEMO_DATA.products.filter(p => p.subcat==='Pico Laser'),
-      exilis:     DEMO_DATA.products.filter(p => p.cat==='Exilis Glow' && p.id >= 603),
-      tattoo:     DEMO_DATA.products.filter(p => p.id===504),
-      glow_clear: DEMO_DATA.products.filter(p => p.cat==='Glow Clear'),
-    };
+    // Classify live/demo products into tabs using getCatTabId — the same ID-independent
+    // (cat/subcat/name string matching) classifier already used elsewhere in this file,
+    // rather than a second hardcoded scheme that assumed numeric legacy product IDs.
+    const tabMap = {};
+    DATA.products.forEach(p=>{
+      const tid=getCatTabId(p);
+      if(!tabMap[tid]) tabMap[tid]=[];
+      tabMap[tid].push(p);
+    });
 
     // Build tabs in preferred order
     const pkgs=DATA.packages.filter(p=>p.active!==false);
@@ -679,7 +672,9 @@ function showStep1(){
     const activeTab=orderedTabs.find(t=>t.id===activeSvcCat);
     if(activeTab){
       const isLaserTab=['diode','rejuv','pico','exilis','tattoo'].includes(activeSvcCat);
-      const tabPkgs=DEMO_DATA.packages.filter(p=>p.tab===activeSvcCat&&p.active!==false);
+      // getPkgTabId (name-based, ID-independent) rather than a literal .tab field — live
+      // packages synced from pos.html have no .tab field at all, only DEMO_DATA's do.
+      const tabPkgs=DATA.packages.filter(p=>getPkgTabId(p)===activeSvcCat&&p.active!==false);
       const subcatMap={};
       activeTab.services.forEach(p=>{
         const sc=p.subcat||'';
