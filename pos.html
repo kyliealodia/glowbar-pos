@@ -4602,7 +4602,7 @@ function initPosMobile(){
 
 // ══ POS ══
 let activeSubCat='All';
-const CAT_ORDER=['Glow Nails','Glow Eyelashes','Glow Wax','Glow Facials','Glow Skin','Glow Ink','Glow Clear','Exilis Glow','Retail Products'];
+const CAT_ORDER=['Glow Nails','Glow Eyelashes','Glow Massage','Glow Wax','Glow Facials','Glow Skin','Glow Ink','Glow Clear','Exilis Glow','Retail Products'];
 function getCats(){
   const cats=[...new Set(S.products.filter(p=>p.inPOS).map(p=>p.cat))];
   cats.sort((a,b)=>{

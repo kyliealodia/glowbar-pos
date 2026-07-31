@@ -1989,6 +1989,14 @@ let SVC_CATS = [
   {id:'eyelash_addon', name:'Glow Eyelashes — Add-on Looks', group:'Glow Eyelashes', type:'addon', canAddServices:true, services:[
     {id:'ea1',name:'Cat Eye / Doll Eye',price:200,durationMins:15,staffRole:'r2',noWater:true,consumables:[]},
   ]},
+  // ── GLOW MASSAGE ──────────────────────────────────────────────────
+  {id:'massage', name:'Glow Massage — Massage', group:'Glow Massage', type:'standard', canAddServices:true, services:[
+    {id:'m1',name:'Swedish',price:700,durationMins:60,staffRole:'',inPOS:true,unit:'session',consumables:[],desc:'Relaxing full-body massage with long, gliding strokes'},
+    {id:'m2',name:'Shiatsu',price:1000,durationMins:60,staffRole:'',inPOS:true,unit:'session',consumables:[],desc:'Japanese-style acupressure massage to relieve tension'},
+    {id:'m3',name:'Combination',price:1000,durationMins:60,staffRole:'',inPOS:true,unit:'session',consumables:[],desc:'A blend of massage techniques for full-body relaxation'},
+    {id:'m4',name:'Hot Stone',price:1200,durationMins:75,staffRole:'',inPOS:true,unit:'session',consumables:[],desc:'Heated stone massage to ease muscle tension and improve circulation'},
+    {id:'m5',name:'Ventosa',price:1200,durationMins:45,staffRole:'',inPOS:true,unit:'session',consumables:[],desc:'Cupping therapy massage to relieve muscle pain and improve blood flow'},
+  ]},
   // ── GLOW WAX ──────────────────────────────────────────────────────
   {id:'waxing', name:'Glow Wax', group:'Glow Wax', type:'standard', canAddServices:true, services:[
     {id:'s20',name:'Underarm',price:500,durationMins:20,staffRole:'',consumables:[{groupId:'waxing',iIdx:5,amt:'2',unit:'pcs'},{groupId:'waxing',iIdx:1,amt:'2',unit:'g'},{groupId:'waxing',iIdx:2,amt:'2',unit:'g'},{groupId:'waxing',iIdx:6,amt:'3',unit:'ml'},{groupId:'waxing',iIdx:7,amt:'3',unit:'ml'},{groupId:'waxing',iIdx:4,amt:'2',unit:'pcs'},{groupId:'nails',iIdx:38,amt:'2',unit:'pcs'},{groupId:'nails',iIdx:37,amt:'1',unit:'ml'},{groupId:'facial',iIdx:47,amt:'1',unit:'pcs'},{groupId:'waxing',iIdx:0,amt:'10',unit:'g'}]},
