@@ -352,11 +352,12 @@ nav{flex:1;padding:12px 0;overflow-y:auto;}
           <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center;">
             <select class="form-select" id="payStaffSel" onchange="renderPayslip()" style="width:160px;font-size:12px;display:none;"></select>
             <select class="form-select" id="payPeriodSel" onchange="renderPayslip()" style="width:180px;font-size:12px;"></select>
+            <select class="form-select" id="payWeekSel" onchange="renderPayslip()" style="width:220px;font-size:12px;display:none;"></select>
             <button class="btn btn-outline btn-sm" onclick="printPayslip()">🖨 Print</button>
           </div>
         </div>
-        <!-- Cut-off Pay -->
-        <div style="max-width:680px;margin:0 auto 4px;">
+        <!-- Cut-off Pay (CO1/CO2 staff only — hidden for weekly-pay staff) -->
+        <div id="monthlyCutoffWrap" style="max-width:680px;margin:0 auto 4px;">
           <div style="display:flex;gap:6px;margin-bottom:12px;">
             <button id="co1btn" onclick="selectCutoff(1)" style="flex:1;padding:8px 0;border-radius:8px;border:1.5px solid #C9A84C;background:#C9A84C;color:#fff;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;">1st Cut-off &nbsp;(1–15)</button>
             <button id="co2btn" onclick="selectCutoff(2)" style="flex:1;padding:8px 0;border-radius:8px;border:1.5px solid #C9A84C;background:#fff;color:#C9A84C;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;">2nd Cut-off &nbsp;(16–end)</button>
@@ -372,6 +373,7 @@ nav{flex:1;padding:12px 0;overflow-y:auto;}
       <div id="page-commissions" class="page" style="display:none;">
         <div class="page-hdr">
           <div class="page-title">💵 My Commissions</div>
+          <div id="commPeriodLabel" class="page-sub" style="margin-top:2px;font-weight:600;"></div>
           <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center;">
             <select class="form-select" id="commStaffSel" onchange="renderMyCommissions()" style="width:160px;font-size:12px;display:none;"></select>
             <select class="form-select" id="commPeriodSel" onchange="renderMyCommissions()" style="width:180px;font-size:12px;"></select>
@@ -386,7 +388,7 @@ nav{flex:1;padding:12px 0;overflow-y:auto;}
           <div class="card-body" style="padding:0;display:none;" id="commDrilldownWrap">
             <div class="tbl-wrap">
               <table class="tbl">
-                <thead><tr><th>Date</th><th>Client</th><th>Service</th><th>Qty</th><th>Paid Amount</th><th>Commission</th></tr></thead>
+                <thead id="commTableHead"><tr><th>Date</th><th>Client</th><th>Service</th><th>Qty</th><th>Paid Amount</th><th>Commission</th></tr></thead>
                 <tbody id="commBody"></tbody>
               </table>
             </div>
@@ -1194,6 +1196,18 @@ function loadFromCloud(){
             const staff=S.users.filter(u=>u.role==='staff');
             container.innerHTML=staff.map(u=>`<div class="c-input-row"><label>${u.name} (${u.specialty})</label><input type="number" id="csal_${u.id}" value="${(u.dailyRate||700)*26}" onchange="cAll()"></div>`).join('');
           }
+          // Keep owner/admin payslip & commissions staff selectors in sync with the
+          // live roster (e.g. staff added directly via the Firebase console).
+          if(currentUser&&(currentUser.role==='owner'||currentUser.role==='admin')){
+            ['payStaffSel','commStaffSel'].forEach(id=>{
+              const sel=document.getElementById(id);
+              if(!sel) return;
+              const prevVal=sel.value;
+              sel.style.display='block';
+              sel.innerHTML=S.users.map(u=>`<option value="${u.id}"${u.id===currentUser.id?' selected':''}>${u.name}</option>`).join('');
+              if(prevVal&&[...sel.options].some(o=>o.value===prevVal)) sel.value=prevVal;
+            });
+          }
           if(typeof window.cAll==='function') window.cAll();
           if(typeof window.cOwner==='function') window.cOwner();
         }
@@ -1278,7 +1292,7 @@ function computeCurrentCutoffEarnings(){
 
   const userRecord=S.users.find(u=>u.id===currentUser?.id)||currentUser||{};
   const dailyRate=userRecord.dailyRate||0;
-  const commRate=userRecord.commission||0;
+  const commRate=userRecord.commRate||userRecord.commission||0;
 
   const presentDates=new Set();
   (S.loginLogs||[]).forEach(l=>{
@@ -1376,6 +1390,34 @@ function _staffCommissionLines(staffName,commRate,txns){
   });
   lines.sort((a,b)=>a.date.localeCompare(b.date));
   return lines;
+}
+// ══ WEEKLY PAY SCHEDULE HELPERS (paySchedule:'weekly', e.g. Jocelyn Magallon, Christine Borce) ══
+function isWeeklyPay(u){ return !!(u&&u.paySchedule==='weekly'); }
+function toDateStr(d){const pad=x=>String(x).padStart(2,'0');return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;}
+function getMonday(d){
+  const dt=new Date(d);
+  const day=dt.getDay();
+  dt.setDate(dt.getDate()+(day===0?-6:1-day));
+  dt.setHours(0,0,0,0);
+  return dt;
+}
+function weekLabel(monday){
+  const sunday=new Date(monday); sunday.setDate(sunday.getDate()+6);
+  const sameMonth=monday.getMonth()===sunday.getMonth()&&monday.getFullYear()===sunday.getFullYear();
+  const moStr=monday.toLocaleDateString('en-PH',{month:'short'});
+  if(sameMonth) return `${moStr} ${monday.getDate()}–${sunday.getDate()}, ${sunday.getFullYear()}`;
+  const moStr2=sunday.toLocaleDateString('en-PH',{month:'short'});
+  return `${moStr} ${monday.getDate()} – ${moStr2} ${sunday.getDate()}, ${sunday.getFullYear()}`;
+}
+// Last n Mon–Sun weeks, most recent first, as Monday Date objects
+function getWeekOptions(n){
+  const weeks=[];
+  const monday0=getMonday(new Date());
+  for(let i=0;i<n;i++){
+    const wk=new Date(monday0); wk.setDate(wk.getDate()-7*i);
+    weeks.push(wk);
+  }
+  return weeks;
 }
 function fmtDate(d){return new Date(d+'T12:00').toLocaleDateString('en-PH',{weekday:'short',month:'short',day:'numeric'});}
 function cap(s){return s?s.charAt(0).toUpperCase()+s.slice(1):'';}
@@ -1702,7 +1744,7 @@ function renderCutoff(){
   console.log('[renderCutoff] viewUser=',viewUser?.name,'id=',viewUser?.id);
   const userRecord=S.users.find(u=>u.id===viewUser.id)||viewUser;
   const basicPay=userRecord.basicSalary||userRecord.salary||userRecord.basicPay||0;
-  const commRate=userRecord.commission||0;
+  const commRate=userRecord.commRate||userRecord.commission||0;
   const allowances=userRecord.allowances||0;
   const otherDeductions=userRecord.otherDeductions||0;
   const f=fmtPrice;
@@ -2158,37 +2200,108 @@ function toggleCommDrilldown(){
   wrap.style.display=showing?'none':'block';
   btn.textContent=showing?'Show Details ▾':'Hide Details ▴';
 }
+// Repopulates commPeriodSel with weeks (weekly-pay staff) or months (everyone else),
+// only rebuilding the option list when the selector's mode actually needs to change so
+// the user's current selection survives re-renders that don't change staff.
+function populateCommPeriodSel(){
+  const sel=document.getElementById('commPeriodSel');
+  if(!sel) return;
+  const viewUser=getCommissionsUser();
+  const weekly=isWeeklyPay(viewUser);
+  const wantMode=weekly?'weekly':'monthly';
+  if(sel.dataset.mode===wantMode&&sel.options.length) return;
+  const prevVal=sel.value;
+  if(weekly){
+    sel.innerHTML=getWeekOptions(8).map(wk=>`<option value="${toDateStr(wk)}">${weekLabel(wk)}</option>`).join('');
+  } else {
+    const now=new Date();
+    const opts=[];
+    for(let i=0;i<12;i++){
+      const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+      const val=d.toISOString().slice(0,7);
+      const lbl=d.toLocaleDateString('en-PH',{month:'long',year:'numeric'});
+      opts.push(`<option value="${val}">${lbl}</option>`);
+    }
+    sel.innerHTML=opts.join('');
+  }
+  sel.dataset.mode=wantMode;
+  if(prevVal&&[...sel.options].some(o=>o.value===prevVal)) sel.value=prevVal;
+}
 function renderMyCommissions(){
-  const period=document.getElementById('commPeriodSel')?.value||td().slice(0,7);
-  const [yr,mo]=period.split('-').map(Number);
-  if(!yr||!mo) return;
+  populateCommPeriodSel();
   const viewUser=getCommissionsUser();
   const u=S.users.find(x=>x.id===viewUser.id)||viewUser;
-  const commRate=u.commission||0;
+  const commRate=u.commRate||u.commission||0;
+  const f=fmtPrice;
+  const sel=document.getElementById('commPeriodSel');
+  const metricsEl=document.getElementById('commMetrics');
+  const body=document.getElementById('commBody');
+  const head=document.getElementById('commTableHead');
+  const lblEl=document.getElementById('commPeriodLabel');
+  if(!sel||!body) return;
+
+  if(isWeeklyPay(u)){
+    const val=sel.value;
+    if(!val) return;
+    const monday=new Date(val+'T00:00:00');
+    const start=toDateStr(monday);
+    const sunday=new Date(monday); sunday.setDate(sunday.getDate()+6);
+    const end=toDateStr(sunday);
+    const txns=(S.transactions||[]).filter(t=>{
+      const d=toPHDateStr(t.time);
+      return d>=start&&d<=end;
+    });
+    const lines=_staffCommissionLines(viewUser.name,commRate,txns);
+    const totalCommission=lines.reduce((s,l)=>s+l.commAmt,0);
+    const totalPaid=lines.reduce((s,l)=>s+l.paidAmt,0);
+
+    if(lblEl) lblEl.textContent=`Weekly Commission — ${weekLabel(monday)}`;
+    if(head) head.innerHTML='<tr><th>Date</th><th>Client</th><th>Service</th><th>Qty</th><th>Paid Amount</th><th>Commission</th></tr>';
+    if(metricsEl) metricsEl.innerHTML=`
+      <div class="metric"><div class="metric-lbl">Total Commission</div><div class="metric-val" style="color:var(--success)">${f(totalCommission)}</div><div class="metric-sub">${commRate}% rate</div></div>
+      <div class="metric"><div class="metric-lbl">Services Rendered</div><div class="metric-val">${lines.length}</div><div class="metric-sub">line items</div></div>
+      <div class="metric"><div class="metric-lbl">Sales Handled</div><div class="metric-val">${f(totalPaid)}</div><div class="metric-sub">paid amount</div></div>`;
+
+    if(!lines.length){
+      body.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--ink3);padding:16px;">No commission-earning transactions this week.</td></tr>';
+      return;
+    }
+    body.innerHTML=lines.map(l=>`
+      <tr><td>${fmtDate(l.date)}</td><td>${l.client}</td><td>${l.service}</td><td>${l.qty}</td><td>${f(l.paidAmt)}</td><td>${f(l.commAmt)}</td></tr>`).join('')
+      +`<tr style="font-weight:700;border-top:2px solid var(--border2);"><td colspan="4">Subtotal</td><td>${f(totalPaid)}</td><td>${f(totalCommission)}</td></tr>`;
+    return;
+  }
+
+  // Monthly (CO1/CO2) staff — split transactions by cut-off
+  const period=sel.value||td().slice(0,7);
+  const [yr,mo]=period.split('-').map(Number);
+  if(!yr||!mo) return;
+  const daysInMonth=new Date(yr,mo,0).getDate();
   const txns=(S.transactions||[]).filter(t=>{
     const d=toPHDate(t.time);
     return d.getFullYear()===yr&&d.getMonth()===mo-1;
   });
-  const lines=_staffCommissionLines(viewUser.name,commRate,txns);
-  const totalCommission=lines.reduce((s,l)=>s+l.commAmt,0);
+  const lines=_staffCommissionLines(viewUser.name,commRate,txns)
+    .map(l=>({...l,co:parseInt(l.date.slice(8,10))<=15?'CO1':'CO2'}));
+  const co1Commission=lines.filter(l=>l.co==='CO1').reduce((s,l)=>s+l.commAmt,0);
+  const co2Commission=lines.filter(l=>l.co==='CO2').reduce((s,l)=>s+l.commAmt,0);
+  const totalCommission=co1Commission+co2Commission;
   const totalPaid=lines.reduce((s,l)=>s+l.paidAmt,0);
-  const f=fmtPrice;
 
-  const metricsEl=document.getElementById('commMetrics');
+  if(lblEl) lblEl.textContent='';
+  if(head) head.innerHTML='<tr><th>Date</th><th>Period</th><th>Client</th><th>Service</th><th>Qty</th><th>Paid Amount</th><th>Commission</th></tr>';
   if(metricsEl) metricsEl.innerHTML=`
-    <div class="metric"><div class="metric-lbl">Total Commission</div><div class="metric-val" style="color:var(--success)">${f(totalCommission)}</div><div class="metric-sub">${commRate}% rate</div></div>
-    <div class="metric"><div class="metric-lbl">Services Rendered</div><div class="metric-val">${lines.length}</div><div class="metric-sub">line items</div></div>
-    <div class="metric"><div class="metric-lbl">Sales Handled</div><div class="metric-val">${f(totalPaid)}</div><div class="metric-sub">paid amount</div></div>`;
+    <div class="metric"><div class="metric-lbl">CO1 Commission (1–15)</div><div class="metric-val" style="color:var(--success)">${f(co1Commission)}</div><div class="metric-sub">${commRate}% rate</div></div>
+    <div class="metric"><div class="metric-lbl">CO2 Commission (16–${daysInMonth})</div><div class="metric-val" style="color:var(--success)">${f(co2Commission)}</div><div class="metric-sub">${commRate}% rate</div></div>
+    <div class="metric"><div class="metric-lbl">Total Commission</div><div class="metric-val">${f(totalCommission)}</div><div class="metric-sub">${lines.length} line items</div></div>`;
 
-  const body=document.getElementById('commBody');
-  if(!body) return;
   if(!lines.length){
-    body.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--ink3);padding:16px;">No commission-earning transactions this period.</td></tr>';
+    body.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--ink3);padding:16px;">No commission-earning transactions this period.</td></tr>';
     return;
   }
   body.innerHTML=lines.map(l=>`
-    <tr><td>${fmtDate(l.date)}</td><td>${l.client}</td><td>${l.service}</td><td>${l.qty}</td><td>${f(l.paidAmt)}</td><td>${f(l.commAmt)}</td></tr>`).join('')
-    +`<tr style="font-weight:700;border-top:2px solid var(--border2);"><td colspan="4">Subtotal</td><td>${f(totalPaid)}</td><td>${f(totalCommission)}</td></tr>`;
+    <tr><td>${fmtDate(l.date)}</td><td>${l.co}</td><td>${l.client}</td><td>${l.service}</td><td>${l.qty}</td><td>${f(l.paidAmt)}</td><td>${f(l.commAmt)}</td></tr>`).join('')
+    +`<tr style="font-weight:700;border-top:2px solid var(--border2);"><td colspan="5">Subtotal</td><td>${f(totalPaid)}</td><td>${f(totalCommission)}</td></tr>`;
 }
 
 function getPayslipUser(){
@@ -2202,8 +2315,146 @@ function getPayslipUser(){
   return currentUser;
 }
 
+function populatePayWeekSel(){
+  const sel=document.getElementById('payWeekSel');
+  if(!sel) return;
+  const prevVal=sel.value;
+  sel.innerHTML=getWeekOptions(8).map(wk=>`<option value="${toDateStr(wk)}">${weekLabel(wk)}</option>`).join('');
+  if(prevVal&&[...sel.options].some(o=>o.value===prevVal)) sel.value=prevVal;
+}
+
+// Weekly payslip for paySchedule:'weekly' staff (payDay:'Sunday') — no CO1/CO2 split,
+// no government deductions (sssVoluntary etc. are opt-in only), just basic + commission
+// for the selected Mon–Sun week.
+function renderWeeklyPayslip(userRecord,viewUser){
+  const el=document.getElementById('payslipContent');
+  if(!el) return;
+  const sel=document.getElementById('payWeekSel');
+  const val=sel?.value||toDateStr(getMonday(new Date()));
+  const monday=new Date(val+'T00:00:00');
+  const sunday=new Date(monday); sunday.setDate(sunday.getDate()+6);
+  const start=toDateStr(monday), end=toDateStr(sunday);
+  const f=fmtPrice;
+  const dailyRate=userRecord.dailyRate||0;
+  const commRate=userRecord.commRate||userRecord.commission||0;
+
+  const standardHoursW=userRecord.standardHours||9;
+  const attMap=buildAttendanceMap(
+    l=>l.userId===viewUser.id||l.user===viewUser.name||l.name===viewUser.name,
+    dt=>dt>=start&&dt<=end
+  );
+  const daysWorked=Object.values(attMap).reduce((s,{inTime,outTime})=>s+computeDayFraction(inTime,outTime,standardHoursW),0);
+  const basicPay=Math.round(dailyRate*daysWorked);
+
+  const commItems=[];
+  (S.transactions||[]).forEach(t=>{
+    const d=toPHDateStr(t.time||'');
+    if(d<start||d>end) return;
+    const ratio=_txDiscRatio(t);
+    (t.items||[]).length
+      ?(t.items||[]).forEach(ci=>{if((ci.staffName||t.staff||'')===viewUser.name)commItems.push({price:ci.price,qty:ci.qty,ratio});})
+      :(t.staff===viewUser.name&&commItems.push({price:t.total||0,qty:1,ratio:1}));
+  });
+  const commEarned=Math.round(commItems.reduce((s,ci)=>s+(ci.price||0)*(ci.qty||1)*(ci.ratio!=null?ci.ratio:1),0)*(commRate/100));
+
+  let holReg=0,holSp=0;
+  Object.keys(attMap).forEach(ds=>{
+    if(PH_HOLIDAYS.regular.includes(ds)) holReg++;
+    else if(PH_HOLIDAYS.special.includes(ds)) holSp++;
+  });
+  const holidayPay=Math.round(dailyRate*holReg)+Math.round(dailyRate*0.30*holSp);
+
+  const otPay=(S.overtimeRequests||[]).filter(o=>
+    o.userId===viewUser.id&&o.status==='approved'&&o.date>=start&&o.date<=end
+  ).reduce((s,o)=>s+(o.amount||0),0);
+
+  const grossPay=basicPay+commEarned+holidayPay+otPay;
+
+  // Non-government deductions only (cash advances, one-time pay adjustments) — this
+  // staff has sssVoluntary:false etc., so statutory contributions never apply here.
+  const uid=String(viewUser.id);
+  const caDeduct=(S.cashAdvances||[]).filter(ca=>
+    String(ca.userId)===uid&&ca.status==='approved'&&ca.approvedAt&&ca.approvedAt.slice(0,10)>=start&&ca.approvedAt.slice(0,10)<=end
+  ).reduce((s,ca)=>s+(ca.amount||0),0);
+  const payAdjRows=(S.payAdjustments||[]).filter(pa=>String(pa.userId)===uid&&pa.payPeriod===`${start}_WK`);
+  const payAdjDeduct=payAdjRows.reduce((s,pa)=>s+(pa.amount||0),0);
+  const totalDeductions=caDeduct+payAdjDeduct;
+  const netPay=grossPay-totalDeductions;
+
+  const monLbl=monday.toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'numeric'});
+  const sunLbl=sunday.toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'numeric'});
+  const clinic=S.settings?.clinicName||'GlowBar Beauty Clinic';
+  const addr=S.settings?.address||'';
+
+  el.innerHTML=`
+    <div id="printablePayslip">
+      <div style="background:#fff;border:2px solid #2C2318;border-radius:16px;overflow:hidden;max-width:680px;margin:0 auto;font-size:13px;">
+        <div style="background:linear-gradient(135deg,#2C2318,#5C4F3D);color:#fff;padding:20px 24px;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;">
+          <div>
+            <div style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;color:#B8935A;">${clinic}</div>
+            ${addr?`<div style="font-size:11px;color:rgba(255,255,255,0.6);margin-top:2px;">${addr}</div>`:''}
+            <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-top:6px;text-transform:uppercase;letter-spacing:1px;">Weekly Pay — ${monLbl} to ${sunLbl}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:13px;font-weight:700;color:#fff;">${viewUser.name}</div>
+            <div style="font-size:11px;color:rgba(255,255,255,0.6);">${cap(userRecord.role||'Staff')}</div>
+          </div>
+        </div>
+        <div style="padding:14px 20px;">
+          <div style="display:flex;gap:10px;margin-bottom:14px;">
+            <div style="flex:1;background:#F5EFE3;border-radius:10px;padding:10px;text-align:center;">
+              <div style="font-size:9px;color:#8C7B65;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Days Worked</div>
+              <div style="font-size:20px;font-weight:700;color:#2C2318;">${daysWorked}</div>
+            </div>
+            <div style="flex:1;background:#F5EFE3;border-radius:10px;padding:10px;text-align:center;">
+              <div style="font-size:9px;color:#8C7B65;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Daily Rate</div>
+              <div style="font-size:13px;font-weight:700;color:#2C2318;">${f(dailyRate)}</div>
+            </div>
+          </div>
+          <div style="font-size:10px;font-weight:700;color:#C9A84C;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">Earnings</div>
+          <div style="background:#FAFAF8;border-radius:8px;padding:10px 12px;margin-bottom:10px;">
+            ${coRow('Basic Pay ('+daysWorked+' day'+(daysWorked!==1?'s':'')+' × '+f(dailyRate)+')',f(basicPay))}
+            ${commEarned>0?coRow(`Commission (${commRate}%)`,'+'+f(commEarned)):''}
+            ${holidayPay>0?coRow('Holiday Pay','+'+f(holidayPay)):''}
+            ${otPay>0?coRow('Overtime Pay','+'+f(otPay)):''}
+            <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;padding-top:8px;margin-top:4px;border-top:1px solid #E8DFD0;color:#2C2318;">
+              <span>Gross Pay</span><span>${f(grossPay)}</span>
+            </div>
+          </div>
+          ${totalDeductions>0?`
+          <div style="font-size:10px;font-weight:700;color:#C9A84C;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">Deductions</div>
+          <div style="background:#FAFAF8;border-radius:8px;padding:10px 12px;margin-bottom:10px;">
+            ${caDeduct>0?coRow('Cash Advance Deduction','<span style="color:#C44A4A;">−'+f(caDeduct)+'</span>'):''}
+            ${payAdjRows.map(pa=>coRow('Adjustment: '+(pa.reason||'Adjustment'),'<span style="color:#C44A4A;">−'+f(pa.amount)+'</span>')).join('')}
+            <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;padding-top:8px;margin-top:4px;border-top:1px solid #E8DFD0;color:#c0392b;">
+              <span>Total Deductions</span><span>−${f(totalDeductions)}</span>
+            </div>
+          </div>`:''}
+          <div style="background:linear-gradient(135deg,#2C2318,#5C4F3D);border-radius:10px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;">
+            <span style="color:rgba(255,255,255,0.75);font-size:13px;font-weight:500;">Total Take-Home</span>
+            <span style="font-size:22px;font-weight:700;color:#C9A84C;">${f(netPay)}</span>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
 function renderPayslip(){
   console.log('[renderPayslip] START — payStaffSel.value=',document.getElementById('payStaffSel')?.value);
+  const _viewUserEarly=getPayslipUser();
+  const _userRecordEarly=S.users.find(u=>u.id===_viewUserEarly.id)||_viewUserEarly;
+  const weekly=isWeeklyPay(_userRecordEarly);
+  const monthlyWrap=document.getElementById('monthlyCutoffWrap');
+  const weekSel=document.getElementById('payWeekSel');
+  const periodSel=document.getElementById('payPeriodSel');
+  if(monthlyWrap) monthlyWrap.style.display=weekly?'none':'block';
+  if(weekSel) weekSel.style.display=weekly?'block':'none';
+  if(periodSel) periodSel.style.display=weekly?'none':'block';
+  if(weekly){
+    populatePayWeekSel();
+    renderWeeklyPayslip(_userRecordEarly,_viewUserEarly);
+    return;
+  }
   renderCutoff();
   const period=document.getElementById('payPeriodSel')?.value||td().slice(0,7);
   const [yr,mo]=period.split('-').map(Number);
@@ -2230,7 +2481,7 @@ function renderPayslip(){
   const userRecord=S.users.find(u=>u.id===viewUser.id)||viewUser;
   console.log('[renderPayslip] MONTHLY userRecord=',userRecord?.name,'id=',userRecord?.id);
   const basicPay=userRecord.basicSalary||userRecord.salary||userRecord.basicPay||0;
-  const commRate=userRecord.commission||0;
+  const commRate=userRecord.commRate||userRecord.commission||0;
   const allowances=userRecord.allowances||0;
   const otherDeductions=userRecord.otherDeductions||0;
   const sssNo=userRecord.sssNo||'—';
@@ -3312,7 +3563,7 @@ function renderAdminPayroll(){
 
   const cards=staff.map(u=>{
     const dailyRate=u.dailyRate||0;
-    const commRate=u.commission||0;
+    const commRate=u.commRate||u.commission||0;
     const allowances=u.allowances||0;
     const otherDeductions=u.otherDeductions||0;
 
