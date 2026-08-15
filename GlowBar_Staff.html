@@ -1785,7 +1785,7 @@ function renderCutoff(){
   const _isCOOwner=userRecord.role==='owner';
   const standardHoursCO=userRecord.standardHours||9;
   const _coAttMap=_isCOOwner?{}:buildAttendanceMap(
-    l=>l.userId===viewUser.id||l.user===viewUser.name||l.name===viewUser.name,
+    l=>l.userId==viewUser.id||l.user===viewUser.name||l.name===viewUser.name,
     dt=>dt>=coStartStr&&dt<=coEndStr
   );
   const presentDatesCO=new Set(Object.keys(_coAttMap));
@@ -2092,7 +2092,9 @@ function computeDayFraction(inTime,outTime,standardHours){
 // Two record shapes exist: unified {date,inTime,outTime} rows (manually added), and
 // legacy {action:'clockin'/'clockout',time} rows (from the POS clock-in button, paired
 // by date via toPHDateStr(time)). A unified record for a date always wins over a legacy
-// pair for that same date.
+// pair for that same date. For legacy rows: use the FIRST clockin and LAST clockout of
+// each date (handles duplicate clockins); if a clockin has no matching clockout, the
+// staff is still counted present for a full standard shift (outTime = inTime + 9h).
 function buildAttendanceMap(matchUserFn,dateInRangeFn){
   const map={};
   (S.loginLogs||[]).filter(l=>{const dt=l.date||'';return matchUserFn(l)&&dt&&dateInRangeFn(dt)&&!l.action;}).forEach(l=>{
@@ -2103,17 +2105,23 @@ function buildAttendanceMap(matchUserFn,dateInRangeFn){
     if(l.out||l.outTime)map[dt].outTime=new Date(l.out||l.outTime);
   });
   const unifiedDates=new Set(Object.keys(map));
-  (S.loginLogs||[]).filter(l=>{const dt=l.time?toPHDateStr(String(l.time)):'';return matchUserFn(l)&&dt&&dateInRangeFn(dt)&&(l.action==='clockin'||l.action==='in');}).forEach(l=>{
+  const legacyIn={},legacyOut={};
+  (S.loginLogs||[]).filter(l=>matchUserFn(l)&&l.time&&(l.action==='clockin'||l.action==='in')).forEach(l=>{
     const dt=toPHDateStr(String(l.time));
-    if(unifiedDates.has(dt))return;
-    if(!map[dt])map[dt]={inTime:null,outTime:null};
-    if(!map[dt].inTime)map[dt].inTime=new Date(l.time);
+    if(!dt||!dateInRangeFn(dt)||unifiedDates.has(dt))return;
+    const t=new Date(l.time);
+    if(!legacyIn[dt]||t<legacyIn[dt])legacyIn[dt]=t;
   });
-  (S.loginLogs||[]).filter(l=>{const dt=l.time?toPHDateStr(String(l.time)):'';return matchUserFn(l)&&dt&&dateInRangeFn(dt)&&(l.action==='clockout'||l.action==='out');}).forEach(l=>{
+  (S.loginLogs||[]).filter(l=>matchUserFn(l)&&l.time&&(l.action==='clockout'||l.action==='out')).forEach(l=>{
     const dt=toPHDateStr(String(l.time));
-    if(unifiedDates.has(dt))return;
-    if(!map[dt])map[dt]={inTime:null,outTime:null};
-    map[dt].outTime=new Date(l.time);
+    if(!dt||!dateInRangeFn(dt)||unifiedDates.has(dt))return;
+    const t=new Date(l.time);
+    if(!legacyOut[dt]||t>legacyOut[dt])legacyOut[dt]=t;
+  });
+  Object.keys(legacyIn).forEach(dt=>{
+    const inTime=legacyIn[dt];
+    const outTime=legacyOut[dt]||new Date(inTime.getTime()+9*3600000);
+    map[dt]={inTime,outTime};
   });
   return map;
 }
@@ -2354,7 +2362,7 @@ function renderWeeklyPayslip(userRecord,viewUser){
 
   const standardHoursW=userRecord.standardHours||9;
   const attMap=buildAttendanceMap(
-    l=>l.userId===viewUser.id||l.user===viewUser.name||l.name===viewUser.name,
+    l=>l.userId==viewUser.id||l.user===viewUser.name||l.name===viewUser.name,
     dt=>dt>=start&&dt<=end
   );
   const daysWorked=Object.values(attMap).reduce((s,{inTime,outTime})=>s+computeDayFraction(inTime,outTime,standardHoursW),0);
@@ -2558,7 +2566,7 @@ const _schedLabel=_shiftDays.join(', ')||'No days';
   const _isOwner=userRecord.role==='owner';
   const standardHoursM=userRecord.standardHours||9;
   const _moAttMap=_isOwner?{}:buildAttendanceMap(
-    l=>l.userId===viewUser.id||l.user===viewUser.name||l.name===viewUser.name,
+    l=>l.userId==viewUser.id||l.user===viewUser.name||l.name===viewUser.name,
     dt=>dt.startsWith(period)
   );
   const presentDatesM=new Set(Object.keys(_moAttMap));
@@ -2832,7 +2840,7 @@ function row(label, value, color){
 
 function countDaysPresent(period){
   const map=buildAttendanceMap(
-    l=>l.userId===currentUser.id||l.user===currentUser.name||l.name===currentUser.name,
+    l=>l.userId==currentUser.id||l.user===currentUser.name||l.name===currentUser.name,
     dt=>dt.startsWith(period)
   );
   const standardHours=(S.users.find(u=>u.id===currentUser.id)||currentUser).standardHours||9;
@@ -3637,7 +3645,7 @@ function renderAdminPayroll(){
     // Days present — legacy clockin/clockout rows AND unified {date,inTime,outTime} rows,
     // half-day-aware: sum of per-date fractions (0/0.5/1) instead of a flat day count
     const _smMap=buildAttendanceMap(
-      l=>l.userId===u.id||l.user===u.name||l.name===u.name,
+      l=>l.userId==u.id||l.user===u.name||l.name===u.name,
       dt=>dt>=coStartStr&&dt<=coEndStr
     );
     const standardHoursSum=u.standardHours||9;
