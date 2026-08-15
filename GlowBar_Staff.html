@@ -1791,7 +1791,6 @@ function renderCutoff(){
   const presentDatesCO=new Set(Object.keys(_coAttMap));
   // Half-day-aware total: sum of per-date fractions (0/0.5/1) instead of a flat day count
   const daysPresent=_isCOOwner?workingDaysInCO:Object.values(_coAttMap).reduce((s,{inTime,outTime})=>s+computeDayFraction(inTime,outTime,standardHoursCO),0);
-  console.log('[renderCutoff:daysPresent]',viewUser?.name,'role=',userRecord.role,'_isCOOwner=',_isCOOwner,'coAttMap keys=',Object.keys(_coAttMap),'daysPresent=',daysPresent,'workingDaysInCO=',workingDaysInCO);
   const _isCOOnCall=userRecord.onCall===true;
   let _ocCO={days:[],totalPay:0,totalHours:0};
   if(_isCOOnCall&&dailyRate>0){
@@ -2089,26 +2088,19 @@ function computeDayFraction(inTime,outTime,standardHours){
   const frac=Math.min(1,hours/std);
   return Math.round(frac*2)/2;
 }
-// Merges legacy clockin/clockout rows and unified {date,inTime/in,outTime/out} rows into a
-// single per-date {inTime,outTime} map for one staff member, for a given date range.
+// Builds a per-date {inTime,outTime} map for one staff member, for a given date range.
+// Only unified {date,inTime,outTime} records are used — legacy clockin/clockout rows
+// (identified by a `time` field + action, no `date` field) are ignored, since deriving
+// their date from `time` via toPHDateStr can shift them outside the intended range and
+// inflate the attendance count.
 function buildAttendanceMap(matchUserFn,dateInRangeFn){
   const map={};
-  (S.loginLogs||[]).filter(l=>{const dt=l.date||((l.in||l.inTime)?toPHDateStr(l.in||l.inTime):'');return matchUserFn(l)&&dt&&dateInRangeFn(dt)&&!l.action;}).forEach(l=>{
-    const dt=l.date||((l.in||l.inTime)?toPHDateStr(l.in||l.inTime):'');
+  (S.loginLogs||[]).filter(l=>{const dt=l.date||'';return matchUserFn(l)&&dt&&dateInRangeFn(dt)&&!l.action;}).forEach(l=>{
+    const dt=l.date;
     if(!dt)return;
     if(!map[dt])map[dt]={inTime:null,outTime:null};
     if((l.in||l.inTime)&&!map[dt].inTime)map[dt].inTime=new Date(l.in||l.inTime);
     if(l.out||l.outTime)map[dt].outTime=new Date(l.out||l.outTime);
-  });
-  (S.loginLogs||[]).filter(l=>{const dt=l.time?toPHDateStr(String(l.time)):'';return matchUserFn(l)&&dt&&dateInRangeFn(dt)&&(l.action==='clockin'||l.action==='in');}).forEach(l=>{
-    const dt=toPHDateStr(String(l.time));
-    if(!map[dt])map[dt]={inTime:null,outTime:null};
-    if(!map[dt].inTime)map[dt].inTime=new Date(l.time);
-  });
-  (S.loginLogs||[]).filter(l=>{const dt=l.time?toPHDateStr(String(l.time)):'';return matchUserFn(l)&&dt&&dateInRangeFn(dt)&&(l.action==='clockout'||l.action==='out');}).forEach(l=>{
-    const dt=toPHDateStr(String(l.time));
-    if(!map[dt])map[dt]={inTime:null,outTime:null};
-    map[dt].outTime=new Date(l.time);
   });
   return map;
 }
