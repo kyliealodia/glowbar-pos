@@ -1791,6 +1791,7 @@ function renderCutoff(){
   const presentDatesCO=new Set(Object.keys(_coAttMap));
   // Half-day-aware total: sum of per-date fractions (0/0.5/1) instead of a flat day count
   const daysPresent=_isCOOwner?workingDaysInCO:Object.values(_coAttMap).reduce((s,{inTime,outTime})=>s+computeDayFraction(inTime,outTime,standardHoursCO),0);
+  console.log('[renderCutoff:daysPresent]',viewUser?.name,'role=',userRecord.role,'_isCOOwner=',_isCOOwner,'coAttMap keys=',Object.keys(_coAttMap),'daysPresent=',daysPresent,'workingDaysInCO=',workingDaysInCO);
   const _isCOOnCall=userRecord.onCall===true;
   let _ocCO={days:[],totalPay:0,totalHours:0};
   if(_isCOOnCall&&dailyRate>0){
