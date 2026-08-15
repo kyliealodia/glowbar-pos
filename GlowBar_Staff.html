@@ -2089,10 +2089,10 @@ function computeDayFraction(inTime,outTime,standardHours){
   return Math.round(frac*2)/2;
 }
 // Builds a per-date {inTime,outTime} map for one staff member, for a given date range.
-// Only unified {date,inTime,outTime} records are used — legacy clockin/clockout rows
-// (identified by a `time` field + action, no `date` field) are ignored, since deriving
-// their date from `time` via toPHDateStr can shift them outside the intended range and
-// inflate the attendance count.
+// Two record shapes exist: unified {date,inTime,outTime} rows (manually added), and
+// legacy {action:'clockin'/'clockout',time} rows (from the POS clock-in button, paired
+// by date via toPHDateStr(time)). A unified record for a date always wins over a legacy
+// pair for that same date.
 function buildAttendanceMap(matchUserFn,dateInRangeFn){
   const map={};
   (S.loginLogs||[]).filter(l=>{const dt=l.date||'';return matchUserFn(l)&&dt&&dateInRangeFn(dt)&&!l.action;}).forEach(l=>{
@@ -2101,6 +2101,19 @@ function buildAttendanceMap(matchUserFn,dateInRangeFn){
     if(!map[dt])map[dt]={inTime:null,outTime:null};
     if((l.in||l.inTime)&&!map[dt].inTime)map[dt].inTime=new Date(l.in||l.inTime);
     if(l.out||l.outTime)map[dt].outTime=new Date(l.out||l.outTime);
+  });
+  const unifiedDates=new Set(Object.keys(map));
+  (S.loginLogs||[]).filter(l=>{const dt=l.time?toPHDateStr(String(l.time)):'';return matchUserFn(l)&&dt&&dateInRangeFn(dt)&&(l.action==='clockin'||l.action==='in');}).forEach(l=>{
+    const dt=toPHDateStr(String(l.time));
+    if(unifiedDates.has(dt))return;
+    if(!map[dt])map[dt]={inTime:null,outTime:null};
+    if(!map[dt].inTime)map[dt].inTime=new Date(l.time);
+  });
+  (S.loginLogs||[]).filter(l=>{const dt=l.time?toPHDateStr(String(l.time)):'';return matchUserFn(l)&&dt&&dateInRangeFn(dt)&&(l.action==='clockout'||l.action==='out');}).forEach(l=>{
+    const dt=toPHDateStr(String(l.time));
+    if(unifiedDates.has(dt))return;
+    if(!map[dt])map[dt]={inTime:null,outTime:null};
+    map[dt].outTime=new Date(l.time);
   });
   return map;
 }
