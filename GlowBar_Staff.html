@@ -1379,12 +1379,12 @@ function _staffCommissionLines(staffName,commRate,txns){
       t.items.forEach(ci=>{
         if((ci.staffName||t.staff||'')!==staffName) return;
         const paidAmt=Math.round((ci.price||0)*(ci.qty||1)*ratio*100)/100;
-        const commAmt=Math.round(paidAmt*(commRate/100)*100)/100;
+        const commAmt=t.commOverride!==undefined?t.commOverride:Math.round(paidAmt*(commRate/100)*100)/100;
         lines.push({date:toPHDateStr(t.time||''),client:t.client||'Walk-in',service:ci.name||'',qty:ci.qty||1,paidAmt,commAmt});
       });
     } else if(t.staff===staffName){
       const paidAmt=Math.round((t.total||0)*100)/100;
-      const commAmt=Math.round(paidAmt*(commRate/100)*100)/100;
+      const commAmt=t.commOverride!==undefined?t.commOverride:Math.round(paidAmt*(commRate/100)*100)/100;
       lines.push({date:toPHDateStr(t.time||''),client:t.client||'Walk-in',service:'(transaction)',qty:1,paidAmt,commAmt});
     }
   });
@@ -1805,15 +1805,19 @@ function renderCutoff(){
   // scaled by each transaction's discount ratio so commission reflects the
   // amount actually paid, not the pre-discount listed price.
   const _coCommItems=[];
+  let _coCommOverrideTotal=0;
   (S.transactions||[]).forEach(t=>{
     const d=toPHDateStr(t.time||'');
     if(d<coStartStr||d>coEndStr) return;
     const _tRatio=_txDiscRatio(t);
+    const _hasStaffItem=(t.items||[]).length?(t.items||[]).some(ci=>(ci.staffName||t.staff||'')===viewUser.name):t.staff===viewUser.name;
+    if(!_hasStaffItem) return;
+    if(t.commOverride!==undefined){ _coCommOverrideTotal+=t.commOverride; return; }
     (t.items||[]).length
       ?(t.items||[]).forEach(ci=>{if((ci.staffName||t.staff||'')===viewUser.name)_coCommItems.push({price:ci.price,qty:ci.qty,ratio:_tRatio});})
       :(t.staff===viewUser.name&&_coCommItems.push({price:t.total||0,qty:1,ratio:1}));
   });
-  const commEarned=Math.round(_coCommItems.reduce((s,ci)=>s+(ci.price||0)*(ci.qty||1)*(ci.ratio!=null?ci.ratio:1),0)*(commRate/100));
+  const commEarned=Math.round(_coCommItems.reduce((s,ci)=>s+(ci.price||0)*(ci.qty||1)*(ci.ratio!=null?ci.ratio:1),0)*(commRate/100))+_coCommOverrideTotal;
 
   // Holiday pay for cut-off period — same logic as monthly payslip
   let coHolidayRegularDays=0,coHolidaySpecialDays=0;
@@ -1871,14 +1875,18 @@ function renderCutoff(){
   const _moHolPay=Math.round(dailyRate*_moHolReg)+Math.round(dailyRate*0.30*_moHolSp);
   // Full-month commission
   const _moCommItems=[];
+  let _moCommOverrideTotal=0;
   (S.transactions||[]).forEach(t=>{
     const td=toPHDateStr(t.time||'');
     if(!td.startsWith(_moPeriod)) return;
+    const _hasStaffItem=(t.items||[]).length?(t.items||[]).some(ci=>(ci.staffName||t.staff||'')===viewUser.name):t.staff===viewUser.name;
+    if(!_hasStaffItem) return;
+    if(t.commOverride!==undefined){ _moCommOverrideTotal+=t.commOverride; return; }
     (t.items||[]).length
       ?(t.items||[]).forEach(ci=>{if((ci.staffName||t.staff||'')===viewUser.name)_moCommItems.push(ci);})
       :(t.staff===viewUser.name&&_moCommItems.push({price:t.subtotal||t.total||0,qty:1}));
   });
-  const _moCommEarned=Math.round(_moCommItems.reduce((s,ci)=>s+(ci.price||0)*(ci.qty||1),0)*(commRate/100));
+  const _moCommEarned=Math.round(_moCommItems.reduce((s,ci)=>s+(ci.price||0)*(ci.qty||1),0)*(commRate/100))+_moCommOverrideTotal;
   // Full-month OT
   const _moOTPay=(S.overtimeRequests||[]).filter(o=>
     o.userId===viewUser.id&&o.status==='approved'&&(o.date||'').startsWith(_moPeriod)
@@ -2347,15 +2355,19 @@ function renderWeeklyPayslip(userRecord,viewUser){
   const basicPay=Math.round(dailyRate*daysWorked);
 
   const commItems=[];
+  let commOverrideTotal=0;
   (S.transactions||[]).forEach(t=>{
     const d=toPHDateStr(t.time||'');
     if(d<start||d>end) return;
     const ratio=_txDiscRatio(t);
+    const hasStaffItem=(t.items||[]).length?(t.items||[]).some(ci=>(ci.staffName||t.staff||'')===viewUser.name):t.staff===viewUser.name;
+    if(!hasStaffItem) return;
+    if(t.commOverride!==undefined){ commOverrideTotal+=t.commOverride; return; }
     (t.items||[]).length
       ?(t.items||[]).forEach(ci=>{if((ci.staffName||t.staff||'')===viewUser.name)commItems.push({price:ci.price,qty:ci.qty,ratio});})
       :(t.staff===viewUser.name&&commItems.push({price:t.total||0,qty:1,ratio:1}));
   });
-  const commEarned=Math.round(commItems.reduce((s,ci)=>s+(ci.price||0)*(ci.qty||1)*(ci.ratio!=null?ci.ratio:1),0)*(commRate/100));
+  const commEarned=Math.round(commItems.reduce((s,ci)=>s+(ci.price||0)*(ci.qty||1)*(ci.ratio!=null?ci.ratio:1),0)*(commRate/100))+commOverrideTotal;
 
   let holReg=0,holSp=0;
   Object.keys(attMap).forEach(ds=>{
