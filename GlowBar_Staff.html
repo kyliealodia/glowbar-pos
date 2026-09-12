@@ -1210,6 +1210,11 @@ function loadFromCloud(){
           }
           if(typeof window.cAll==='function') window.cAll();
           if(typeof window.cOwner==='function') window.cOwner();
+          // Keep an already-open payslip in sync with compensation edits made
+          // elsewhere (e.g. commission rate changed in pos.html) instead of
+          // showing stale figures until the user navigates away and back.
+          const payslipPage=document.getElementById('page-payslip');
+          if(payslipPage&&payslipPage.style.display!=='none'&&typeof renderPayslip==='function') renderPayslip();
         }
       }
     });
