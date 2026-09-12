@@ -1297,7 +1297,7 @@ function computeCurrentCutoffEarnings(){
 
   const userRecord=S.users.find(u=>u.id===currentUser?.id)||currentUser||{};
   const dailyRate=userRecord.dailyRate||0;
-  const commRate=userRecord.commRate||userRecord.commission||0;
+  const commRate=userRecord.commission||0;
 
   const presentDates=new Set();
   (S.loginLogs||[]).forEach(l=>{
@@ -1765,7 +1765,7 @@ function renderCutoff(){
   console.log('[renderCutoff] viewUser=',viewUser?.name,'id=',viewUser?.id);
   const userRecord=S.users.find(u=>u.id===viewUser.id)||viewUser;
   const basicPay=userRecord.basicSalary||userRecord.salary||userRecord.basicPay||0;
-  const commRate=userRecord.commRate||userRecord.commission||0;
+  const commRate=userRecord.commission||0;
   const allowances=userRecord.allowances||0;
   const otherDeductions=userRecord.otherDeductions||0;
   const f=fmtPrice;
@@ -2274,7 +2274,7 @@ function renderMyCommissions(){
   populateCommPeriodSel();
   const viewUser=getCommissionsUser();
   const u=S.users.find(x=>x.id===viewUser.id)||viewUser;
-  const commRate=u.commRate||u.commission||0;
+  const commRate=u.commission||0;
   const f=fmtPrice;
   const sel=document.getElementById('commPeriodSel');
   const metricsEl=document.getElementById('commMetrics');
@@ -2379,7 +2379,7 @@ function renderWeeklyPayslip(userRecord,viewUser){
   const start=toDateStr(monday), end=toDateStr(sunday);
   const f=fmtPrice;
   const dailyRate=userRecord.dailyRate||0;
-  const commRate=userRecord.commRate||userRecord.commission||0;
+  const commRate=userRecord.commission||0;
 
   const standardHoursW=userRecord.standardHours||9;
   const attMap=buildAttendanceMap(
@@ -2565,7 +2565,7 @@ function renderPayslip(){
   const userRecord=S.users.find(u=>u.id===viewUser.id)||viewUser;
   console.log('[renderPayslip] MONTHLY userRecord=',userRecord?.name,'id=',userRecord?.id);
   const basicPay=userRecord.basicSalary||userRecord.salary||userRecord.basicPay||0;
-  const commRate=userRecord.commRate||userRecord.commission||0;
+  const commRate=userRecord.commission||0;
   const allowances=userRecord.allowances||0;
   const otherDeductions=userRecord.otherDeductions||0;
 
@@ -3640,7 +3640,7 @@ function renderAdminPayroll(){
 
   const cards=staff.map(u=>{
     const dailyRate=u.dailyRate||0;
-    const commRate=u.commRate||u.commission||0;
+    const commRate=u.commission||0;
     const allowances=u.allowances||0;
     const otherDeductions=u.otherDeductions||0;
 
