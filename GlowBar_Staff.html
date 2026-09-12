@@ -1716,6 +1716,22 @@ function coRow(label,value){
     <span style="color:#5C4F3D;">${label}</span><span style="font-weight:500;">${value}</span></div>`;
 }
 
+function govIdsBlock(userRecord,rowFn){
+  rowFn=rowFn||coRow;
+  const ids=[
+    ['SSS No.',userRecord.sssNumber],
+    ['TIN',userRecord.tinNumber],
+    ['PhilHealth No.',userRecord.philhealthNumber],
+    ['Pag-IBIG No.',userRecord.pagibigNumber]
+  ].filter(([,v])=>v);
+  if(!ids.length) return '';
+  return `
+    <div style="font-size:10px;font-weight:700;color:#C9A84C;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">Government IDs</div>
+    <div style="background:#FAFAF8;border-radius:8px;padding:10px 12px;margin-bottom:10px;">
+      ${ids.map(([label,val])=>rowFn(label,val)).join('')}
+    </div>`;
+}
+
 function renderCutoff(){
   const el=document.getElementById('cutoffContent');if(!el)return;
   const period=document.getElementById('payPeriodSel')?.value||td().slice(0,7);
@@ -2492,6 +2508,7 @@ function renderWeeklyPayslip(userRecord,viewUser){
               <span>Total Deductions</span><span>−${f(totalDeductions)}</span>
             </div>
           </div>`:''}
+          ${govIdsBlock(userRecord)}
           <div style="background:linear-gradient(135deg,#2C2318,#5C4F3D);border-radius:10px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;">
             <span style="color:rgba(255,255,255,0.75);font-size:13px;font-weight:500;">Total Take-Home</span>
             <span style="font-size:22px;font-weight:700;color:#C9A84C;">${f(netPay)}</span>
@@ -2546,10 +2563,6 @@ function renderPayslip(){
   const commRate=userRecord.commRate||userRecord.commission||0;
   const allowances=userRecord.allowances||0;
   const otherDeductions=userRecord.otherDeductions||0;
-  const sssNo=userRecord.sssNo||'—';
-  const philhealthNo=userRecord.philhealthNo||'—';
-  const pagibigNo=userRecord.pagibigNo||'—';
-  const tinNo=userRecord.tinNo||'—';
 
   // Daily rate from Users & Roles setting
 const dailyRate=userRecord.dailyRate||0;
@@ -2669,6 +2682,7 @@ const paidDays=daysPresent+leaveDays;
 
   const clinic=S.settings?.clinicName||'GlowBar Beauty Clinic';
   const addr=S.settings?.address||'';
+  const _govIds=govIdsBlock(userRecord,row);
 
   document.getElementById('payslipContent').innerHTML=`
     <div id="printablePayslip">
@@ -2688,7 +2702,7 @@ const paidDays=daysPresent+leaveDays;
         </div>
 
         <!-- Employee Info -->
-        <div style="background:#F5EFE3;padding:14px 24px;display:grid;grid-template-columns:1fr 1fr;gap:8px;border-bottom:1px solid #E8DFD0;">
+        <div style="background:#F5EFE3;padding:14px 24px;border-bottom:1px solid #E8DFD0;">
           <div>
             <div style="font-size:10px;color:#8C7B65;text-transform:uppercase;letter-spacing:.8px;">Employee</div>
             <div style="font-size:15px;font-weight:700;color:#2C2318;">${viewUser.name}</div>
@@ -2698,12 +2712,6 @@ const paidDays=daysPresent+leaveDays;
                 ${userRecord.empStatus==='regular'?'✅ Regular':'⏳ '+(userRecord.empStatus?cap(userRecord.empStatus):'Probationary')}
               </span>
             </div>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:11px;">
-            <div><span style="color:#8C7B65;">SSS No.</span><br><strong>${sssNo}</strong></div>
-            <div><span style="color:#8C7B65;">PhilHealth No.</span><br><strong>${philhealthNo}</strong></div>
-            <div><span style="color:#8C7B65;">Pag-IBIG No.</span><br><strong>${pagibigNo}</strong></div>
-            <div><span style="color:#8C7B65;">TIN</span><br><strong>${tinNo}</strong></div>
           </div>
         </div>
 
@@ -2804,6 +2812,8 @@ const paidDays=daysPresent+leaveDays;
           <div style="font-size:11px;"><span style="color:#8C7B65;">PhilHealth ER: </span><strong>${fmtPrice(phER)}</strong></div>
           <div style="font-size:11px;"><span style="color:#8C7B65;">Pag-IBIG ER: </span><strong>${fmtPrice(pagibigER)}</strong></div>
         </div>
+
+        ${_govIds?`<div style="padding:14px 24px 0;">${_govIds}</div>`:''}
 
         <!-- Net Pay -->
         <div style="background:#2C2318;padding:18px 24px;display:flex;justify-content:space-between;align-items:center;">

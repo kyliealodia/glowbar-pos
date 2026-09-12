@@ -2618,6 +2618,19 @@ html{height:-webkit-fill-available;}
         <div style="font-size:11px;color:var(--ink3);margin-top:4px;" id="shiftPreview"></div>
       </div>
 
+      <!-- Government IDs -->
+      <div style="background:var(--cream2);border-radius:10px;padding:12px;border:1px solid var(--border);margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:600;color:var(--ink2);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.8px;">Government IDs</div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">SSS No.</label><input class="form-input" id="auSssNo" placeholder="e.g. 34-1234567-8"></div>
+          <div class="form-group"><label class="form-label">PhilHealth No.</label><input class="form-input" id="auPhilhealthNo" placeholder="e.g. 12-345678901-2"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Pag-IBIG No.</label><input class="form-input" id="auPagibigNo" placeholder="e.g. 1234-5678-9012"></div>
+          <div class="form-group"><label class="form-label">TIN</label><input class="form-input" id="auTinNo" placeholder="e.g. 123-456-789-000"></div>
+        </div>
+      </div>
+
       <div style="background:var(--cream2);border-radius:10px;padding:12px;border:1px solid var(--border);">
         <div style="font-size:11px;font-weight:600;color:var(--ink2);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.8px;">Custom Permissions</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;" id="permCheckboxes"></div>
@@ -2748,6 +2761,14 @@ html{height:-webkit-fill-available;}
         <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;"><input type="checkbox" id="scPhilHealth" style="accent-color:var(--gold);width:15px;height:15px;"> PhilHealth — 5% of salary (employee: 2.5%)</label>
         <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;"><input type="checkbox" id="scPagibig" style="accent-color:var(--gold);width:15px;height:15px;"> Pag-IBIG — ₱100/month employee share</label>
         <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;"><input type="checkbox" id="scTax" style="accent-color:var(--gold);width:15px;height:15px;"> Withholding Tax — computed per BIR table</label>
+        <div class="form-row" style="margin-top:4px;">
+          <div class="form-group"><label class="form-label">SSS No.</label><input class="form-input" id="scSssNo" placeholder="e.g. 34-1234567-8"></div>
+          <div class="form-group"><label class="form-label">TIN</label><input class="form-input" id="scTinNo" placeholder="e.g. 123-456-789-000"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">PhilHealth No.</label><input class="form-input" id="scPhilhealthNo" placeholder="e.g. 12-345678901-2"></div>
+          <div class="form-group"><label class="form-label">Pag-IBIG No.</label><input class="form-input" id="scPagibigNo" placeholder="e.g. 1234-5678-9012"></div>
+        </div>
       </div>
       <div class="form-group"><label class="form-label">Other Deductions (₱) <span style="color:var(--ink3);font-weight:400;">e.g. cash advance, absences</span></label><input class="form-input" type="number" id="scOtherDeduct" placeholder="0" min="0"></div>
       <div class="form-group"><label class="form-label">Other Allowances (₱) <span style="color:var(--ink3);font-weight:400;">e.g. transport, meal, rice</span></label><input class="form-input" type="number" id="scAllowance" placeholder="0" min="0"></div>
@@ -8277,6 +8298,7 @@ function renderUsersGrid(){
       </div>
       ${canEdit?`<div style="display:flex;gap:6px;">
         <button class="btn btn-outline btn-sm" onclick="editUser(${u.id})">Edit</button>
+        <button class="btn btn-outline btn-sm" onclick="openStaffComp(${u.id})" title="Compensation, deductions & government IDs">Pay</button>
         ${u.id!==currentUser.id?`<button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id})" title="Delete user">✕</button>`:'<span style="width:28px;"></span>'}
       </div>`:''}
     </div>`).join('');
@@ -8296,7 +8318,7 @@ function deleteUser(id){
 function openAddUser(){
   const canEdit=currentUser?.role==='owner'||currentUser?.role==='admin'||S.users.find(u=>u.id===currentUser?.id)?.role==='owner';
   if(!canEdit){showToast('Admin access required','err');return;}
-  editUserId=null;['auName','auPin','auSpecialty'].forEach(id=>document.getElementById(id).value='');
+  editUserId=null;['auName','auPin','auSpecialty','auSssNo','auPhilhealthNo','auPagibigNo','auTinNo'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('auRole').value='staff';
   document.getElementById('auEmpStatus').value='probationary';
   document.getElementById('auStartDate').value=td();
@@ -8323,6 +8345,10 @@ function editUser(id){
   document.getElementById('auShiftStart').value=u.shiftStart||'09:00';
   document.getElementById('auShiftEnd').value=u.shiftEnd||'18:00';
   setShiftDays(u.shiftDays||['Mon','Tue','Wed','Thu','Fri','Sat']);
+  document.getElementById('auSssNo').value=u.sssNo||'';
+  document.getElementById('auPhilhealthNo').value=u.philhealthNo||'';
+  document.getElementById('auPagibigNo').value=u.pagibigNo||'';
+  document.getElementById('auTinNo').value=u.tinNo||'';
   updateEmpStatusHint();
   // Lock role if owner
   const roleSelect=document.getElementById('auRole');
@@ -8402,6 +8428,10 @@ async function saveUser(){
     specialty:document.getElementById('auSpecialty').value.trim(),
     perms,color:COLORS[Math.floor(Math.random()*COLORS.length)],
     empStatus,startDate,shiftDays,shiftStart,shiftEnd,
+    sssNo:document.getElementById('auSssNo').value.trim(),
+    philhealthNo:document.getElementById('auPhilhealthNo').value.trim(),
+    pagibigNo:document.getElementById('auPagibigNo').value.trim(),
+    tinNo:document.getElementById('auTinNo').value.trim(),
 dailyRate:parseFloat(document.getElementById('auDailyRate').value)||700
   };
   if(editUserId!==null&&editUserId!==undefined){
@@ -9890,6 +9920,10 @@ function openStaffComp(uid){
   document.getElementById('scPhilHealth').checked=u.philhealthVoluntary!==false;
   document.getElementById('scPagibig').checked=u.pagibigVoluntary!==false;
   document.getElementById('scTax').checked=u.withholdingTax!==false;
+  document.getElementById('scSssNo').value=u.sssNumber||'';
+  document.getElementById('scTinNo').value=u.tinNumber||'';
+  document.getElementById('scPhilhealthNo').value=u.philhealthNumber||'';
+  document.getElementById('scPagibigNo').value=u.pagibigNumber||'';
   document.getElementById('scOtherDeduct').value=u.otherDeductions||0;
   document.getElementById('scAllowance').value=u.allowances||0;
   document.getElementById('scPreview').style.display='none';
@@ -9948,6 +9982,10 @@ const sssVoluntary=document.getElementById('scSSS').checked;
 const philhealthVoluntary=document.getElementById('scPhilHealth').checked;
 const pagibigVoluntary=document.getElementById('scPagibig').checked;
 const withholdingTax=document.getElementById('scTax').checked;
+const sssNumber=document.getElementById('scSssNo').value.trim();
+const tinNumber=document.getElementById('scTinNo').value.trim();
+const philhealthNumber=document.getElementById('scPhilhealthNo').value.trim();
+const pagibigNumber=document.getElementById('scPagibigNo').value.trim();
 const otherDeductions=parseFloat(document.getElementById('scOtherDeduct').value)||0;
 const allowances=parseFloat(document.getElementById('scAllowance').value)||0;
 // Auto-sync dailyRate from salary
@@ -9961,7 +9999,7 @@ cats.forEach(cat=>{
   if(el&&el.value.trim()!=='') categoryCommissions[cat]=parseFloat(el.value)||0;
 });
 const i=S.users.findIndex(x=>x.id===editCompUserId);
-if(i>=0) S.users[i]={...S.users[i],salary,commission,onCall,restDays,sssVoluntary,philhealthVoluntary,pagibigVoluntary,withholdingTax,otherDeductions,allowances,dailyRate,categoryCommissions};
+if(i>=0) S.users[i]={...S.users[i],salary,commission,onCall,restDays,sssVoluntary,philhealthVoluntary,pagibigVoluntary,withholdingTax,sssNumber,tinNumber,philhealthNumber,pagibigNumber,otherDeductions,allowances,dailyRate,categoryCommissions};
 closeM('staffCompModal');sync('users');
 showToast(u.name+'\'s compensation saved','ok');
 }
