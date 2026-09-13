@@ -9776,6 +9776,7 @@ function renderCashAdvanceAdmin(){
           <div style="display:flex;gap:6px;flex-shrink:0;">
             <button style="background:var(--success);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-family:inherit;cursor:pointer;font-weight:600;" onclick="approveCashAdvance('${ca.id}')">✓ Approve</button>
             <button style="background:var(--danger);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-family:inherit;cursor:pointer;font-weight:600;" onclick="rejectCashAdvance('${ca.id}')">✕ Reject</button>
+            <button style="background:#fff;color:var(--ink3);border:1px solid var(--border2);border-radius:8px;padding:6px 10px;font-size:12px;font-family:inherit;cursor:pointer;" onclick="deleteCashAdvance('${ca.id}')" title="Delete record">🗑</button>
           </div>
         </div>
       </div>`).join('');
@@ -9817,6 +9818,7 @@ function renderCashAdvanceAdmin(){
           <div style="font-size:10px;color:var(--ink3);margin-top:2px;">${ca.requestedAt?new Date(ca.requestedAt).toLocaleDateString('en-PH'):''} ${ca.approvedBy?'· '+ca.status+' by '+ca.approvedBy:''}</div>
         </div>
         <span style="font-size:11px;font-weight:700;color:${statusColor};text-transform:uppercase;">${ca.status}</span>
+        <button style="background:#fff;color:var(--ink3);border:1px solid var(--border2);border-radius:8px;padding:5px 9px;font-size:11px;font-family:inherit;cursor:pointer;" onclick="deleteCashAdvance('${ca.id}')" title="Delete record">🗑</button>
       </div>`;
     }).join('');
   }
@@ -9828,6 +9830,14 @@ function approveCashAdvance(id){
   ca.status='approved';ca.approvedBy=currentUser.name;ca.approvedAt=new Date().toISOString();
   sync('cashAdvances');renderCashAdvanceAdmin();
   showToast('Cash advance approved for '+ca.userName,'ok');
+}
+function deleteCashAdvance(id){
+  if(!(currentUser&&(currentUser.role==='owner'||currentUser.role==='admin')))return;
+  const ca=S.cashAdvances.find(x=>x.id===id);if(!ca)return;
+  if(!confirm(`Delete ${ca.userName||'this'} cash advance of ${fmtPrice(ca.amount)} (${ca.payPeriod||'no period'})? This cannot be undone.`))return;
+  S.cashAdvances=S.cashAdvances.filter(x=>x.id!==id);
+  sync('cashAdvances');renderCashAdvanceAdmin();
+  showToast('Cash advance record deleted','ok');
 }
 function rejectCashAdvance(id){
   const ca=S.cashAdvances.find(x=>x.id===id);if(!ca)return;
