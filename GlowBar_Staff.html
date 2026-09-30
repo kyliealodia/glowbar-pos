@@ -1323,7 +1323,7 @@ function computeCurrentCutoffEarnings(){
   const baseEarned=Math.round(dailyRate*daysWorked);
 
   const commItems=[];
-  (S.transactions||[]).forEach(t=>{
+  _commTxns().forEach(t=>{
     const d=toPHDateStr(t.time||'');
     if(!d||d<coStartStr||d>effectiveEnd) return;
     (t.items||[]).length
@@ -1382,6 +1382,34 @@ function toPHDateStr(isoString){
 function _txDiscRatio(t){
   const _tSub=t.sub||0;
   return _tSub?Math.max(0,(t.total||0)/_tSub):1;
+}
+// Transactions as seen by commission math. POS refunds are stored as a separate
+// {type:'refund'} record with no items, attributed to whoever clicked Refund — so
+// each one is swapped for a negative mirror of its original sale (same staff, items
+// and discount ratio, scaled by refundAmt/total). The original sale is left untouched
+// so already-locked payslips stay valid; the clawback lands in the refund's own period.
+function _commTxns(){
+  const all=S.transactions||[];
+  const byId={};
+  all.forEach(t=>{if(t&&t.type!=='refund'&&t.id!=null)byId[String(t.id)]=t;});
+  const out=[];
+  all.forEach(t=>{
+    if(!t) return;
+    if(t.type!=='refund'){ out.push(t); return; }
+    const o=byId[String(t.originalTxId)];
+    if(!o||!(o.total||0)) return;
+    const scale=Math.min(1,(t.refundAmt||0)/o.total);
+    const m={...o,id:t.id,time:t.time,client:(o.client||'Walk-in')+' (refund)'};
+    if((o.items||[]).length){
+      m.items=o.items.map(ci=>({...ci,price:-(ci.price||0)*scale,name:'↩ Refund: '+(ci.name||'')}));
+    } else {
+      m.total=-(o.total||0)*scale;
+      m.subtotal=-(o.subtotal||o.total||0)*scale;
+    }
+    if(o.commOverride!==undefined) m.commOverride=-o.commOverride*scale;
+    out.push(m);
+  });
+  return out;
 }
 // Builds one row per commission-earning line item for a given staff member across a
 // set of transactions — shared by the Commissions tab so it doesn't grow a 4th inline
@@ -1837,7 +1865,7 @@ function renderCutoff(){
   // amount actually paid, not the pre-discount listed price.
   const _coCommItems=[];
   let _coCommOverrideTotal=0;
-  (S.transactions||[]).forEach(t=>{
+  _commTxns().forEach(t=>{
     const d=toPHDateStr(t.time||'');
     if(d<coStartStr||d>coEndStr) return;
     const _tRatio=_txDiscRatio(t);
@@ -1907,7 +1935,7 @@ function renderCutoff(){
   // Full-month commission
   const _moCommItems=[];
   let _moCommOverrideTotal=0;
-  (S.transactions||[]).forEach(t=>{
+  _commTxns().forEach(t=>{
     const td=toPHDateStr(t.time||'');
     if(!td.startsWith(_moPeriod)) return;
     const _hasStaffItem=(t.items||[]).length?(t.items||[]).some(ci=>(ci.staffName||t.staff||'')===viewUser.name):t.staff===viewUser.name;
@@ -2300,7 +2328,7 @@ function renderMyCommissions(){
     const start=toDateStr(monday);
     const sunday=new Date(monday); sunday.setDate(sunday.getDate()+6);
     const end=toDateStr(sunday);
-    const txns=(S.transactions||[]).filter(t=>{
+    const txns=_commTxns().filter(t=>{
       const d=toPHDateStr(t.time);
       return d>=start&&d<=end;
     });
@@ -2330,7 +2358,7 @@ function renderMyCommissions(){
   const [yr,mo]=period.split('-').map(Number);
   if(!yr||!mo) return;
   const daysInMonth=new Date(yr,mo,0).getDate();
-  const txns=(S.transactions||[]).filter(t=>{
+  const txns=_commTxns().filter(t=>{
     const d=toPHDate(t.time);
     return d.getFullYear()===yr&&d.getMonth()===mo-1;
   });
@@ -2407,7 +2435,7 @@ function renderWeeklyPayslip(userRecord,viewUser){
 
   const commItems=[];
   let commOverrideTotal=0;
-  (S.transactions||[]).forEach(t=>{
+  _commTxns().forEach(t=>{
     const d=toPHDateStr(t.time||'');
     if(d<start||d>end) return;
     const ratio=_txDiscRatio(t);
@@ -2630,7 +2658,7 @@ const paidDays=daysPresent+leaveDays;
   // each transaction's discount ratio so commission reflects the amount
   // actually paid, not the pre-discount listed price.
   const _mCommItems=[];
-  (S.transactions||[]).forEach(t=>{
+  _commTxns().forEach(t=>{
     const d=toPHDate(t.time);
     if(d.getFullYear()!==yr||d.getMonth()!==mo-1) return;
     const _tRatio=_txDiscRatio(t);
@@ -3723,7 +3751,7 @@ function renderAdminPayroll(){
     // transaction's discount ratio so commission reflects the amount
     // actually paid, not the pre-discount listed price.
     const _sumCommItems=[];
-    (S.transactions||[]).forEach(t=>{
+    _commTxns().forEach(t=>{
       const d=(t.time||'').slice(0,10);
       if(d<coStartStr||d>coEndStr) return;
       const _tRatio=_txDiscRatio(t);
