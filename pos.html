@@ -2737,6 +2737,7 @@ html{height:-webkit-fill-available;}
         <div class="form-group"><label class="form-label">Monthly Basic Salary (₱)</label><input class="form-input" type="number" id="scSalary" placeholder="0" min="0"></div>
         <div class="form-group"><label class="form-label">Commission Rate (%)</label><input class="form-input" type="number" id="scCommission" placeholder="0" min="0" max="100"></div>
       </div>
+      <div class="form-group"><label class="form-label">Pay Schedule</label><select class="form-input" id="scPaySchedule"><option value="">Semi-monthly (CO1 / CO2 cut-offs)</option><option value="weekly">Weekly — paid every Sunday (Mon–Sun week)</option></select></div>
       <div style="font-size:11px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px;">Schedule Type</div>
       <div style="background:var(--cream2);border-radius:10px;padding:12px 14px;">
         <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;"><input type="checkbox" id="scOnCall" style="accent-color:var(--gold);width:15px;height:15px;"> On-Call / Flexible Schedule — no absent day deductions</label>
@@ -9924,6 +9925,7 @@ function openStaffComp(uid){
   document.getElementById('scSalary').value=u.basicSalary||u.salary||0;
   document.getElementById('scCommission').value=u.commission||0;
   document.getElementById('scOnCall').checked=u.onCall===true;
+  document.getElementById('scPaySchedule').value=u.paySchedule==='weekly'?'weekly':'';
   const _restDays=u.restDays||[1];
   document.querySelectorAll('#staffCompModal .sc-wd').forEach(cb=>{cb.checked=!_restDays.includes(parseInt(cb.dataset.day));});
   document.getElementById('scSSS').checked=u.sssVoluntary!==false;
@@ -9987,6 +9989,8 @@ function saveStaffComp(){
 const salary=parseFloat(document.getElementById('scSalary').value)||0;
 const commission=parseFloat(document.getElementById('scCommission').value)||0;
 const onCall=document.getElementById('scOnCall').checked;
+const paySchedule=document.getElementById('scPaySchedule').value==='weekly'?'weekly':null;
+const payDay=paySchedule?'Sunday':null;
 const restDays=[];document.querySelectorAll('#staffCompModal .sc-wd').forEach(cb=>{if(!cb.checked)restDays.push(parseInt(cb.dataset.day));});
 const sssVoluntary=document.getElementById('scSSS').checked;
 const philhealthVoluntary=document.getElementById('scPhilHealth').checked;
@@ -10009,7 +10013,7 @@ cats.forEach(cat=>{
   if(el&&el.value.trim()!=='') categoryCommissions[cat]=parseFloat(el.value)||0;
 });
 const i=S.users.findIndex(x=>x.id===editCompUserId);
-if(i>=0) S.users[i]={...S.users[i],salary,commission,onCall,restDays,sssVoluntary,philhealthVoluntary,pagibigVoluntary,withholdingTax,sssNumber,tinNumber,philhealthNumber,pagibigNumber,otherDeductions,allowances,dailyRate,categoryCommissions};
+if(i>=0) S.users[i]={...S.users[i],salary,commission,onCall,paySchedule,payDay,restDays,sssVoluntary,philhealthVoluntary,pagibigVoluntary,withholdingTax,sssNumber,tinNumber,philhealthNumber,pagibigNumber,otherDeductions,allowances,dailyRate,categoryCommissions};
 closeM('staffCompModal');sync('users');
 showToast(u.name+'\'s compensation saved','ok');
 }
