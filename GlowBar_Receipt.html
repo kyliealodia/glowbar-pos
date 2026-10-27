@@ -145,11 +145,13 @@ function renderReceipt(r){
   const amountPaidToday = r.totalCharged - (r.remainingBalance||0);
 
   // Services rows
-  const svcRows=(r.services||[]).map(s=>`
+  const svcRows=(r.services||[]).map(s=>{
+    const gross=s.price*s.qty, d=s.discAmt||0;
+    return `
     <div class="svc-item">
-      <span class="svc-name">${s.name}${s.qty>1?' <span style="color:#8a7a6a;font-weight:400;font-size:12px;">×'+s.qty+'</span>':''}</span>
-      <span class="svc-price">${fp(s.price*s.qty)}</span>
-    </div>`).join('');
+      <span class="svc-name">${s.name}${s.qty>1?' <span style="color:#8a7a6a;font-weight:400;font-size:12px;">×'+s.qty+'</span>':''}${d>0?'<br><span style="font-size:11px;color:#c0392b;font-weight:400;">−'+fp(d)+' discount</span>':''}</span>
+      <span class="svc-price">${d>0?'<span style="text-decoration:line-through;color:#8a7a6a;font-weight:400;font-size:12px;margin-right:6px;">'+fp(gross)+'</span>'+fp(gross-d):fp(gross)}</span>
+    </div>`;}).join('');
 
   // Payment breakdown
   const payRows=[];
